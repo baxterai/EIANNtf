@@ -56,14 +56,21 @@ if(dataset == "POStagSequence"):
 elif(dataset == "NewThyroid"):
 	trainingSteps = 1000
 
-if(SANItf2_algorithmSANI.tMinMidMaxUpdateMode == "fastApproximation"):
+if(algorithm == "SANI"):
+	if(SANItf2_algorithmSANI.allowMultipleSubinputsPerSequentialInput):
+		if(SANItf2_algorithmSANI.tMinMidMaxUpdateMode == "fastApproximation"):
+			batchSize = 1000
+			displayStep = 100
+		elif(SANItf2_algorithmSANI.tMinMidMaxUpdateMode == "slowExact"):
+			batchSize = 50
+			displayStep = 10
+	else:
+		batchSize = 1000
+		displayStep = 100
+elif(algorithm == "ANN"):
 	batchSize = 1000
 	displayStep = 100
-elif(SANItf2_algorithmSANI.tMinMidMaxUpdateMode == "slowExact"):
-	batchSize = 50
-	displayStep = 10
-
-
+		
 def neuralNetworkPropagation(x):
 	if(algorithm == "SANI"):
 		pred = SANItf2_algorithmSANI.neuralNetworkPropagationSANI(x)
@@ -86,8 +93,12 @@ def executeOptimisation(x, y):
 		loss = crossEntropy(pred, y)
 		
 	if(algorithm == "SANI"):
-		trainableVariables = list(SANItf2_algorithmSANI.Wseq.values())  + list(SANItf2_algorithmSANI.Bseq.values())
-		#trainableVariables = list(W.values()) + list(B.values()) + list(Wseq.values())  + list(Bseq.values())
+		if(SANItf2_algorithmSANI.allowMultipleSubinputsPerSequentialInput):
+			trainableVariables = list(SANItf2_algorithmSANI.Wseq.values())  + list(SANItf2_algorithmSANI.Bseq.values())
+			#trainableVariables = list(W.values()) + list(B.values()) + list(Wseq.values())  + list(Bseq.values())
+		else:
+			trainableVariables = list(SANItf2_algorithmSANI.W.values())
+			#trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.B.values())
 	elif(algorithm == "ANN"):
 		trainableVariables = list(SANItf2_algorithmANN.W.values())  + list(SANItf2_algorithmANN.B.values())
 
