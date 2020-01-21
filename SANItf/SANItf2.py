@@ -32,6 +32,8 @@ import SANItf2_algorithmSANI
 import SANItf2_algorithmANN
 from SANItf2_loadDataset import loadDatasetType1, loadDatasetType2
 
+debugUseSmallDataset = False
+
 algorithm = "SANI"
 #algorithm = "ANN"
 if(algorithm == "SANI"):
@@ -41,8 +43,12 @@ elif(algorithm == "ANN"):
 	#dataset = "NewThyroid"
 
 trainMultipleFiles = False
-datasetFileNameXstart = "XtrainBatch"
-datasetFileNameYstart = "YtrainBatch"
+if(debugUseSmallDataset):
+	datasetFileNameXstart = "XtrainBatchSmall"
+	datasetFileNameYstart = "YtrainBatchSmall"
+else:
+	datasetFileNameXstart = "XtrainBatch"
+	datasetFileNameYstart = "YtrainBatch"
 datasetFileNameXend = ".dat"
 datasetFileNameYend = ".dat"
 datasetFileNameStart = "trainBatch"
@@ -58,12 +64,12 @@ elif(dataset == "NewThyroid"):
 
 if(algorithm == "SANI"):
 	if(SANItf2_algorithmSANI.allowMultipleSubinputsPerSequentialInput):
-		if(SANItf2_algorithmSANI.tMinMidMaxUpdateMode == "fastApproximation"):
-			batchSize = 1000
-			displayStep = 100
-		elif(SANItf2_algorithmSANI.tMinMidMaxUpdateMode == "slowExact"):
-			batchSize = 50
-			displayStep = 10
+		#if(SANItf2_algorithmSANI.performIndependentSubInputValidation):
+		batchSize = 1000
+		displayStep = 100
+		#else
+		#	batchSize = 50
+		#	displayStep = 10
 	else:
 		batchSize = 1000
 		displayStep = 100
@@ -94,11 +100,25 @@ def executeOptimisation(x, y):
 		
 	if(algorithm == "SANI"):
 		if(SANItf2_algorithmSANI.allowMultipleSubinputsPerSequentialInput):
-			trainableVariables = list(SANItf2_algorithmSANI.Wseq.values())  + list(SANItf2_algorithmSANI.Bseq.values())
-			#trainableVariables = list(W.values()) + list(B.values()) + list(Wseq.values())  + list(Bseq.values())
+			if(SANItf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
+				if(SANItf2_algorithmSANI.performSummationOfSubInputsWeighted):
+					trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.Wseq.values())
+					#trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.B.values()) + list(SANItf2_algorithmSANI.Wseq.values()) + list(SANItf2_algorithmSANI.Bseq.values())
+				else:
+					trainableVariables = list(SANItf2_algorithmSANI.W.values())
+					#trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.B.values())
+			else:
+				if(SANItf2_algorithmSANI.performSummationOfSubInputsWeighted):
+					trainableVariables = list(SANItf2_algorithmSANI.Wseq.values())
+					#trainableVariables = list(SANItf2_algorithmSANI.Wseq.values()) + list(SANItf2_algorithmSANI.Bseq.values())
+				else:
+					print("error: allowMultipleSubinputsPerSequentialInput && !performSummationOfSequentialInputsWeighted && !performSummationOfSubInputsWeighted")
 		else:
-			trainableVariables = list(SANItf2_algorithmSANI.W.values())
-			#trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.B.values())
+			if(SANItf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
+				trainableVariables = list(SANItf2_algorithmSANI.W.values())
+				#trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.B.values())
+			else:
+				print("error: !allowMultipleSubinputsPerSequentialInput && !performSummationOfSequentialInputsWeighted")
 	elif(algorithm == "ANN"):
 		trainableVariables = list(SANItf2_algorithmANN.W.values())  + list(SANItf2_algorithmANN.B.values())
 
@@ -129,12 +149,6 @@ elif(dataset == "NewThyroid"):
 #Model constants
 num_input_neurons = datasetNumFeatures  #train_x.shape[1]
 num_output_neurons = datasetNumClasses
-
-#print("datasetNumFeatures = " + str(datasetNumFeatures))
-#print(train_xTemp[0:5,:])
-#print(train_yTemp[0:5])
-#print(test_xTemp[0:5,:])
-#print(test_yTemp[0:5])
 
 if(algorithm == "SANI"):
 	SANItf2_algorithmSANI.defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset)

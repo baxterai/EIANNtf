@@ -23,46 +23,79 @@ import numpy as np
 from SANItf2_operations import * #generateParameterNameSeq, generateParameterName
 
 
-allowMultipleSubinputsPerSequentialInput = False
-if(allowMultipleSubinputsPerSequentialInput):
-	#[multiple subinputs per sequential input]
-	#each sequential input can detect a pattern of activation from the previous layer
+veryLargeInt = 99999999
 
-	tMinMidMaxUpdateMode = "fastApproximation"
-	#tMinMidMaxUpdateMode = "slowExact"
-	useSparseTensors = False
-	sparsityRatioSeq = 10	#10x: 0s to 1s ratio - sparsity ratio for connections to previous layer for each sequential input
+supportSkipLayers = True	#will add on average an equal number of connections to each previous layer (can be modified in future to bias number of local or distant connections)
+allowMultipleSubinputsPerSequentialInput = True
+
+if(allowMultipleSubinputsPerSequentialInput):
+	#[multiple subinputs per sequential input] #each sequential input can detect a pattern of activation from the previous layer
+
+	performIndependentSubInputValidation = True
+	
+	performSummationOfSubInputs = True	#else take sub input with max input signal*weight
+	if(performSummationOfSubInputs):
+		performSummationOfSubInputsWeighted = True	#determines if backprop is required to update weight matrix associated with inputs to a sequential input?
+		performSummationOfSubInputsNonlinear = True
+	else:
+		performSummationOfSubInputsWeighted = False
+		performSummationOfSubInputsNonlinear = False	
+	
+	performSummationOfSequentialInputs = True	#else useLastSequentialInputOnly
+	if(performSummationOfSequentialInputs):
+		performSummationOfSequentialInputsWeighted = True	#determines if backprop is required to update weight matrix associated with sequential inputs
+		performSummationOfSequentialInputsNonlinear = True
+	else:
+		performSummationOfSequentialInputsWeighted = False
+		performSummationOfSequentialInputsNonlinear = False
+			
+	numberSubinputsPerSequentialInput = 10 #sparsity
+	
 	sequentialityMode = "default"
 	#sequentialityMode = "temporalCrossoverAllowed"
 	#sequentialityMode = "contiguousInputEnforced"
-	sequentialInputCombinationMode2 = "summation"			
-	#sequentialInputCombinationMode2 = "useLastSequentialInputOnly"
-	sequentialInputCombinationMode1 = 1
-	#sequentialInputCombinationMode1 = 2
-	#sequentialInputCombinationMode1 = 3
+	
+	if(performSummationOfSequentialInputs):
+		if(performSummationOfSequentialInputsWeighted):
+			#sequentialInputCombinationModeSummation = 3
+			sequentialInputCombinationModeSummation = 4
+		else:
+			#sequentialInputCombinationModeSummation = 1
+			sequentialInputCombinationModeSummation = 2	
+	else:
+		useLastSequentialInputOnly = True	#implied variable (not used)
 else:
-	#[single subinput per sequential input]
-	#each sequential input is directly connected to a single neuron on the previous layer
+	#[single subinput per sequential input] #each sequential input is directly connected to a single neuron on the previous layer
 
+	performIndependentSubInputValidation = False	#always False (ie false by definition because there is only 1 subinput per sequential input)
+	
+	performSummationOfSequentialInputs = True
+	if(performSummationOfSequentialInputs):
+		performSummationOfSequentialInputsWeighted = True	#does backprop require to update weight matrix associated with sequential inputs?
+		performSummationOfSequentialInputsNonlinear = True
+	else:
+		performSummationOfSequentialInputsWeighted = False
+		performSummationOfSequentialInputsNonlinear = False
+			
 	sequentialityMode = "default"
 	#sequentialityMode = "temporalCrossoverAllowed"
-	#sequentialityMode = "contiguousInputEnforced"	
-
-				
-if(allowMultipleSubinputsPerSequentialInput):
-	Wseq = {}	#weights matrix
-	Bseq = {}	#biases vector
-	Cseq = {}	#biases vector
-
-	#W = {}	#weights matrix
-	#B = {}	#biases vector
-else:
-	Cseq = {}	#biases vector
+	#sequentialityMode = "contiguousInputEnforced"
 	
+
+#variable parameters (tf.variable): 
+if(allowMultipleSubinputsPerSequentialInput):
+	if(performSummationOfSubInputsWeighted):
+		Wseq = {}	#weights matrix
+		Bseq = {}	#biases vector
+if(performSummationOfSequentialInputsWeighted):
 	W = {}	#weights matrix
 	B = {}	#biases vector
 
-
+#static parameters (convert from tf.variable to tf.constant?):
+Cseq = {}	#connectivity vector
+if(supportSkipLayers):	
+	CseqLayer = {}	
+	n_h_cumulative = {}
 #Network parameters
 n_h = []
 numberOfLayers = 0
@@ -94,8 +127,7 @@ def neuralNetworkPropagationSANI(x):
 	global useSparseTensors
 	global sparsityRatioSeq
 	global sequentialityMode
-	global sequentialInputCombinationMode2
-	global sequentialInputCombinationMode1
+	global sequentialInputCombinationModeSummation
 	
 	global n_h
 	global numberOfLayers
@@ -103,16 +135,30 @@ def neuralNetworkPropagationSANI(x):
 	
 	batchSize = x.shape[0]
 
+	#note connectivity indexes are used rather than sparse weight matrices due to limitations in current tf2 sparse tensor implementation
+	
 	#definitions for reference:
-	#tMinSeq	#mutable time vector (dim: batchSize*n_h[l])
-	#tMidSeq	#mutable time vector (dim: batchSize*n_h[l])
-	#tMaxSeq	#mutable time vector (dim: batchSize*n_h[l])
 	#if(allowMultipleSubinputsPerSequentialInput):
-		#Cseq	#static connectivity matrix (bool) - defines sparsity of connection matrix W  (dim: n_h[l-1]*n_h[l])
+		#Cseq	#static connectivity matrix (int) - indexes of neurons on prior layer stored; mapped to W  (dim: numberSubinputsPerSequentialInput*n_h[l])
+		#if(supportSkipLayers):
+			#CseqLayer	#static connectivity matrix (int) - indexes of pior layer stored; mapped to W (dim: numberSubinputsPerSequentialInput*n_h[l])
+		#Wseq #weights of connections; see Cseq (dim: numberSubinputsPerSequentialInput*n_h[l])
 		#AseqSum	#combination variable
 	#else:
-		#Cseq	#static connectivity vector (int) - defines which previous layer neuron a sequential input is connected to (dim: n_h[l])	
-	#Vseq	#mutable verification vector (dim: batchSize*n_h[l] - regenerated for each sequential input index)
+		#Cseq	#static connectivity vector (int) - indexes of neurons on prior layer stored; mapped to W - defines which prior layer neuron a sequential input is connected to (dim: n_h[l])
+		#if(supportSkipLayers):
+			#CseqLayer	#static connectivity matrix (int) - indexes of pior layer stored; mapped to W - defines which prior layer a sequential input is connected to  (dim: n_h[l])
+		#Wseq #weights of connections; see Cseq (dim: n_h[l])
+	#if(performIndependentSubInputValidation):
+		#Vseq	#mutable verification vector (dim: batchSize*numberSubinputsPerSequentialInput*n_h[l] - regenerated for each sequential input index)
+		#tMinSeq	#mutable time vector (dim: batchSize*numberSubinputsPerSequentialInput*n_h[l])
+		#tMidSeq	#mutable time vector (dim: batchSize*numberSubinputsPerSequentialInput*n_h[l])
+		#tMaxSeq	#mutable time vector (dim: batchSize*numberSubinputsPerSequentialInput*n_h[l])
+	#else
+		#Vseq	#mutable verification vector (dim: batchSize*n_h[l] - regenerated for each sequential input index)
+		#tMinSeq	#mutable time vector (dim: batchSize*n_h[l])
+		#tMidSeq	#mutable time vector (dim: batchSize*n_h[l])
+		#tMaxSeq	#mutable time vector (dim: batchSize*n_h[l])
 	#Zseq	#neuron activation function input vector (dim: batchSize*n_h[l]  - regenerated for each sequential input index)
 	#Aseq	#neuron activation function output vector (dim: batchSize*n_h[l]  - regenerated for each sequential input index)
 	#tMin	#mutable time vector (dim: batchSize*n_h[l-1])
@@ -122,9 +168,6 @@ def neuralNetworkPropagationSANI(x):
 	#Z	#neuron activation function input (dim: batchSize*n_h[l])
 	#A	#neuron activation function output (dim: batchSize*n_h[l])
 	#tMidSeqSum	#combination variable
-
-	#print("x.shape") 
-	#print(x.shape)	
 	
 	AprevLayer = x
 	
@@ -132,8 +175,8 @@ def neuralNetworkPropagationSANI(x):
 		
 		#print("\tl = " + str(l))
 		
-		#declare variables:
-		#vectors:
+		#declare variables used across all sequential input of neuron
+		#primary vars;
 		if(l == 1):
 			#declare variables:
 			tMinL0Row = tf.range(0, n_h[l-1], delta=1, dtype=tf.int32)	#n_h[l-1] = datasetNumFeatures
@@ -143,196 +186,265 @@ def neuralNetworkPropagationSANI(x):
 			tMin = tf.tile(tf.reshape(tMinL0Row, [1, n_h[l-1]]), multiples)
 			tMid = tf.tile(tf.reshape(tMidL0Row, [1, n_h[l-1]]), multiples)
 			tMax = tf.tile(tf.reshape(tMaxL0Row, [1, n_h[l-1]]), multiples)
+			if(supportSkipLayers):
+				tMinLayerAll = tMin
+				tMidLayerAll = tMid
+				tMaxLayerAll = tMax
+				AprevLayerAll = AprevLayer	#x
 		else:
 			tMin = tMinNext
 			tMid = tMidNext
 			tMax = tMaxNext
+			if(supportSkipLayers):
+				tMinLayerAll = tf.concat([tMinLayerAll, tMin], 1)
+				tMidLayerAll = tf.concat([tMidLayerAll, tMid], 1)
+				tMaxLayerAll = tf.concat([tMaxLayerAll, tMax], 1)
+				AprevLayerAll = tf.concat([AprevLayerAll, AprevLayer], 1)
 			
 		#combination vars;
 		tMidSeqSum = tf.zeros([batchSize, n_h[l]], tf.int32)
 		if(allowMultipleSubinputsPerSequentialInput):
-			AseqSum = tf.zeros([batchSize, n_h[l]], tf.float32)
-			ZseqSum = tf.zeros([batchSize, n_h[l]], tf.float32)
+			if(performSummationOfSequentialInputs):
+				#these are all used for different methods of sequential input summation:
+				if(sequentialInputCombinationModeSummation == 1):
+					ZseqSum = tf.zeros([batchSize, n_h[l]], tf.float32)
+				if(sequentialInputCombinationModeSummation == 2):
+					AseqSum = tf.zeros([batchSize, n_h[l]], tf.float32)
+				if(sequentialInputCombinationModeSummation == 3):
+					ZseqWeightedSum = tf.zeros([batchSize, n_h[l]], tf.float32)
+				if(sequentialInputCombinationModeSummation == 4):
+					AseqWeightedSum = tf.zeros([batchSize, n_h[l]], tf.float32)
+				
 		else:
-			AseqWeightedSum = tf.zeros([batchSize, n_h[l]], tf.float32)
-
-		
+			AseqInputWeightedSum = tf.zeros([batchSize, n_h[l]], tf.float32)
+			
 		for s in range(numberOfSequentialInputs):
 			
 			#print("\t\ts = " + str(s))
 			
-			if(allowMultipleSubinputsPerSequentialInput):
 			
-				#print("tsLxSx1" + str(tf.timestamp(name="tsLxSx1")))
-
-				#this is where a slow down is occuring by a factor of approx 1000
-
-				#if not useSparseTensors:
-				#	Wseq[generateParameterNameSeq(l, s, "Wseq")] = tf.multiply(Wseq[generateParameterNameSeq(l, s, "Wseq")], tf.dtypes.cast(tf.dtypes.cast(Cseq[generateParameterNameSeq(l, s, "Cseq")], tf.int32), tf.float32))		#reset weights for unconnected weights to zero in case they have been updated by backprop
-
-				if(tMinMidMaxUpdateMode == "fastApproximation"):
-					#version 2 (fast: ~0.006s) (fast but inaccurate calculation of min/max; requires single connection per sequential input - ie max sparsity - for calculations to be accurate)
-					tMinSeq = tf.matmul(tMin, tf.dtypes.cast(Cseq[generateParameterNameSeq(l, s, "Cseq")], tf.int32))
-					tMidSeq = tf.matmul(tMid, tf.dtypes.cast(Cseq[generateParameterNameSeq(l, s, "Cseq")], tf.int32))
-					tMaxSeq = tf.matmul(tMax, tf.dtypes.cast(Cseq[generateParameterNameSeq(l, s, "Cseq")], tf.int32))      
-					CnumConnectionsVector = tf.math.reduce_sum(tf.dtypes.cast(Cseq[generateParameterNameSeq(l, s, "Cseq")], tf.int32), axis=0)
-					multiples = tf.constant([batchSize,1], tf.int32) 
-					CnumConnectionsMatrix = tf.tile(tf.reshape(CnumConnectionsVector, [1,n_h[l]]), multiples)
-					tMinSeq = tf.dtypes.cast(tf.divide(tMinSeq, CnumConnectionsMatrix), tf.int32)   #element wise division
-					tMidSeq = tf.dtypes.cast(tf.divide(tMidSeq, CnumConnectionsMatrix), tf.int32)  #element wise division
-					tMaxSeq = tf.dtypes.cast(tf.divide(tMaxSeq, CnumConnectionsMatrix), tf.int32)  #element wise division
-				elif(tMinMidMaxUpdateMode == "slowExact"):
-					#version 1 (slow: ~6.0s) (slower by a factor of ~x1000)
-					#              C     _n_
-					#                  o|
-					#                   |
-					# tminTiled  _o_  *
-					#	s*o|
-					#          |
-					#          |
-					#          |
-					#	
-					#multiples = tf.constant([n_h[l-1],1], tf.int32) 
-					#tMinTiled = tf.tile(tMin, multiples)
-					#tMidTiled = tf.tile(tMid, multiples)
-					#tMaxTiled = tf.tile(tMax, multiples)
-					#tMinMasked = tf.matmul(tMinTiled, tf.dtypes.cast(Cseq[generateParameterNameSeq(l, s, "Cseq")], tf.int32))
-					#tMidMasked = tf.matmul(tMidTiled, tf.dtypes.cast(Cseq[generateParameterNameSeq(l, s, "Cseq")], tf.int32))
-					#tMaxMasked = tf.matmul(tMaxTiled, tf.dtypes.cast(Cseq[generateParameterNameSeq(l, s, "Cseq")], tf.int32))
-					#tMinMasked3D = tf.reshape(tMinMasked, [n_h[l-1], batchSize, n_h[l]])
-					#tMidMasked3D = tf.reshape(tMidMasked, [n_h[l-1], batchSize, n_h[l]])
-					#tMaxMasked3D = tf.reshape(tMaxMasked, [n_h[l-1], batchSize, n_h[l]])
-					#tMinSeq = tf.math.reduce_min(tMinMasked3D, axis=0)
-					#tMidSeq = tf.math.reduce_mean(tMidMasked3D, axis=0)
-					#tMaxSeq = tf.math.reduce_max(tMaxMasked3D, axis=0)	
-
-					#version 3 (slow: ~0.6s) (slower by a factor of ~x100)
-					#
-					# tminTiled  _o_  *
-					#	n *s   |
-					#          |
-					#          |
-					#          |
-					#
-					# CTiled    _o__ 
-					#    s *n  | 
-					#          |
-					#          |
-					#          |
-					#
-					multiples = tf.constant([n_h[l],1], tf.int32) 
-					tMinTiled = tf.tile(tMin, multiples)
-					tMidTiled = tf.tile(tMid, multiples)
-					tMaxTiled = tf.tile(tMax, multiples)
-					tMinTiled3D = tf.reshape(tMinTiled, [n_h[l], batchSize, n_h[l-1]])
-					tMidTiled3D = tf.reshape(tMidTiled, [n_h[l], batchSize, n_h[l-1]])
-					tMaxTiled3D = tf.reshape(tMaxTiled, [n_h[l], batchSize, n_h[l-1]])
-					Ctransposed = tf.transpose(Cseq[generateParameterNameSeq(l, s, "Cseq")])
-					multiples = tf.constant([batchSize,1], tf.int32) 
-					CTiled = tf.tile(Ctransposed, multiples)
-					CTiled3D = tf.reshape(CTiled, [batchSize, n_h[l], n_h[l-1]])
-					CTiled3DaxesAligned = tf.transpose(CTiled3D, [1, 0, 2])
-					tMinMasked3D = tf.multiply(tMinTiled3D, tf.dtypes.cast(CTiled3DaxesAligned, tf.int32))	#check conversion
-					tMidMasked3D = tf.multiply(tMidTiled3D, tf.dtypes.cast(CTiled3DaxesAligned, tf.int32))
-					tMaxMasked3D = tf.multiply(tMaxTiled3D, tf.dtypes.cast(CTiled3DaxesAligned, tf.int32))
-					tMinSeq = tf.math.reduce_min(tMinMasked3D, axis=2)
-					tMidSeq = tf.math.reduce_mean(tMidMasked3D, axis=2)
-					tMaxSeq = tf.math.reduce_max(tMaxMasked3D, axis=2)		
-					tMinSeq = tf.reshape(tMinSeq, [n_h[l], batchSize])
-					tMidSeq = tf.reshape(tMidSeq, [n_h[l], batchSize])
-					tMaxSeq = tf.reshape(tMaxSeq, [n_h[l], batchSize])	
-					tMinSeq = tf.transpose(tMinSeq, [1, 0])
-					tMidSeq = tf.transpose(tMidSeq, [1, 0])
-					tMaxSeq = tf.transpose(tMaxSeq, [1, 0])		
-
-				#print("tsLxSx2" + str(tf.timestamp(name="tsLxSx2")))
+			#calculate tMin/Mid/Max for sequential input
+			#print("tsLxSx1" + str(tf.timestamp(name="tsLxSx1")))
+			if(supportSkipLayers):
+				CseqCrossLayer = tf.add(Cseq[generateParameterNameSeq(l, s, "Cseq")], tf.gather(n_h_cumulative['n_h_cumulative'], CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")]))
+				tMinSeq = tf.gather(tMinLayerAll, CseqCrossLayer, axis=1)
+				tMidSeq = tf.gather(tMidLayerAll, CseqCrossLayer, axis=1)
+				tMaxSeq = tf.gather(tMaxLayerAll, CseqCrossLayer, axis=1)	
 			else:
-				#tMinSeq = tMin[:,Cseq[generateParameterNameSeq(l, s, "Cseq")]]
-				#tMidSeq = tMid[:,Cseq[generateParameterNameSeq(l, s, "Cseq")]]
-				#tMaxSeq = tMax[:,Cseq[generateParameterNameSeq(l, s, "Cseq")]]
 				tMinSeq = tf.gather(tMin, Cseq[generateParameterNameSeq(l, s, "Cseq")], axis=1)
 				tMidSeq = tf.gather(tMid, Cseq[generateParameterNameSeq(l, s, "Cseq")], axis=1)
 				tMaxSeq = tf.gather(tMax, Cseq[generateParameterNameSeq(l, s, "Cseq")], axis=1)
-				
+			
+			tMinSeqTest = tMinSeq
+			tMidSeqTest = tMidSeq
+			tMaxSeqTest = tMaxSeq
+			if(allowMultipleSubinputsPerSequentialInput):
+				if not(performIndependentSubInputValidation):
+					tMinSeqReduced = tf.math.reduce_min(tMinSeq, axis=1)
+					tMidSeqReduced = tf.math.reduce_mean(tMidSeq, axis=1)
+					tMaxSeqReduced = tf.math.reduce_max(tMaxSeq, axis=1)
+					tMinSeqTest = tMinSeqReduced
+					tMidSeqTest = tMidSeqReduced
+					tMaxSeqTest = tMaxSeqReduced
 
+			#print("tsLxSx2" + str(tf.timestamp(name="tsLxSx2")))
+
+
+			#calculate validation matrix based upon sequentiality requirements
 			if(s == 0):
-				Vseq = tf.fill([batchSize, n_h[l]], True)	#all values of Vseq0_l are always set to 1 as they have no sequential dependencies		
+				if(performIndependentSubInputValidation):
+					Vseq = tf.fill([batchSize, numberSubinputsPerSequentialInput, n_h[l]], True)
+				else:
+					Vseq = tf.fill([batchSize, n_h[l]], True)	#all values of Vseq0_l are always set to 1 as they have no sequential dependencies		
 			else:
+				if(performIndependentSubInputValidation):
+					multiples = tf.constant([1, numberSubinputsPerSequentialInput, 1], tf.int32) 
+					#printShape(tMinSeqPrev, "tMinSeqPrev")
+					tMinSeqPrevTest = tf.tile(tf.reshape(tMinSeqPrev, [batchSize, 1, n_h[l]]), multiples)
+					tMidSeqPrevTest = tf.tile(tf.reshape(tMidSeqPrev, [batchSize, 1, n_h[l]]), multiples)
+					tMaxSeqPrevTest = tf.tile(tf.reshape(tMaxSeqPrev, [batchSize, 1, n_h[l]]), multiples)
+					VseqPrevTest = tf.tile(tf.reshape(VseqPrev, [batchSize, 1, n_h[l]]), multiples)
+				else:
+					tMinSeqPrevTest = tMinSeqPrev
+					tMidSeqPrevTest = tMidSeqPrev
+					tMaxSeqPrevTest = tMaxSeqPrev
+					VseqPrevTest = VseqPrev
+
 				if(sequentialityMode == "default"):
 					#the first sub input of sequential input #2 must fire after the last subinput of sequential input #1
-					Vseq = tf.math.greater(tMinSeq, tMaxSeqPrev)
+					Vseq = tf.math.greater(tMinSeqTest, tMaxSeqPrevTest)
 				elif(sequentialityMode == "temporalCrossoverAllowed"):
 					#the last sub input of sequential input #1 can fire after the first subinput of sequential input #2
-					Vseq = tf.math.greater(tMaxSeq, tMaxSeqPrev)
+					Vseq = tf.math.greater(tMaxSeqTest, tMaxSeqPrevTest)
 				elif(sequentialityMode == "contiguousInputEnforced"):
 					#the last sub input of sequential input #1 must fire immediately before the first subinput of sequentialInput #2
-					Vseq = tf.math.equal(tMinSeq, tMaxSeqPrev+1)	#TODO: verify that the +1 here gets properly broadcasted
-				Vseq = tf.math.logical_and(Vseq, VseqPrev)	#if previous sequentiality check fails, then all future sequentiality checks must fail
-				
+					Vseq = tf.math.equal(tMinSeqTest, tMaxSeqPrevTest+1)	#TODO: verify that the +1 here gets properly broadcasted
+				Vseq = tf.math.logical_and(Vseq, VseqPrevTest)	#if previous sequentiality check fails, then all future sequentiality checks must fail
+			
 			VseqInt = tf.dtypes.cast(Vseq, tf.int32)
 			VseqFloat = tf.dtypes.cast(VseqInt, tf.float32)
 			
-			tMidSeqSum = tf.math.add(tMidSeqSum, tMidSeq) 
-
-			if(allowMultipleSubinputsPerSequentialInput):
-				if(useSparseTensors):
-					Zseq = tf.add(tf.matmul(AprevLayer, tf.sparse.to_dense(Wseq[generateParameterNameSeq(l, s, "Wseq")])), Bseq[generateParameterNameSeq(l, s, "Bseq")])			
-				else:
-					Zseq = tf.add(tf.matmul(AprevLayer, Wseq[generateParameterNameSeq(l, s, "Wseq")]), Bseq[generateParameterNameSeq(l, s, "Bseq")])			
-				Zseq = tf.multiply(VseqFloat, Zseq)	
-				Aseq = tf.nn.sigmoid(Zseq)	#or relu
-					
-				AseqSum = tf.math.add(AseqSum, Aseq)
-				ZseqSum = tf.math.add(ZseqSum, Zseq)
+			#identify input of neuron sequential input
+			if(supportSkipLayers):
+				CseqCrossLayer = tf.add(Cseq[generateParameterNameSeq(l, s, "Cseq")], tf.gather(n_h_cumulative['n_h_cumulative'], CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")]))
+				AseqInput = tf.gather(AprevLayerAll, CseqCrossLayer, axis=1)	
 			else:
-				Aseq = tf.gather(AprevLayer, Cseq[generateParameterNameSeq(l, s, "Cseq")], axis=1)
+				AseqInput = tf.gather(AprevLayer, Cseq[generateParameterNameSeq(l, s, "Cseq")], axis=1)
+				
+			
+			#apply validation matrix
+			if(allowMultipleSubinputsPerSequentialInput):
+				if(performIndependentSubInputValidation):
+					AseqInput = tf.multiply(VseqFloat, AseqInput)
+				else:
+					#checkthis:
+					multiples = tf.constant([1,numberSubinputsPerSequentialInput,1], tf.int32)
+					VseqFloatTiled = tf.tile(tf.reshape(VseqFloat, [batchSize, 1, n_h[l]]), multiples)
+					AseqInput = tf.multiply(VseqFloatTiled, AseqInput)
+			else:
+				AseqInput = tf.multiply(VseqFloat, AseqInput)
+
+
+			#apply weights to input of neuron sequential input
+			if(performSummationOfSequentialInputsWeighted):
 				multiples = tf.constant([batchSize,1], tf.int32)
 				Wtiled = tf.tile(tf.reshape(W[generateParameterName(l, "W")][s], [1, n_h[l]]), multiples)
-				AseqWeighted = tf.multiply(Aseq, Wtiled)
-				AseqWeightedSum = tf.add(AseqWeightedSum, AseqWeighted)
-				
-			if(s == 0):
-				tMinSeqFirst = tMinSeq
-			#if(s == numberOfSequentialInputs-1):
-			tMinNext = tMinSeqFirst
-			tMidNext = tf.dtypes.cast(tf.math.divide(tMidSeqSum, s+1), tf.int32)	#OLD: AseqSum
-			tMaxNext = tMaxSeq
-
-			tMinSeqPrev = tMinSeq
-			tMidSeqPrev = tMidSeq
-			tMaxSeqPrev = tMaxSeq
-			VseqPrev = Vseq
-			
-			if(s == 0):
-				tMinSeqFirst = tMinSeq
 					
-		VseqLastFloat = VseqFloat
-		if(allowMultipleSubinputsPerSequentialInput):
-			AseqLast = Aseq
-			ZseqLast = Zseq
+			if(allowMultipleSubinputsPerSequentialInput):
+				if(performSummationOfSubInputsWeighted):
+					multiplesSeq = tf.constant([batchSize,1,1], tf.int32)
+					WseqTiled = tf.tile(tf.reshape(Wseq[generateParameterNameSeq(l, s, "Wseq")], [1, numberSubinputsPerSequentialInput, n_h[l]]), multiplesSeq)
+					AseqInputWeighted = tf.multiply(AseqInput, WseqTiled)
+				else:
+					AseqInputWeighted = AseqInput
+				
+				if(performSummationOfSubInputs):
+					Zseq = tf.math.reduce_sum(AseqInputWeighted, axis=1)
+				else:
+					#take sub input with max input signal*weight
+					Zseq = tf.math.reduce_max(AseqInputWeighted, axis=1)
+					ZseqIndex = tf.math.argmax(AseqInputWeighted, axis=1)
+					
+				Aseq = tf.nn.sigmoid(Zseq)	#or relu
+
+				if(performSummationOfSequentialInputs):
+					#these are all used for different methods of sequential input summation
+					if(sequentialInputCombinationModeSummation == 1):
+						ZseqSum = tf.add(ZseqSum, Zseq)
+					if(sequentialInputCombinationModeSummation == 2):
+						AseqSum = tf.math.add(AseqSum, Aseq)
+					if(sequentialInputCombinationModeSummation == 3):
+						ZseqWeighted = tf.multiply(Zseq, Wtiled)
+						ZseqWeightedSum = tf.math.add(ZseqWeightedSum, ZseqWeighted)
+					if(sequentialInputCombinationModeSummation == 4):	
+						AseqWeighted = tf.multiply(Aseq, Wtiled)
+						AseqWeightedSum = tf.math.add(AseqWeightedSum, AseqWeighted)
+			else:
+				if(performSummationOfSequentialInputs):
+					AseqInputWeighted = tf.multiply(AseqInput, Wtiled)
+					AseqInputWeightedSum = tf.add(AseqInputWeightedSum, AseqInputWeighted)
+			
+			#generate reduced versions of tMin/Mid/MaxSeq with only sequentially valid elements
+			if(performIndependentSubInputValidation):
+				if(performSummationOfSubInputs):
+					#mask tMin/Mid/MaxSeq based on sequentiality validation matrix 
+					VseqNot = tf.logical_not(Vseq)  
+					VseqNotInt = tf.dtypes.cast(VseqNot, tf.int32)
+					VseqSumAxis1 = tf.math.reduce_sum(VseqInt, axis=1)
+					VseqIntMin = tf.add(tf.multiply(VseqNotInt, veryLargeInt), 1)  	#if VseqInt[x] = 0/False, then VseqIntMin = veryLargeInt. If VseqInt[x] = 1/True, then VseqIntMin = 1
+					VseqIntMid = tf.multiply(VseqInt, 1)				#if VseqInt[x] = 0/False, then VseqIntMid = 0. If VseqInt[x] = 1/True, then VseqIntMid = 1
+					VseqIntMax = tf.multiply(VseqInt, 1)				#if VseqInt[x] = 0/False, then VseqIntMax = 0. If VseqInt[x] = 1/True, then VseqIntMax = 1
+					tMinSeqOnlyValid = tf.multiply(tMinSeq, VseqIntMin)
+					tMidSeqOnlyValid = tf.multiply(tMidSeq, VseqIntMid)
+					tMaxSeqOnlyValid = tf.multiply(tMaxSeq, VseqIntMax)
+					tMinSeqValidatedReduced = tf.math.reduce_min(tMinSeqOnlyValid, axis=1)
+					tMidSeqValidatedReduced = tf.divide(tf.math.reduce_sum(tMidSeqOnlyValid, axis=1), VseqSumAxis1)
+					tMaxSeqValidatedReduced = tf.math.reduce_max(tMaxSeqOnlyValid, axis=1)
+					tMinSeqValidatedReduced = tf.dtypes.cast(tMinSeqValidatedReduced, tf.int32)
+					tMidSeqValidatedReduced = tf.dtypes.cast(tMidSeqValidatedReduced, tf.int32)
+					tMaxSeqValidatedReduced = tf.dtypes.cast(tMaxSeqValidatedReduced, tf.int32)
+					VseqReduced = tf.reduce_any(Vseq, axis=1)
+				else:
+					#take subinput with max input signal (AseqInput)
+					tMinSeqValidatedReduced = tMinSeq[:, ZseqIndex, :]
+					tMidSeqValidatedReduced = tMidSeq[:, ZseqIndex, :]
+					tMaxSeqValidatedReduced = tMaxSeq[:, ZseqIndex, :]
+					VseqReduced = Vseq[:, ZseqIndex, :]
+					
+			#calculate tMin/Mid/MaxNext (ie the tMin/Mid/Max values to be assigned to the current layer after it has been processed):
+			if(s == 0):
+				if(performIndependentSubInputValidation):
+					tMinSeqFirst = tMinSeqValidatedReduced
+				else:
+					tMinSeqFirst = tMinSeqTest
+			if(s == numberOfSequentialInputs-1):
+				if(performIndependentSubInputValidation):
+					tMaxSeqLast = tMaxSeqValidatedReduced
+				else:
+					tMaxSeqLast = tMaxSeqTest
+			if(performIndependentSubInputValidation):
+				tMidSeqSum = tf.math.add(tMidSeqSum, tMidSeqValidatedReduced)
+			else:
+				tMidSeqSum = tf.math.add(tMidSeqSum, tMidSeqTest)
+			
+			if(s == numberOfSequentialInputs-1):
+				tMinNext = tMinSeqFirst
+				tMidNext = tf.dtypes.cast(tf.math.divide(tMidSeqSum, s+1), tf.int32)
+				tMaxNext = tMaxSeqLast			
+				
+			if(performIndependentSubInputValidation):
+				tMinSeqPrev = tMinSeqValidatedReduced
+				tMidSeqPrev = tMidSeqValidatedReduced
+				tMaxSeqPrev = tMaxSeqValidatedReduced
+				VseqPrev = VseqReduced
+			else:
+				tMinSeqPrev = tMinSeqTest
+				tMidSeqPrev = tMidSeqTest
+				tMaxSeqPrev = tMaxSeqTest
+				VseqPrev = Vseq
+			
 		
-		if(allowMultipleSubinputsPerSequentialInput):		
-			if(sequentialInputCombinationMode1 == 1):
-				if(sequentialInputCombinationMode2 == "summation"):
-					Q = AseqSum
-					Q = tf.multiply(VseqLastFloat, AseqSum)	#supress activation if last sequentialy verification (V) check fails
+		#calculate A (output) matrix of current layer		
+		if(allowMultipleSubinputsPerSequentialInput):
+			if(performSummationOfSequentialInputs):	
+				if(sequentialInputCombinationModeSummation == 1):
 					Z = ZseqSum
-				elif(sequentialInputCombinationMode2 == "useLastSequentialInputOnly"):
-					Q = AseqLast
-					Z = ZseqLast
-				#Z = tf.add(tf.matmul(Q, W[generateParameterName(l, "W")]), B[generateParameterName(l, "B")])
-				#A = tf.nn.sigmoid(Z)	#or relu
-				A = Q	
-			if(sequentialInputCombinationMode1 == 2):
-				Z = ZseqSum
-				A = tf.nn.sigmoid(Z)
-			elif(sequentialInputCombinationMode1 == 3):
-				Z = AseqSum
-				A = tf.nn.sigmoid(Z)
+					if(performSummationOfSequentialInputsNonlinear):
+						A = tf.nn.sigmoid(Z)	#no weights are applied
+					else:
+						A = Z
+				elif(sequentialInputCombinationModeSummation == 2):
+					Z = AseqSum
+					if(performSummationOfSequentialInputsNonlinear):
+						A = tf.nn.sigmoid(Z)	#no weights are applied
+					else:
+						A = Z
+				elif(sequentialInputCombinationModeSummation == 3):
+					Z = ZseqWeightedSum
+					if(performSummationOfSequentialInputsNonlinear):
+						A = tf.nn.sigmoid(Z)
+					else:
+						A = Z
+				elif(sequentialInputCombinationModeSummation == 4):
+					Z = AseqWeightedSum
+					if(performSummationOfSequentialInputsNonlinear):
+						A = tf.nn.sigmoid(Z)
+					else:
+						A = Z
+			else:
+				ZseqLast = Zseq
+				AseqLast = Aseq
+				#VseqLastFloat = VseqFloat
+				Z = ZseqLast
+				A = AseqLast
 		else:
-			#Z = tf.add(tf.matmul(AseqAll, W[generateParameterName(l, "W")]), B[generateParameterName(l, "B")])
-			Z = AseqWeightedSum
-			A = tf.nn.sigmoid(Z)
+			if(performSummationOfSequentialInputsNonlinear):
+				#Z = tf.add(tf.matmul(AseqAll, W[generateParameterName(l, "W")]), B[generateParameterName(l, "B")])
+				Z = AseqInputWeightedSum
+				if(performSummationOfSequentialInputsNonlinear):
+					A = tf.nn.sigmoid(Z)
+				else:
+					A = Z
 		
 		AprevLayer = A
 		
@@ -347,45 +459,64 @@ def defineNeuralNetworkParametersSANI():
 	global useSparseTensors
 	global sparsityRatioSeq
 	global sequentialityMode
-	global sequentialInputCombinationMode2
-	global sequentialInputCombinationMode1
+	global sequentialInputCombinationModeSummation
+	
+	global n_h_cumulative
 	
 	global n_h
 	global numberOfLayers
 	global numberOfSequentialInputs
 	
+	if(supportSkipLayers):
+		n_h_cumulativeNP = np.zeros((numberOfLayers+1))
+		n_h_cumulativeNP[0] = n_h[0]
+		
 	for l in range(1, numberOfLayers+1):
 		for s in range(numberOfSequentialInputs):
-			if(allowMultipleSubinputsPerSequentialInput):	
-				#matrices:
-				CseqNP = np.random.randint(-sparsityRatioSeq, 1+1, (n_h[l-1], n_h[l]))	#note +1 is required because np.random.randint generates int between min and max-1
-				CseqNP = np.maximum(CseqNP, 0)
-				CseqNP = np.array(CseqNP, dtype=int)
-				CseqNPmask = (CseqNP != 0)
-				WseqNP = np.random.rand(n_h[l-1], n_h[l])
-				WseqNPsparseValues = WseqNP[CseqNPmask]
-				WseqNPsparseIndices = np.asarray(np.where(CseqNPmask))
-				WseqNPsparseIndices = np.transpose(WseqNPsparseIndices)
-				WseqSparseValues = tf.convert_to_tensor(WseqNPsparseValues, dtype=tf.float32)
-
-				WseqNPsparse = np.multiply(WseqNP, CseqNPmask)
-
-				#sparse tensors:
-				if(useSparseTensors):		
-					Wseq[generateParameterNameSeq(l, s, "Wseq")] = tf.SparseTensor(indices=WseqNPsparseIndices, values=WseqSparseValues, dense_shape=[n_h[l-1], n_h[l]])	#, dtype=tf.int32
+			if(allowMultipleSubinputsPerSequentialInput):
+				if(supportSkipLayers):
+					#neuronIndex = np.random.randint(0, n_h_cumulativeNP[l-1]+1, n_h[l])
+					CseqNP = np.zeros((numberSubinputsPerSequentialInput, n_h[l]))
+					CseqLayerNP = np.random.randint(0, l, (numberSubinputsPerSequentialInput, n_h[l]))	#this can be modified to make local/distant connections more probable
+					for i in range(numberSubinputsPerSequentialInput):
+						for j in range(n_h[l]):
+							l2 = CseqLayerNP[i, j]
+							CseqNP[i,j] = np.random.randint(0, n_h[l2], 1)
+					Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNP, dtype=tf.int32)
+					CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")] = tf.Variable(CseqLayerNP, dtype=tf.int32)
 				else:
-					Wseq[generateParameterNameSeq(l, s, "Wseq")] = tf.Variable(WseqNPsparse, dtype=tf.float32)		#tf.SparseTensor(indices=WseqNPsparseIndices, values=WseqSparseValues, dense_shape=[n_h[l-1], n_h[l]])
-				Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNPmask, dtype=tf.bool)	#ORIG: tf.convert_to_tensor(CseqNPmask, dtype=tf.bool)
-				Bseq[generateParameterNameSeq(l, s, "Bseq")] = tf.Variable(tf.zeros(n_h[l]), dtype=tf.float32)
-			else:
-				CseqNP = np.random.randint(0, n_h[l-1]+1, n_h[l])	#note +1 is required because np.random.randint generates int between min and max-1
-				Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNP, dtype=tf.int32)	#ORIG: tf.convert_to_tensor(CseqNPmask, dtype=tf.bool)
-		
-		if not(allowMultipleSubinputsPerSequentialInput):	
-			W[generateParameterName(l, "W")] = tf.Variable(randomNormal([numberOfSequentialInputs, n_h[l]], dtype=tf.float32))	#randomNormal	#note the architecture of this weight matrix is different than a normal weight matrix. Every set of numberOfSequentialInputs (e.g. 3) represents a unique set of sequential neuron inputs (artificial neurons), and are mapped to an independent neuron (real neuron)
-			#B[generateParameterName(l, "B")] = tf.Variable(tf.zeros(n_h[l]), tf.float32)
-		#else:	
-			#W[generateParameterName(l, "W")] = tf.Variable(randomNormal([numberOfSequentialInputs, n_h[l]], dtype=tf.float32))	#randomNormal	#note the architecture of this weight matrix is different than a normal weight matrix. Every set of numberOfSequentialInputs (e.g. 3) represents a unique set of sequential neuron inputs (artificial neurons), and are mapped to an independent neuron (real neuron)
-			#B[generateParameterName(l, "B")] = tf.Variable(tf.zeros(n_h[l]), tf.float32)
-				
+					CseqNP = np.random.randint(0, n_h[l-1]+1, (numberSubinputsPerSequentialInput, n_h[l]))	#note +1 is required because np.random.randint generates int between min and max-1
+					Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNP, dtype=tf.int32)
 
+				if(performSummationOfSubInputsWeighted):
+					WseqNP = np.random.rand(numberSubinputsPerSequentialInput, n_h[l])
+					Wseq[generateParameterNameSeq(l, s, "Wseq")] = tf.Variable(WseqNP, dtype=tf.float32)
+					Bseq[generateParameterNameSeq(l, s, "Bseq")] = tf.Variable(tf.zeros(n_h[l]), dtype=tf.float32)
+			else:
+				if(supportSkipLayers):
+					#neuronIndex = np.random.randint(0, n_h_cumulativeNP[l-1]+1, n_h[l])
+					CseqNP = np.zeros((n_h[l]))
+					CseqLayerNP = np.random.randint(0, l, n_h[l])	#this can be modified to make local/distant connections more probable
+					for index, l2 in enumerate(CseqLayerNP):
+						CseqNP[index] = np.random.randint(0, n_h[l2], 1)
+					Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNP, dtype=tf.int32)
+					CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")] = tf.Variable(CseqLayerNP, dtype=tf.int32)
+				else:
+					CseqNP = np.random.randint(0, n_h[l-1]+1, n_h[l])	#note +1 is required because np.random.randint generates int between min and max-1
+					Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNP, dtype=tf.int32)
+
+		if(performSummationOfSequentialInputsWeighted):	
+			W[generateParameterName(l, "W")] = tf.Variable(randomNormal([numberOfSequentialInputs, n_h[l]], dtype=tf.float32))	#randomNormal	#note the architecture of this weight matrix is different than a normal weight matrix. Every set of numberOfSequentialInputs (e.g. 3) represents a unique set of sequential neuron inputs (artificial neurons), and are mapped to an independent neuron (real neuron)
+			if(allowMultipleSubinputsPerSequentialInput):
+				B[generateParameterName(l, "B")] = tf.Variable(tf.zeros(n_h[l]), tf.float32)
+				
+		if(supportSkipLayers):
+			n_h_cumulativeNP[l] = n_h_cumulativeNP[l-1] +  n_h[l]
+			  
+	if(supportSkipLayers):
+		n_h_cumulative['n_h_cumulative'] = tf.Variable(n_h_cumulativeNP, dtype=tf.int32)
+
+def printShape(tensor, tensorName):
+	print("tensorName.shape = ")
+	print(tensor.shape)
+	
