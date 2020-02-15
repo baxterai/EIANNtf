@@ -26,23 +26,37 @@ import tensorflow as tf
 import numpy as np
 
 import sys
-np.set_printoptions(threshold=sys.maxsize)
-
-import SANItf2_algorithmSANI
-import SANItf2_algorithmANN
-from SANItf2_loadDataset import loadDatasetType1, loadDatasetType2
-
-debugUseSmallDataset = False
+#np.set_printoptions(threshold=sys.maxsize)
 
 algorithm = "SANI"
 #algorithm = "ANN"
 if(algorithm == "SANI"):
-	dataset = "POStagSequence"
+	algorithmSANI = "sharedModules"
+	#algorithmSANI = "repeatedModules"
+	if(algorithmSANI == "repeatedModules"):
+		import SANItf2_algorithmSANIrepeatedModules as SANItf2_algorithmSANI
+	elif(algorithmSANI == "sharedModules"):
+		import SANItf2_algorithmSANIsharedModules as SANItf2_algorithmSANI
 elif(algorithm == "ANN"):
-	dataset = "POStagSequence"
-	#dataset = "NewThyroid"
+	import SANItf2_algorithmANN
 
+import SANItf2_loadDataset
+
+debugUseSmallDataset = True
 trainMultipleFiles = False
+
+
+if(algorithm == "SANI"):
+	if(algorithmSANI == "repeatedModules"):
+		dataset = "POStagSequence"
+	elif(algorithmSANI == "sharedModules"):
+		dataset = "POStagSentence"
+		numberOfFeaturesPerWord = -1
+		paddingTagIndex = -1
+elif(algorithm == "ANN"):
+	#dataset = "POStagSequence"
+	dataset = "NewThyroid"
+
 if(debugUseSmallDataset):
 	datasetFileNameXstart = "XtrainBatchSmall"
 	datasetFileNameYstart = "YtrainBatchSmall"
@@ -55,27 +69,7 @@ datasetFileNameStart = "trainBatch"
 datasetFileNameEnd = ".dat"
 
 
-#Training parameters
-learningRate = 0.001
-if(dataset == "POStagSequence"):
-	trainingSteps = 10000
-elif(dataset == "NewThyroid"):
-	trainingSteps = 1000
-
-if(algorithm == "SANI"):
-	if(SANItf2_algorithmSANI.allowMultipleSubinputsPerSequentialInput):
-		#if(SANItf2_algorithmSANI.performIndependentSubInputValidation):
-		batchSize = 1000
-		displayStep = 100
-		#else
-		#	batchSize = 50
-		#	displayStep = 10
-	else:
-		batchSize = 1000
-		displayStep = 100
-elif(algorithm == "ANN"):
-	batchSize = 1000
-	displayStep = 100
+	
 		
 def neuralNetworkPropagation(x):
 	if(algorithm == "SANI"):
@@ -85,9 +79,14 @@ def neuralNetworkPropagation(x):
 	return pred
 	
 def crossEntropy(y_pred, y_true):
-	y_true = tf.one_hot(y_true, depth=datasetNumClasses)
-	y_pred = tf.clip_by_value(y_pred, 1e-9, 1.)
-	return tf.reduce_mean(-tf.reduce_sum(y_true * tf.math.log(y_pred)))
+	if((algorithm == "SANI") and (algorithmSANI == "sharedModules")):
+		cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=tf.squeeze(y_pred), labels=tf.cast(y_true, tf.float32)))
+		return cost
+	else:
+		y_true = tf.one_hot(y_true, depth=datasetNumClasses)
+		y_pred = tf.clip_by_value(y_pred, 1e-9, 1.)
+		cost = tf.reduce_mean(-tf.reduce_sum(y_true * tf.math.log(y_pred)))
+		return cost
 
 def calculateAccuracy(y_pred, y_true):
 	correct_prediction = tf.equal(tf.argmax(y_pred, 1), tf.cast(y_true, tf.int64))
@@ -99,26 +98,40 @@ def executeOptimisation(x, y):
 		loss = crossEntropy(pred, y)
 		
 	if(algorithm == "SANI"):
-		if(SANItf2_algorithmSANI.allowMultipleSubinputsPerSequentialInput):
-			if(SANItf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
-				if(SANItf2_algorithmSANI.performSummationOfSubInputsWeighted):
-					trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.Wseq.values())
-					#trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.B.values()) + list(SANItf2_algorithmSANI.Wseq.values()) + list(SANItf2_algorithmSANI.Bseq.values())
+		if(algorithmSANI == "sharedModules"):
+			if(SANItf2_algorithmSANI.useSparseTensors):
+				if(SANItf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
+					trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.Wseq.values())	#+ list(SANItf2_algorithmSANI.B.values()) 
 				else:
+					trainableVariables = list(SANItf2_algorithmSANI.Wseq.values())
+			else:
+				if(SANItf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
+					trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.Wseq.values()) + list(SANItf2_algorithmSANI.Bseq.values())	#+ list(SANItf2_algorithmSANI.B.values()) 
+				else:
+					trainableVariables = list(SANItf2_algorithmSANI.Wseq.values()) + list(SANItf2_algorithmSANI.Bseq.values())
+					#trainableVariables = list(SANItf2_algorithmSANI.Wseq.values())
+					
+		elif(algorithmSANI == "repeatedModules"):
+			if(SANItf2_algorithmSANI.allowMultipleSubinputsPerSequentialInput):
+				if(SANItf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
+					if(SANItf2_algorithmSANI.performSummationOfSubInputsWeighted):
+						trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.Wseq.values())
+						#trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.B.values()) + list(SANItf2_algorithmSANI.Wseq.values()) + list(SANItf2_algorithmSANI.Bseq.values())
+					else:
+						trainableVariables = list(SANItf2_algorithmSANI.W.values())
+						#trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.B.values())
+				else:
+					if(SANItf2_algorithmSANI.performSummationOfSubInputsWeighted):
+						trainableVariables = list(SANItf2_algorithmSANI.Wseq.values())
+						#trainableVariables = list(SANItf2_algorithmSANI.Wseq.values()) + list(SANItf2_algorithmSANI.Bseq.values())
+					else:
+						print("error: allowMultipleSubinputsPerSequentialInput && !performSummationOfSequentialInputsWeighted && !performSummationOfSubInputsWeighted")
+			else:
+				if(SANItf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
 					trainableVariables = list(SANItf2_algorithmSANI.W.values())
 					#trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.B.values())
-			else:
-				if(SANItf2_algorithmSANI.performSummationOfSubInputsWeighted):
-					trainableVariables = list(SANItf2_algorithmSANI.Wseq.values())
-					#trainableVariables = list(SANItf2_algorithmSANI.Wseq.values()) + list(SANItf2_algorithmSANI.Bseq.values())
 				else:
-					print("error: allowMultipleSubinputsPerSequentialInput && !performSummationOfSequentialInputsWeighted && !performSummationOfSubInputsWeighted")
-		else:
-			if(SANItf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
-				trainableVariables = list(SANItf2_algorithmSANI.W.values())
-				#trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.B.values())
-			else:
-				print("error: !allowMultipleSubinputsPerSequentialInput && !performSummationOfSequentialInputsWeighted")
+					print("error: !allowMultipleSubinputsPerSequentialInput && !performSummationOfSequentialInputsWeighted")
 	elif(algorithm == "ANN"):
 		trainableVariables = list(SANItf2_algorithmANN.W.values())  + list(SANItf2_algorithmANN.B.values())
 
@@ -142,19 +155,27 @@ datasetType1FileNameY = datasetFileNameYstart + fileIndexStr + datasetFileNameYe
 datasetType2FileName = datasetFileNameStart + fileIndexStr + datasetFileNameEnd
 
 if(dataset == "POStagSequence"):
-	datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
+	datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = SANItf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
+elif(dataset == "POStagSentence"):
+	numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = SANItf2_loadDataset.loadDatasetType3(datasetType1FileNameX)
 elif(dataset == "NewThyroid"):
-	datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = loadDatasetType2(datasetType2FileName)
+	datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = SANItf2_loadDataset.loadDatasetType2(datasetType2FileName)
+
+
 
 #Model constants
 num_input_neurons = datasetNumFeatures  #train_x.shape[1]
 num_output_neurons = datasetNumClasses
 
 if(algorithm == "SANI"):
-	SANItf2_algorithmSANI.defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset)
+	if(dataset == "POStagSentence"):
+		SANItf2_algorithmSANI.defineTrainingParametersSANIsharedModules(numberOfFeaturesPerWord, paddingTagIndex)
+	learningRate, trainingSteps, batchSize, displayStep = SANItf2_algorithmSANI.defineTrainingParametersSANI(dataset, trainMultipleFiles)
+	SANItf2_algorithmSANI.defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles)
 	SANItf2_algorithmSANI.defineNeuralNetworkParametersSANI()
 elif(algorithm == "ANN"):
-	SANItf2_algorithmANN.defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset)
+	learningRate, trainingSteps, batchSize, displayStep = SANItf2_algorithmANN.defineTrainingParametersANN(dataset, trainMultipleFiles)
+	SANItf2_algorithmANN.defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles)
 	SANItf2_algorithmANN.defineNeuralNetworkParametersANN()
 		
 		
@@ -194,9 +215,11 @@ for e in range(numEpochs):
 		datasetType2FileName = datasetFileNameStart + fileIndexStr + datasetFileNameEnd
 		
 		if(dataset == "POStagSequence"):
-			datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
+			datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = SANItf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
+		if(dataset == "POStagSentence"):
+			numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = SANItf2_loadDataset.loadDatasetType3(datasetType1FileNameX)
 		elif(dataset == "NewThyroid"):
-			datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = loadDatasetType2(datasetType2FileName)
+			datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = SANItf2_loadDataset.loadDatasetType2(datasetType2FileName)
 
 		shuffleSize = datasetNumExamples	#10*batchSize
 		trainData = tf.data.Dataset.from_tensor_slices((train_x, train_y))
