@@ -26,7 +26,7 @@ import tensorflow as tf
 import numpy as np
 
 import sys
-#np.set_printoptions(threshold=sys.maxsize)
+np.set_printoptions(threshold=sys.maxsize)
 
 algorithm = "SANI"
 #algorithm = "ANN"
@@ -42,7 +42,7 @@ elif(algorithm == "ANN"):
 
 import SANItf2_loadDataset
 
-debugUseSmallDataset = True
+debugUseSmallDataset = False
 trainMultipleFiles = False
 
 
@@ -53,6 +53,13 @@ if(algorithm == "SANI"):
 		dataset = "POStagSentence"
 		numberOfFeaturesPerWord = -1
 		paddingTagIndex = -1
+		if(SANItf2_algorithmSANI.allowMultipleContributingSubinputsPerSequentialInput):
+			generatePOSunambiguousInput = False
+			onlyAddPOSunambiguousInputToTrain = False
+		else:
+			#if generatePOSunambiguousInput=False and onlyAddPOSunambiguousInputToTrain=False, requires simultaneous propagation of different (ambiguous) POS possibilities
+			generatePOSunambiguousInput = False
+			onlyAddPOSunambiguousInputToTrain = True	#if True, do not train network with ambiguous POS possibilities
 elif(algorithm == "ANN"):
 	#dataset = "POStagSequence"
 	dataset = "NewThyroid"
@@ -100,10 +107,16 @@ def executeOptimisation(x, y):
 	if(algorithm == "SANI"):
 		if(algorithmSANI == "sharedModules"):
 			if(SANItf2_algorithmSANI.useSparseTensors):
-				if(SANItf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
-					trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.Wseq.values())	#+ list(SANItf2_algorithmSANI.B.values()) 
+				if(SANItf2_algorithmSANI.performSummationOfSubInputsWeighted):
+					if(SANItf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
+						trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.Wseq.values())	#+ list(SANItf2_algorithmSANI.B.values()) 
+					else:
+						trainableVariables = list(SANItf2_algorithmSANI.Wseq.values())
 				else:
-					trainableVariables = list(SANItf2_algorithmSANI.Wseq.values())
+					if(SANItf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
+						trainableVariables = list(SANItf2_algorithmSANI.W.values()) #+ list(SANItf2_algorithmSANI.B.values())
+					else:
+						trainableVariables = list()	
 			else:
 				if(SANItf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
 					trainableVariables = list(SANItf2_algorithmSANI.W.values()) + list(SANItf2_algorithmSANI.Wseq.values()) + list(SANItf2_algorithmSANI.Bseq.values())	#+ list(SANItf2_algorithmSANI.B.values()) 
@@ -157,7 +170,7 @@ datasetType2FileName = datasetFileNameStart + fileIndexStr + datasetFileNameEnd
 if(dataset == "POStagSequence"):
 	datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = SANItf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
 elif(dataset == "POStagSentence"):
-	numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = SANItf2_loadDataset.loadDatasetType3(datasetType1FileNameX)
+	numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = SANItf2_loadDataset.loadDatasetType3(datasetType1FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain)
 elif(dataset == "NewThyroid"):
 	datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = SANItf2_loadDataset.loadDatasetType2(datasetType2FileName)
 
@@ -217,7 +230,7 @@ for e in range(numEpochs):
 		if(dataset == "POStagSequence"):
 			datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = SANItf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
 		if(dataset == "POStagSentence"):
-			numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = SANItf2_loadDataset.loadDatasetType3(datasetType1FileNameX)
+			numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = SANItf2_loadDataset.loadDatasetType3(datasetType1FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain)
 		elif(dataset == "NewThyroid"):
 			datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = SANItf2_loadDataset.loadDatasetType2(datasetType2FileName)
 

@@ -117,6 +117,9 @@ import tensorflow as tf
 import numpy as np
 from numpy import genfromtxt
 
+GIA_PREPROCESSOR_POS_TYPE_ARRAY_NUMBER_OF_TYPES = 52
+GIA_PREPROCESSOR_POS_TAGGER_DATABASE_POS_NUMBER_OF_TYPES = GIA_PREPROCESSOR_POS_TYPE_ARRAY_NUMBER_OF_TYPES+1	#includes GIA_PREPROCESSOR_POS_TAGGER_DATABASE_POS_INDEX_OUT_OF_SENTENCE_BOUNDS
+GIA_PREPROCESSOR_POS_TYPE_ARRAY_NUMBER_OF_TYPES_EXTENDED = 64
 
 percentageDatasetTrain = 80.0	#ie 80% train, 20% test
 
@@ -124,7 +127,11 @@ datasetType1alreadyNormalised = True	#if True, assume that the dataset includes 
 datasetType2alreadyNormalised = False	#if True, assume that the dataset includes values between 0 and 1 only
 
 numberOfFeaturesPerWord = 53	#last feature identifies word as out of sentence padding (out of sentence padding is not expected by loadDatasetType3 as each row only contains data of a specific sentence length; out of sentence padding will be applied by SANItf2_loadDataset after data is read)
-paddingTagIndex = 0	#out of sentence features will be padded with zeros
+optimiseFeedLength = True
+if(optimiseFeedLength):
+	paddingTagIndex = 9	#out of sentence features will be padded with this character
+else:
+	paddingTagIndex = 0
 
 #"""**Please select both data files from local harddrive: XtrainBatchSmall.dat and YtrainBatchSmall.dat:**"""
 #
@@ -309,7 +316,7 @@ def loadDatasetType2(datasetFileName):
 	return datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y
 	
 
-def loadDatasetType3(datasetFileNameX):
+def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain):
 	
 	#parameters;
 	padExamples = True
@@ -317,18 +324,126 @@ def loadDatasetType3(datasetFileNameX):
 	if(cropExamples):
 		maximumSentenceLength = 50
 		maximumNumFeatures = maximumSentenceLength*numberOfFeaturesPerWord
-	generateNegativeExamples = True
+		minSentenceLengthInWords = 3
+	generateNegativeExamples = False	#for backprop training
 	generateYvalues = True
 	if(generateYvalues):
 		yClassPositive = 1 
 		yClassNegative = 0
-	
+		
 	#all_X = genfromtxt(datasetFileNameX, delimiter=' ')
 	paddingCharacter = str(paddingTagIndex)[0]
 	all_X = iter_loadtxt(datasetFileNameX, delimiter=' ', normaliseRowLengthWithPad=True, normaliseRowLengthWithPadLimit=True, padCharacter=paddingCharacter, maxRowLength=maximumNumFeatures)
 	
+	if(onlyAddPOSunambiguousInputToTrain):
+		
+		datasetNumExamples = all_X.shape[0]
+		datasetNumFeatures = all_X.shape[1]
+		all_Xunambiguous = np.empty((0, datasetNumFeatures), float)
+		
+		xPOStagActive = 1
+		xPOStagInactive = 0
+		eIndex = 0
+		for e in range(datasetNumExamples):
+		
+			#print("eIndex = " + str(eIndex))
+			
+			POSambiguityInfoPermutation = []
+			currentWordPOSfound = False
+			currentWordIndex = 0
+			currentFeatureIndex = 0
+			POSambiguousWordFoundInSentence = False
+			outOfSentenceFound = False
+			sentenceLength = -1
+			for f in range(datasetNumFeatures):
+				if(all_X[e][f] == xPOStagActive):
+					if(currentWordPOSfound):
+						#POS ambiguous word found
+						POSambiguousWordFoundInSentence = True			
+					else:
+						currentWordPOSfound = True
+			
+				if(all_X[e][f] == paddingTagIndex):
+					sentenceLength = currentWordIndex
+					outOfSentenceFound = True
+					break
+					
+				if(currentFeatureIndex == numberOfFeaturesPerWord-1):
+					currentFeatureIndex = 0
+					currentWordIndex = currentWordIndex + 1
+					currentWordPOSfound = False
+				else:
+					currentFeatureIndex = currentFeatureIndex+1
+					
+			if(not POSambiguousWordFoundInSentence):
+				if(sentenceLength >= minSentenceLengthInWords):
+					Xexample = np.expand_dims(all_X[e], axis=0)
+					all_Xunambiguous = np.append(all_Xunambiguous, Xexample, axis=0)
+				
+			eIndex = eIndex + 1
+			
+		all_X = all_Xunambiguous
+							
+	elif(generatePOSunambiguousInput):
+	
+		#Incomplete
+		
+		datasetNumExamples = all_X.shape[0]
+		datasetNumFeatures = all_X.shape[1]
+		all_Xunambiguous = np.empty((0, datasetNumFeatures), float)
+		
+		xPOStagActive = 1
+		xPOStagInactive = 0
+		eIndex = 0
+		for e in range(datasetNumExamples):
+		
+			print("eIndex = " + str(eIndex))
+			
+			POSambiguityInfoPermutation = []
+			currentWordPOS = [False]*GIA_PREPROCESSOR_POS_TYPE_ARRAY_NUMBER_OF_TYPES_EXTENDED
+			currentWordIndex = 0
+			currentFeatureIndex = 0
+			for f in range(datasetNumFeatures):
+				if(all_X[e][f] == xPOStagActive):
+					currentWordPOS[currentFeatureIndex] = True
+				if(currentFeatureIndex == numberOfFeaturesPerWord-1):
+					currentFeatureIndex = 0
+					currentWordIndex = currentWordIndex + 1
+					POSambiguityInfoPermutation.append(currentWordPOS)
+					currentWordPOS = [False]*GIA_PREPROCESSOR_POS_TYPE_ARRAY_NUMBER_OF_TYPES_EXTENDED	#TODO: verify that this doesn't overwrite previous appended currentWordPOS object
+								
+			POSambiguityInfoUnambiguousPermutationArray = []
+			POSambiguityInfoUnambiguousPermutationNew = [[False]*GIA_PREPROCESSOR_POS_TYPE_ARRAY_NUMBER_OF_TYPES_EXTENDED]*len(POSambiguityInfoPermutation)
+			POSambiguityInfoUnambiguousPermutationArray.append(POSambiguityInfoUnambiguousPermutationNew)
+			generatePOSambiguityInfoUnambiguousPermutationArray(POSambiguityInfoUnambiguousPermutationArray, POSambiguityInfoPermutation, POSambiguityInfoUnambiguousPermutationNew, 0)
+			
+			POSambiguityInfoUnambiguousPermutationIndex = 0
+			for POSambiguityInfoUnambiguousPermutation in POSambiguityInfoUnambiguousPermutationArray:
+				print("POSambiguityInfoUnambiguousPermutationIndex = " + str(POSambiguityInfoUnambiguousPermutationIndex))
+				XexamplePOSunambigousVersion = np.zeros((1, datasetNumFeatures), dtype=float)
+				XexamplePOSunambigousVersionIndex = 0
+				for word in POSambiguityInfoUnambiguousPermutation:
+					for POSvalue in word:
+						if(POSvalue == True):
+							XexamplePOSunambigousVersion[0][XexamplePOSunambigousVersionIndex] = xPOStagActive
+						else:
+							XexamplePOSunambigousVersion[0][XexamplePOSunambigousVersionIndex] = xPOStagInactive
+						XexamplePOSunambigousVersionIndex = XexamplePOSunambigousVersionIndex + 1
+						
+				np.append(all_Xunambiguous, XexamplePOSunambigousVersion, axis=0)
+				
+				print(all_Xunambiguous.shape)
+				print(XexamplePOSunambigousVersion.shape)
+
+				POSambiguityInfoUnambiguousPermutationIndex = POSambiguityInfoUnambiguousPermutationIndex + 1
+			
+			eIndex = eIndex + 1
+			
+		all_X = all_Xunambiguous
+				
 
 	datasetNumExamples = all_X.shape[0]
+	
 	print("datasetNumExamples = ", datasetNumExamples)
 	if(generateNegativeExamples):
 		datasetNumClasses = 2
@@ -336,28 +451,38 @@ def loadDatasetType3(datasetFileNameX):
 		datasetNumClasses = 1
 	datasetNumFeatures = all_X.shape[1]
 	
-	
-	all_Xnegative = np.empty(all_X.shape) #all_X
-	all_positive = np.empty([all_X.shape[0], all_X.shape[1]+1])
-	all_negative = np.empty([all_X.shape[0], all_X.shape[1]+1])
-	#NO: generate a negative (non-grammatical) example by randomly shuffling POS values in array?
-	#np.random.shuffle(all_Xnegative)
-	#generate a negative (non-grammatical) example by randomly shuffling words in array.
-	for e in range(datasetNumExamples):
-		#print("e = ", e)
-		exampleX = all_X[e]
-		exampleXnumWords = int(int(len(exampleX)) / numberOfFeaturesPerWord)
-		exampleXnp = np.asarray(exampleX)
-		exampleXReshaped = np.reshape(exampleXnp, (exampleXnumWords, numberOfFeaturesPerWord))
-		exampleXReshapedShuffled = exampleXReshaped
-		np.random.shuffle(exampleXReshapedShuffled)
-		all_Xnegative[e] = np.ndarray.flatten(exampleXReshapedShuffled)
-		
-		if(generateYvalues):
-			all_positive[e] = np.concatenate(([yClassPositive], all_X[e]), axis=0)
-			all_negative[e] = np.concatenate(([yClassNegative], all_Xnegative[e]), axis=0)
-
 	if(generateNegativeExamples):
+	
+		all_Xnegative = np.empty(all_X.shape) #all_X
+		all_positive = np.empty([all_X.shape[0], all_X.shape[1]+1])
+		all_negative = np.empty([all_X.shape[0], all_X.shape[1]+1])
+		#NO: generate a negative (non-grammatical) example by randomly shuffling POS values in array?
+		#np.random.shuffle(all_Xnegative)
+		#generate a negative (non-grammatical) example by randomly shuffling words in array.
+		for e in range(datasetNumExamples):
+			#print("e = ", e)
+			exampleX = all_X[e]
+			if(optimiseFeedLength):
+				exampleXmaxFeatureLength = np.argmax(exampleX==paddingTagIndex)
+			else:
+				exampleXmaxFeatureLength = len(exampleX)
+			#print("exampleXmaxFeatureLength = ", exampleXmaxFeatureLength)
+			#print("len(exampleX) = ", len(exampleX))
+			exampleXnumWords = int(exampleXmaxFeatureLength/numberOfFeaturesPerWord)
+			exampleXnp = np.asarray(exampleX[0:exampleXmaxFeatureLength])
+			exampleXReshaped = np.reshape(exampleXnp, (exampleXnumWords, numberOfFeaturesPerWord))
+			exampleXReshapedShuffled = exampleXReshaped
+			np.random.shuffle(exampleXReshapedShuffled)
+			exampleXReshapedShuffledFlattened = np.ndarray.flatten(exampleXReshapedShuffled)
+			if(optimiseFeedLength):
+				exampleXReshapedShuffledFlattened = np.pad(exampleXReshapedShuffledFlattened, (0, len(exampleX)-exampleXmaxFeatureLength), 'constant', constant_values=(paddingTagIndex, paddingTagIndex))	#pad
+			all_Xnegative[e] = exampleXReshapedShuffledFlattened
+
+			if(generateYvalues):
+				all_positive[e] = np.concatenate(([yClassPositive], all_X[e]), axis=0)
+				all_negative[e] = np.concatenate(([yClassNegative], all_Xnegative[e]), axis=0)
+
+	
 		all_ = np.concatenate((all_positive, all_negative), axis=0)
 		
 		#randomise data
@@ -369,6 +494,7 @@ def loadDatasetType3(datasetFileNameX):
 		datasetNumExamples = datasetNumExamples*2	#positive and negative examples
 	else:
 		all_Y = np.ones(datasetNumExamples)
+		#all_Y = np.expand_dims(all_Y, axis=0)
 
 	datasetNumExamplesTrain = int(float(datasetNumExamples)*percentageDatasetTrain/100.0)
 	datasetNumExamplesTest = int(float(datasetNumExamples)*(100.0-percentageDatasetTrain)/100.0)
@@ -398,4 +524,35 @@ def loadDatasetType3(datasetFileNameX):
 
 	return numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y
 
+
+def generatePOSambiguityInfoUnambiguousPermutationArray(POSambiguityInfoUnambiguousPermutationArray, POSambiguityInfoPermutation, POSambiguityInfoUnambiguousPermutationLocal, wordIndex):
+
+	if(wordIndex < len(POSambiguityInfoPermutation)):
+
+		POSambiguityInfo = POSambiguityInfoPermutation[wordIndex]
+		#maxValForPOSambiguousEntry = int64_t(1U) << GIA_PREPROCESSOR_POS_TYPE_ARRAY_NUMBER_OF_TYPES;
+		#cout << "maxValForPOSambiguousEntry = " << maxValForPOSambiguousEntry << endl;
+		#cout << "POSambiguityInfo = " << POSambiguityInfo << endl;
+				
+		if((max(POSambiguityInfo) > 0) and (max(POSambiguityInfo[GIA_PREPROCESSOR_POS_TYPE_ARRAY_NUMBER_OF_TYPES:]) == 0)):
+			if(POSambiguityInfoUnambiguousPermutationLocal in POSambiguityInfoUnambiguousPermutationArray):
+				#remove POSambiguityInfoUnambiguousPermutationLocal from POSambiguityInfoUnambiguousPermutationArray as it will be replicated
+				POSambiguityInfoUnambiguousPermutationArray.remove(POSambiguityInfoUnambiguousPermutationLocal)
+			else:
+ 				print("generatePOSambiguityInfoUnambiguousPermutationArray error{}: POSambiguityInfoUnambiguousPermutationLocal not found in POSambiguityInfoUnambiguousPermutationArray")
+ 				exit
+			
+			for x in range(GIA_PREPROCESSOR_POS_TYPE_ARRAY_NUMBER_OF_TYPES):
+				if(SHAREDPOSambiguityInfo[x]):
+					print("x = " + x)
+					POSambiguityInfoUnambiguousPermutationNew = POSambiguityInfoUnambiguousPermutationLocal.copy()
+					POSambiguityInfoUnambiguousPermutationArray.append(POSambiguityInfoUnambiguousPermutationNew)
+					POSambiguityInfoUnambiguousPermutationNew[wordIndex][x] = True	#create a new unambigious hypothetical POS value
+					generatePOSambiguityInfoUnambiguousPermutationArray(POSambiguityInfoUnambiguousPermutationArray, POSambiguityInfoPermutation, POSambiguityInfoUnambiguousPermutationNew, wordIndex+1)
+			
+			del POSambiguityInfoUnambiguousPermutationLocal
+		else:
+			#special POS type (e.g. punctuation; GIA_PREPROCESSOR_POS_TAGGER_DATABASE_POS_INDEX_OUT_OF_SENTENCE_BOUNDS)
+			POSambiguityInfoUnambiguousPermutationLocal[wordIndex] = POSambiguityInfo
+			generatePOSambiguityInfoUnambiguousPermutationArray(POSambiguityInfoUnambiguousPermutationArray, POSambiguityInfoPermutation, POSambiguityInfoUnambiguousPermutationLocal, wordIndex+1)
 
