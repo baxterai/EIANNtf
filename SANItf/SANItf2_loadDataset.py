@@ -316,7 +316,7 @@ def loadDatasetType2(datasetFileName):
 	return datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y
 	
 
-def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain):
+def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain, getDataAsBinary):
 	
 	#parameters;
 	padExamples = True
@@ -328,12 +328,21 @@ def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSun
 	generateNegativeExamples = False	#for backprop training
 	generateYvalues = True
 	if(generateYvalues):
-		yClassPositive = 1 
-		yClassNegative = 0
+		if(getDataAsBinary):
+			yClassPositive = True
+			yClassNegative = False	
+		else:
+			yClassPositive = 1 
+			yClassNegative = 0
 		
 	#all_X = genfromtxt(datasetFileNameX, delimiter=' ')
 	paddingCharacter = str(paddingTagIndex)[0]
-	all_X = iter_loadtxt(datasetFileNameX, delimiter=' ', normaliseRowLengthWithPad=True, normaliseRowLengthWithPadLimit=True, padCharacter=paddingCharacter, maxRowLength=maximumNumFeatures)
+	if(getDataAsBinary):
+		dataType = bool
+	else:
+		dataType = float
+		
+	all_X = iter_loadtxt(datasetFileNameX, delimiter=' ', normaliseRowLengthWithPad=True, normaliseRowLengthWithPadLimit=True, padCharacter=paddingCharacter, maxRowLength=maximumNumFeatures, dtype=dataType)
 	
 	if(onlyAddPOSunambiguousInputToTrain):
 		
@@ -341,8 +350,12 @@ def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSun
 		datasetNumFeatures = all_X.shape[1]
 		all_Xunambiguous = np.empty((0, datasetNumFeatures), float)
 		
-		xPOStagActive = 1
-		xPOStagInactive = 0
+		if(getDataAsBinary):
+			xPOStagActive = True
+			xPOStagInactive = False	
+		else:
+			xPOStagActive = 1
+			xPOStagInactive = 0
 		eIndex = 0
 		for e in range(datasetNumExamples):
 		
@@ -390,7 +403,7 @@ def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSun
 		
 		datasetNumExamples = all_X.shape[0]
 		datasetNumFeatures = all_X.shape[1]
-		all_Xunambiguous = np.empty((0, datasetNumFeatures), float)
+		all_Xunambiguous = np.empty((0, datasetNumFeatures), dataType)
 		
 		xPOStagActive = 1
 		xPOStagInactive = 0
@@ -420,7 +433,7 @@ def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSun
 			POSambiguityInfoUnambiguousPermutationIndex = 0
 			for POSambiguityInfoUnambiguousPermutation in POSambiguityInfoUnambiguousPermutationArray:
 				print("POSambiguityInfoUnambiguousPermutationIndex = " + str(POSambiguityInfoUnambiguousPermutationIndex))
-				XexamplePOSunambigousVersion = np.zeros((1, datasetNumFeatures), dtype=float)
+				XexamplePOSunambigousVersion = np.zeros((1, datasetNumFeatures), dtype=dataType)
 				XexamplePOSunambigousVersionIndex = 0
 				for word in POSambiguityInfoUnambiguousPermutation:
 					for POSvalue in word:
@@ -493,7 +506,7 @@ def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSun
 		
 		datasetNumExamples = datasetNumExamples*2	#positive and negative examples
 	else:
-		all_Y = np.ones(datasetNumExamples)
+		all_Y = np.ones(datasetNumExamples, dtype=dataType)
 		#all_Y = np.expand_dims(all_Y, axis=0)
 
 	datasetNumExamplesTrain = int(float(datasetNumExamples)*percentageDatasetTrain/100.0)
@@ -515,12 +528,13 @@ def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSun
 	test_x = all_Xnormalised[-datasetNumExamplesTest:, :]
 	train_y = all_Ynormalised[0:datasetNumExamplesTrain]
 	test_y = all_Ynormalised[-datasetNumExamplesTest:]
-			
-	# Convert x/y data to float32/uint8.
-	train_x, test_x = np.array(train_x, np.float32), np.array(test_x, np.float32)
-	train_y, test_y = np.array(train_y, np.uint8), np.array(test_y, np.uint8) 
-	#https://www.tensorflow.org/api_docs/python/tf/keras/datasets/mnist/load_data?version=stable
-	#https://medium.com/@HojjatA/could-not-find-valid-device-for-node-while-eagerly-executing-8f2ff588d1e
+	
+	if(not getDataAsBinary):	
+		# Convert x/y data to float32/uint8.
+		train_x, test_x = np.array(train_x, np.float32), np.array(test_x, np.float32)
+		train_y, test_y = np.array(train_y, np.uint8), np.array(test_y, np.uint8)
+		#https://www.tensorflow.org/api_docs/python/tf/keras/datasets/mnist/load_data?version=stable
+		#https://medium.com/@HojjatA/could-not-find-valid-device-for-node-while-eagerly-executing-8f2ff588d1e
 
 	return numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y
 

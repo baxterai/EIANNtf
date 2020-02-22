@@ -31,7 +31,7 @@ from SANItf2_operations import * #generateParameterNameSeq, generateParameterNam
 numberOfFeaturesPerWord = -1
 paddingTagIndex = -1
 
-sequentialInputActivationThreshold = 0.1	#CHECKTHIS
+sequentialInputActivationThreshold = 0.1	#CHECKTHIS (requires optimisation)
 
 
 allowMultipleSubinputsPerSequentialInput = False
@@ -278,8 +278,9 @@ def neuralNetworkPropagationSANI(x):
 	#Tseq	#mutable time vector (dim: batchSize*n_h[l] - regenerated for each sequential input index)				#records the time at which a particular sequential input last fired
 	#Zseq	#neuron activation function output vector (dim: batchSize*n_h[l]  - regenerated for each sequential input index)	#records the current output value of sequential inputs
 	#Aseq	#neuron activation function output vector (dim: batchSize*n_h[l]  - regenerated for each sequential input index)	#records the current output value of sequential inputs
-	#if((resetSequentialInputsIfOnlyFirstInputValid) and (s == 0)):
-		#ZseqTadjusted	#neuron activation function output vector T adjusted (dim: batchSize*n_h[l]  - regenerated for each sequential input index)	#records the current output value of sequential inputs*time
+	#if(allowMultipleContributingSubinputsPerSequentialInput):
+		#if((resetSequentialInputsIfOnlyFirstInputValid) and (s == 0)):
+			#ZseqTadjusted	#neuron activation function output vector T adjusted (dim: batchSize*n_h[l]  - regenerated for each sequential input index)	#records the current output value of sequential inputs*time
 	
 	#Q  
 	#Z	#neuron activation function input (dim: batchSize*n_h[l])
@@ -329,8 +330,9 @@ def neuralNetworkPropagationSANI(x):
 			Tseq[generateParameterNameSeq(l, s, "Tseq")] = tf.Variable(tf.zeros([batchSize, n_h[l]], dtype=tf.int32))
 			Zseq[generateParameterNameSeq(l, s, "Zseq")] = tf.Variable(tf.zeros([batchSize, n_h[l]]), dtype=tf.float32)
 			Aseq[generateParameterNameSeq(l, s, "Aseq")] = tf.Variable(tf.zeros([batchSize, n_h[l]]), dtype=tf.float32)
-			if((resetSequentialInputsIfOnlyFirstInputValid) and (s == 0)):
-				ZseqTadjusted[generateParameterNameSeq(l, s, "ZseqTadjusted")] = tf.Variable(tf.zeros([batchSize, n_h[l]]), dtype=tf.float32)
+			if(allowMultipleContributingSubinputsPerSequentialInput):
+				if((resetSequentialInputsIfOnlyFirstInputValid) and (s == 0)):
+					ZseqTadjusted[generateParameterNameSeq(l, s, "ZseqTadjusted")] = tf.Variable(tf.zeros([batchSize, n_h[l]]), dtype=tf.float32)
 
 	#for w in range(maxNumberOfWordsInSentenceBatch):
 	#for w in range(0, 1):
@@ -560,7 +562,7 @@ def neuralNetworkPropagationSANI(x):
 				TseqUpdated = tf.add(TseqUpdated, TseqPassThresoldUpdatedValues)
 				
 				#calculate updated validation matrix
-				VseqUpdated = tf.math.logical_and(Vseq[generateParameterNameSeq(l, s, "Vseq")], ZseqPassThresold)
+				VseqUpdated = tf.math.logical_or(Vseq[generateParameterNameSeq(l, s, "Vseq")], ZseqPassThresold)
 				
 				#reset appropriate neurons
 				if((resetSequentialInputsIfOnlyFirstInputValid) and (s == 0)):

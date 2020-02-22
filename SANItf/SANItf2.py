@@ -26,25 +26,33 @@ import tensorflow as tf
 import numpy as np
 
 import sys
-np.set_printoptions(threshold=sys.maxsize)
+#np.set_printoptions(threshold=sys.maxsize)
 
 algorithm = "SANI"
 #algorithm = "ANN"
 if(algorithm == "SANI"):
-	algorithmSANI = "sharedModules"
+	algorithmSANI = "sharedModulesBinary"
+	#algorithmSANI = "sharedModules"
 	#algorithmSANI = "repeatedModules"
 	if(algorithmSANI == "repeatedModules"):
 		import SANItf2_algorithmSANIrepeatedModules as SANItf2_algorithmSANI
 	elif(algorithmSANI == "sharedModules"):
 		import SANItf2_algorithmSANIsharedModules as SANItf2_algorithmSANI
+	elif(algorithmSANI == "sharedModulesBinary"):
+		import SANItf2_algorithmSANIsharedModulesBinary as SANItf2_algorithmSANI
 elif(algorithm == "ANN"):
 	import SANItf2_algorithmANN
 
 import SANItf2_loadDataset
 
-debugUseSmallDataset = False
+debugUseSmallDataset = True	#False
 trainMultipleFiles = False
 
+
+#loadDatasetType3 parameters:
+#if generatePOSunambiguousInput=True, generate POS unambiguous permutations for every POS ambiguous data example/experience
+#if onlyAddPOSunambiguousInputToTrain=True, do not train network with ambiguous POS possibilities
+#if generatePOSunambiguousInput=False and onlyAddPOSunambiguousInputToTrain=False, requires simultaneous propagation of different (ambiguous) POS possibilities
 
 if(algorithm == "SANI"):
 	if(algorithmSANI == "repeatedModules"):
@@ -57,9 +65,16 @@ if(algorithm == "SANI"):
 			generatePOSunambiguousInput = False
 			onlyAddPOSunambiguousInputToTrain = False
 		else:
-			#if generatePOSunambiguousInput=False and onlyAddPOSunambiguousInputToTrain=False, requires simultaneous propagation of different (ambiguous) POS possibilities
 			generatePOSunambiguousInput = False
-			onlyAddPOSunambiguousInputToTrain = True	#if True, do not train network with ambiguous POS possibilities
+			onlyAddPOSunambiguousInputToTrain = True
+		getDataAsBinary = False
+	elif(algorithmSANI == "sharedModulesBinary"):
+		dataset = "POStagSentence"
+		numberOfFeaturesPerWord = -1
+		paddingTagIndex = -1	
+		generatePOSunambiguousInput = False
+		onlyAddPOSunambiguousInputToTrain = False	#True
+		getDataAsBinary = False	#boolean type does not allow padding	
 elif(algorithm == "ANN"):
 	#dataset = "POStagSequence"
 	dataset = "NewThyroid"
@@ -170,7 +185,7 @@ datasetType2FileName = datasetFileNameStart + fileIndexStr + datasetFileNameEnd
 if(dataset == "POStagSequence"):
 	datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = SANItf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
 elif(dataset == "POStagSentence"):
-	numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = SANItf2_loadDataset.loadDatasetType3(datasetType1FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain)
+	numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = SANItf2_loadDataset.loadDatasetType3(datasetType1FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain, getDataAsBinary)
 elif(dataset == "NewThyroid"):
 	datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = SANItf2_loadDataset.loadDatasetType2(datasetType2FileName)
 
@@ -230,7 +245,7 @@ for e in range(numEpochs):
 		if(dataset == "POStagSequence"):
 			datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = SANItf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
 		if(dataset == "POStagSentence"):
-			numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = SANItf2_loadDataset.loadDatasetType3(datasetType1FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain)
+			numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = SANItf2_loadDataset.loadDatasetType3(datasetType1FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain, getDataAsBinary)
 		elif(dataset == "NewThyroid"):
 			datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = SANItf2_loadDataset.loadDatasetType2(datasetType2FileName)
 
@@ -239,14 +254,22 @@ for e in range(numEpochs):
 		trainData = trainData.repeat().shuffle(shuffleSize).batch(batchSize).prefetch(1)	#do not repeat
 
 		for batchIndex, (batchX, batchY) in enumerate(trainData.take(trainingSteps), 1):
-			
-			executeOptimisation(batchX, batchY)
 
-			if batchIndex % displayStep == 0:
+			if(algorithm == "ANN"):
+				executeOptimisation(batchX, batchY)
+
+				if batchIndex % displayStep == 0:
+					pred = neuralNetworkPropagation(batchX)
+					loss = crossEntropy(pred, batchY)
+					acc = calculateAccuracy(pred, batchY)
+					print("batchIndex: %i, loss: %f, accuracy: %f" % (batchIndex, loss, acc))
+			else:
+				#learning algorithm not yet implemented:
 				pred = neuralNetworkPropagation(batchX)
-				loss = crossEntropy(pred, batchY)
-				acc = calculateAccuracy(pred, batchY)
-				print("batchIndex: %i, loss: %f, accuracy: %f" % (batchIndex, loss, acc))
 
-		pred = neuralNetworkPropagation(test_x)
-		print("Test Accuracy: %f" % calculateAccuracy(pred, test_y))
+		if(algorithm == "ANN"):
+			pred = neuralNetworkPropagation(test_x)
+			print("Test Accuracy: %f" % calculateAccuracy(pred, test_y))
+		else:
+			#learning algorithm not yet implemented:
+			pythonDummy = 1
