@@ -21,7 +21,7 @@ Define fully connected artificial neural network (ANN)
 import tensorflow as tf
 import numpy as np
 from SANItf2_operations import *	#generateParameterNameSeq, generateParameterName, defineNetworkParameters
-
+import SANItf2_globalDefs
 
 W = {}
 B = {}

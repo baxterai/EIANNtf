@@ -7,7 +7,7 @@ Python 3 and Tensorflow 2.1+
 # License:
 MIT License
 
-# Execution:
+# Usage:
 see SANItf2.py
 
 # Description:
@@ -27,6 +27,7 @@ Can parse (by default expects to parse) full sentences; ie features for each wor
 import tensorflow as tf
 import numpy as np
 from SANItf2_operations import * #generateParameterNameSeq, generateParameterName
+import SANItf2_globalDefs
 
 numberOfFeaturesPerWord = -1
 paddingTagIndex = -1
@@ -205,7 +206,9 @@ def defineTrainingParametersSANI(dataset, trainMultipleFiles):
 
 	return learningRate, trainingSteps, batchSize, displayStep
 	
-def defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles):
+def defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, useSmallSentenceLengths):
+
+	#useSmallSentenceLengths not implemented
 
 	global n_h
 	global numberOfLayers
@@ -400,7 +403,12 @@ def neuralNetworkPropagationSANI(x):
 				#identify (hypothetical) activation of neuron sequential input
 				if(useSparseTensors):
 					if(supportSkipLayers):
-						CseqCrossLayer = tf.add(Cseq[generateParameterNameSeq(l, s, "Cseq")], tf.gather(n_h_cumulative['n_h_cumulative'], CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")]))
+					
+						if(l == 1):
+							CseqCrossLayerBase = 0
+						else:
+							CseqCrossLayerBase = tf.gather(n_h_cumulative['n_h_cumulative'], CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")])
+						CseqCrossLayer = tf.add(Cseq[generateParameterNameSeq(l, s, "Cseq")], CseqCrossLayerBase)
 						#printShape(AprevLayerAll, "AprevLayerAll")
 						#printShape(CseqCrossLayer, "CseqCrossLayer")						
 						AseqInput = tf.gather(AprevLayerAll, CseqCrossLayer, axis=1)
@@ -714,7 +722,7 @@ def defineNeuralNetworkParametersSANI():
 					
 					if(supportSkipLayers):
 						#neuronIndex = np.random.randint(0, n_h_cumulativeNP[l-1]+1, n_h[l])
-						CseqNP = np.zeros((numberSubinputsPerSequentialInput, n_h[l]))
+						CseqNP = np.zeros((numberSubinputsPerSequentialInputAdjusted, n_h[l]))
 						CseqLayerNP = np.random.randint(0, l, (numberSubinputsPerSequentialInputAdjusted, n_h[l]))	#this can be modified to make local/distant connections more probable
 						for i in range(numberSubinputsPerSequentialInputAdjusted):
 							for j in range(n_h[l]):

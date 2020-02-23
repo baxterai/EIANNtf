@@ -7,7 +7,7 @@ Python 3 and Tensorflow 2.1+
 # License:
 MIT License
 
-# Execution:
+# Usage:
 see SANItf2.py
 
 # Description:
@@ -23,7 +23,7 @@ Neural modules cannot be shared between different areas of input sequence.
 import tensorflow as tf
 import numpy as np
 from SANItf2_operations import * #generateParameterNameSeq, generateParameterName
-
+import SANItf2_globalDefs
 
 
 veryLargeInt = 99999999
@@ -134,8 +134,10 @@ def defineTrainingParametersSANI(dataset, trainMultipleFiles):
 	
 	return learningRate, trainingSteps, batchSize, displayStep
 	
-def defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles):
+def defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, useSmallSentenceLengths):
 
+	#useSmallSentenceLengths not implemented
+	
 	global n_h
 	global numberOfLayers
 	global numberOfSequentialInputs
@@ -298,7 +300,11 @@ def neuralNetworkPropagationSANI(x):
 			#calculate tMin/Mid/Max for sequential input
 			#print("tsLxSx1" + str(tf.timestamp(name="tsLxSx1")))
 			if(supportSkipLayers):
-				CseqCrossLayer = tf.add(Cseq[generateParameterNameSeq(l, s, "Cseq")], tf.gather(n_h_cumulative['n_h_cumulative'], CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")]))
+				if(l == 1):
+					CseqCrossLayerBase = 0
+				else:
+					CseqCrossLayerBase = tf.gather(n_h_cumulative['n_h_cumulative'], CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")])
+				CseqCrossLayer = tf.add(Cseq[generateParameterNameSeq(l, s, "Cseq")], CseqCrossLayerBase)
 				tMinSeq = tf.gather(tMinLayerAll, CseqCrossLayer, axis=1)
 				tMidSeq = tf.gather(tMidLayerAll, CseqCrossLayer, axis=1)
 				tMaxSeq = tf.gather(tMaxLayerAll, CseqCrossLayer, axis=1)	
@@ -358,7 +364,11 @@ def neuralNetworkPropagationSANI(x):
 			
 			#identify input of neuron sequential input
 			if(supportSkipLayers):
-				CseqCrossLayer = tf.add(Cseq[generateParameterNameSeq(l, s, "Cseq")], tf.gather(n_h_cumulative['n_h_cumulative'], CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")]))
+				if(l == 1):
+					CseqCrossLayerBase = 0
+				else:
+					CseqCrossLayerBase = tf.gather(n_h_cumulative['n_h_cumulative'], CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")])
+				CseqCrossLayer = tf.add(Cseq[generateParameterNameSeq(l, s, "Cseq")], CseqCrossLayerBase)
 				AseqInput = tf.gather(AprevLayerAll, CseqCrossLayer, axis=1)
 			else:
 				AseqInput = tf.gather(AprevLayer, Cseq[generateParameterNameSeq(l, s, "Cseq")], axis=1)

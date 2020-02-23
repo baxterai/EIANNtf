@@ -20,7 +20,7 @@ SANI operations
 
 import tensorflow as tf
 import numpy as np
-
+import SANItf2_globalDefs
 
 
 def generateParameterNameSeq(l, s, arrayName):

@@ -116,6 +116,7 @@ Provide dataset load functions
 import tensorflow as tf
 import numpy as np
 from numpy import genfromtxt
+import SANItf2_globalDefs
 
 GIA_PREPROCESSOR_POS_TYPE_ARRAY_NUMBER_OF_TYPES = 52
 GIA_PREPROCESSOR_POS_TAGGER_DATABASE_POS_NUMBER_OF_TYPES = GIA_PREPROCESSOR_POS_TYPE_ARRAY_NUMBER_OF_TYPES+1	#includes GIA_PREPROCESSOR_POS_TAGGER_DATABASE_POS_INDEX_OUT_OF_SENTENCE_BOUNDS
@@ -143,7 +144,7 @@ else:
 
 
 
-def iter_loadtxt(filename, delimiter=',', skiprows=0, dtype=float, normaliseRowLengthWithPad=False, normaliseRowLengthWithPadLimit=False, padCharacter='0', maxRowLength=100):
+def iter_loadtxt(filename, delimiter=',', skiprows=0, dtype=float, normaliseRowLengthWithPad=False, normaliseRowLengthWithPadLimit=False, padCharacter='0', maxRowLength=100, minRowLength=0):
 	
 	normaliseRowLengthWithPadLimitDisgard = False
 	if(normaliseRowLengthWithPad):
@@ -151,6 +152,7 @@ def iter_loadtxt(filename, delimiter=',', skiprows=0, dtype=float, normaliseRowL
 		iter_loadtxt.maxNumberOfItemsPerRow = 0
 		if(normaliseRowLengthWithPadLimit):
 			iter_loadtxt.maxNumberOfItemsPerRow = maxRowLength
+			iter_loadtxt.minNumberOfItemsPerRow = minRowLength
 		else:
 			with open(filename, 'r') as infile:
 				for _ in range(skiprows):
@@ -172,6 +174,8 @@ def iter_loadtxt(filename, delimiter=',', skiprows=0, dtype=float, normaliseRowL
 				passSentenceLengthReq = True
 				if(normaliseRowLengthWithPadLimitDisgard):
 					if(len(line) > iter_loadtxt.maxNumberOfItemsPerRow):
+						passSentenceLengthReq = False
+					if(len(line) < iter_loadtxt.minNumberOfItemsPerRow):
 						passSentenceLengthReq = False
 				
 				if(passSentenceLengthReq):
@@ -316,15 +320,23 @@ def loadDatasetType2(datasetFileName):
 	return datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y
 	
 
-def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain, getDataAsBinary):
+def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain, useSmallSentenceLengths):
 	
 	#parameters;
+	getDataAsBinary = False	#boolean type does not allow padding	
 	padExamples = True
 	cropExamples = True
 	if(cropExamples):
-		maximumSentenceLength = 50
-		maximumNumFeatures = maximumSentenceLength*numberOfFeaturesPerWord
-		minSentenceLengthInWords = 3
+		minimumSentenceLength = 3
+		if(useSmallSentenceLengths):
+			maximumSentenceLength = 30
+		else:	
+			maximumSentenceLength = 50
+	else:
+		minimumSentenceLength = 0
+		maximumSentenceLength = 100
+	maximumNumFeatures = maximumSentenceLength*numberOfFeaturesPerWord
+	minimumNumFeatures = minimumSentenceLength*numberOfFeaturesPerWord
 	generateNegativeExamples = False	#for backprop training
 	generateYvalues = True
 	if(generateYvalues):
@@ -342,7 +354,7 @@ def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSun
 	else:
 		dataType = float
 		
-	all_X = iter_loadtxt(datasetFileNameX, delimiter=' ', normaliseRowLengthWithPad=True, normaliseRowLengthWithPadLimit=True, padCharacter=paddingCharacter, maxRowLength=maximumNumFeatures, dtype=dataType)
+	all_X = iter_loadtxt(datasetFileNameX, delimiter=' ', normaliseRowLengthWithPad=True, normaliseRowLengthWithPadLimit=True, padCharacter=paddingCharacter, maxRowLength=maximumNumFeatures, minRowLength=minimumNumFeatures, dtype=dataType)
 	
 	if(onlyAddPOSunambiguousInputToTrain):
 		
@@ -389,9 +401,8 @@ def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSun
 					currentFeatureIndex = currentFeatureIndex+1
 					
 			if(not POSambiguousWordFoundInSentence):
-				if(sentenceLength >= minSentenceLengthInWords):
-					Xexample = np.expand_dims(all_X[e], axis=0)
-					all_Xunambiguous = np.append(all_Xunambiguous, Xexample, axis=0)
+				Xexample = np.expand_dims(all_X[e], axis=0)
+				all_Xunambiguous = np.append(all_Xunambiguous, Xexample, axis=0)
 				
 			eIndex = eIndex + 1
 			
