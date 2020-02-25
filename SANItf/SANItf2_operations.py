@@ -31,3 +31,13 @@ def generateParameterName(l, arrayName):
 	parameterName = "l" + str(l) + arrayName
 	return parameterName
 	
+def printShape(tensor, tensorName):
+	print(tensorName + ".shape = ")
+	print(tensor.shape)
+	
+def printAverage(tensor, tensorName, indentation):
+	tensorAverage = tf.reduce_mean(tf.dtypes.cast(tensor, tf.float32))
+	indentationString = ""
+	for i in range(indentation):
+		indentationString = indentationString + "\t"
+	#print(indentationString + tensorName + "Average: %f" % (tensorAverage))

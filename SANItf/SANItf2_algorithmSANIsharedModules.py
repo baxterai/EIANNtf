@@ -37,6 +37,7 @@ sequentialInputActivationThreshold = 0.1	#CHECKTHIS (requires optimisation)
 
 allowMultipleSubinputsPerSequentialInput = False
 
+
 	
 if(allowMultipleSubinputsPerSequentialInput):
 	allowMultipleContributingSubinputsPerSequentialInput = False	#whether only 1 subinput can be fired to activate a sequential input	
@@ -73,13 +74,20 @@ if(useSparseTensors):	#FUTURE: upgrade code to remove this requirement
 			else:
 				lastSequentialInputHasOnlyOneSubinput = True
 
+if(useSparseTensors):
+	enforceTcontiguityConstraints = True
+	if(enforceTcontiguityConstraints):
+		enforceTcontiguityBetweenSequentialInputs = True
+		enforceTcontiguityTakeEncapsulatedSubinputWithMinTvalue = True	#method to decide between subinput selection/parse tree generation
+		enforceTcontiguityTakeEncapsulatedSubinputWithMaxTvalueEqualsW = True
+
 if(allowMultipleSubinputsPerSequentialInput):
 	if(useSparseTensors):
 		supportSkipLayers = True
 		if(oneSequentialInputHasOnlyOneSubinput):
-			numberSubinputsPerSequentialInput = 50	#~approx equal number of prev layer neurons/2	#number of prior/future events in which to calculate a conditional probability
+			maxNumberSubinputsPerSequentialInput = 50	#~approx equal number of prev layer neurons/2	#number of prior/future events in which to calculate a conditional probability
 		else:
-			numberSubinputsPerSequentialInput = 3	#sparsity
+			maxNumberSubinputsPerSequentialInput = 3	#sparsity
 	else:
 		supportSkipLayers = True
 else:
@@ -173,11 +181,13 @@ numberOfSequentialInputs = 0
 Vseq = {}
 Zseq = {}
 Aseq = {}
-Tseq = {}
+TMaxSeq = {}
+TMinSeq = {}
 ZseqTadjusted = {}
 Z = {}
 A = {}
-T = {}
+TMax = {}
+TMin = {}
 sequentialActivationFound = {}
 
 def defineTrainingParametersSANIsharedModules(numberOfFeaturesPerWordNew, paddingTagIndexNew):
@@ -261,10 +271,10 @@ def neuralNetworkPropagationSANI(x):
 	#x/AprevLayer	#output vector (dim: batchSize*n_h[l])
 	#if(allowMultipleSubinputsPerSequentialInput):
 		#if(useSparseTensors):
-			#Cseq	#static connectivity matrix (int) - indexes of neurons on prior layer stored; mapped to W  (dim: numberSubinputsPerSequentialInput*n_h[l])
+			#Cseq	#static connectivity matrix (int) - indexes of neurons on prior layer stored; mapped to W  (dim: maxNumberSubinputsPerSequentialInput*n_h[l])
 			#if(supportSkipLayers):
-				#CseqLayer	#static connectivity matrix (int) - indexes of pior layer stored; mapped to W (dim: numberSubinputsPerSequentialInput*n_h[l])
-			#Wseq #weights of connections; see Cseq (dim: numberSubinputsPerSequentialInput*n_h[l])
+				#CseqLayer	#static connectivity matrix (int) - indexes of pior layer stored; mapped to W (dim: maxNumberSubinputsPerSequentialInput*n_h[l])
+			#Wseq #weights of connections; see Cseq (dim: maxNumberSubinputsPerSequentialInput*n_h[l])
 			#AseqSum	#combination variable
 		#else:
 			#if(supportSkipLayers):
@@ -278,7 +288,8 @@ def neuralNetworkPropagationSANI(x):
 		#Wseq #weights of connections; see Cseq (dim: n_h[l])	
 	
 	#Vseq	#mutable verification vector (dim: batchSize*n_h[l] - regenerated for each sequential input index)			#records whether particular neuron sequential inputs are currently active
-	#Tseq	#mutable time vector (dim: batchSize*n_h[l] - regenerated for each sequential input index)				#records the time at which a particular sequential input last fired
+	#TMaxSeq	#mutable time vector (dim: batchSize*n_h[l] - regenerated for each sequential input index)				#records the time at which a particular sequential input last fired
+	#TMinSeq	#mutable time vector (dim: batchSize*n_h[l] - regenerated for each sequential input index)				#records the time at which a first encapsulated subinput fired
 	#Zseq	#neuron activation function output vector (dim: batchSize*n_h[l]  - regenerated for each sequential input index)	#records the current output value of sequential inputs
 	#Aseq	#neuron activation function output vector (dim: batchSize*n_h[l]  - regenerated for each sequential input index)	#records the current output value of sequential inputs
 	#if(allowMultipleContributingSubinputsPerSequentialInput):
@@ -288,7 +299,8 @@ def neuralNetworkPropagationSANI(x):
 	#Q  
 	#Z	#neuron activation function input (dim: batchSize*n_h[l])
 	#A	#neuron activation function output (dim: batchSize*n_h[l])
-	#T	#mutable time vector (dim: batchSize*n_h[l]) - same as Tseq[numberOfSequentialInputs-1]
+	#TMax	#mutable time vector (dim: batchSize*n_h[l]) - same as TMaxSeq[numberOfSequentialInputs-1]
+	#TMin	#mutable time vector (dim: batchSize*n_h[l]) - same as TMinSeq[numberOfSequentialInputs-1]
 	#if(performSummationOfSequentialInputsWeighted):	
 		#W	(dim: numberOfSequentialInputs*n_h[l])	
 	
@@ -308,29 +320,23 @@ def neuralNetworkPropagationSANI(x):
 	
 	#optimise feed length based on max sentence length in batch:
 	#unoptimised: numberOfFeatures = x.shape[1]
-	#print(x)
 	xIsNotPadding = tf.math.less(x, paddingTagIndex) #tf.math.less(tf.dtypes.cast(x, tf.int32), paddingTagIndex)
-	#print(xIsNotPadding)
 	coordinatesOfNotPadding = tf.where(xIsNotPadding)
-	#print(coordinatesOfNotPadding)
 	numberOfFeaturesCropped = tf.reduce_max(coordinatesOfNotPadding[:, 1]).numpy()+1
-	#print("numberOfFeaturesCropped = ", numberOfFeaturesCropped)
 	
 	inputLength = numberOfFeaturesPerWord*numberOfWordsInConvolutionalWindowSeen
-	
-	#print("numberOfFeaturesPerWord = ", numberOfFeaturesPerWord)
-	#print("numberOfWordsInConvolutionalWindowSeen = ", numberOfWordsInConvolutionalWindowSeen)
-	#print("inputLength = ", inputLength)
 	
 	maxNumberOfWordsInSentenceBatch = int(numberOfFeaturesCropped/numberOfFeaturesPerWord)
 	
 	for l in range(1, numberOfLayers+1):
 		Z[generateParameterName(l, "Z")] = tf.Variable(tf.zeros([batchSize, n_h[l]]), dtype=tf.float32)
 		A[generateParameterName(l, "A")] = tf.Variable(tf.zeros([batchSize, n_h[l]]), dtype=tf.float32)
-		T[generateParameterName(l, "T")] = tf.Variable(tf.zeros([batchSize, n_h[l]], dtype=tf.int32))
+		TMax[generateParameterName(l, "TMax")] = tf.Variable(tf.zeros([batchSize, n_h[l]], dtype=tf.int32))
+		TMin[generateParameterName(l, "TMin")] = tf.Variable(tf.zeros([batchSize, n_h[l]], dtype=tf.int32))
 		for s in range(numberOfSequentialInputs):
 			Vseq[generateParameterNameSeq(l, s, "Vseq")] = tf.Variable(tf.dtypes.cast(tf.zeros([batchSize, n_h[l]]), tf.bool), dtype=tf.bool)
-			Tseq[generateParameterNameSeq(l, s, "Tseq")] = tf.Variable(tf.zeros([batchSize, n_h[l]], dtype=tf.int32))
+			TMaxSeq[generateParameterNameSeq(l, s, "TMaxSeq")] = tf.Variable(tf.zeros([batchSize, n_h[l]], dtype=tf.int32))
+			TMinSeq[generateParameterNameSeq(l, s, "TMinSeq")] = tf.Variable(tf.zeros([batchSize, n_h[l]], dtype=tf.int32))
 			Zseq[generateParameterNameSeq(l, s, "Zseq")] = tf.Variable(tf.zeros([batchSize, n_h[l]]), dtype=tf.float32)
 			Aseq[generateParameterNameSeq(l, s, "Aseq")] = tf.Variable(tf.zeros([batchSize, n_h[l]]), dtype=tf.float32)
 			if(allowMultipleContributingSubinputsPerSequentialInput):
@@ -358,8 +364,10 @@ def neuralNetworkPropagationSANI(x):
 			
 		AprevLayer = AfirstLayerShifted
 		
-		TprevLayer = tf.ones(([batchSize, n_h[0]]), tf.int32)
-		TprevLayer = TprevLayer*w
+		TMaxPrevLayer = tf.ones(([batchSize, n_h[0]]), tf.int32)
+		TMaxPrevLayer = TMaxPrevLayer*w
+		TMinPrevLayer = tf.ones(([batchSize, n_h[0]]), tf.int32)
+		TMinPrevLayer = TMinPrevLayer*w
 		
 		for l in range(1, numberOfLayers+1):	#start algorithm at n_h[1]; ie first hidden layer
 
@@ -370,11 +378,13 @@ def neuralNetworkPropagationSANI(x):
 			if(l == 1):
 				if(supportSkipLayers):
 					AprevLayerAll = AprevLayer	#x
-					TprevLayerAll = TprevLayer
+					TMaxPrevLayerAll = TMaxPrevLayer
+					TMinPrevLayerAll = TMinPrevLayer
 			else:
 				if(supportSkipLayers):
 					AprevLayerAll = tf.concat([AprevLayerAll, AprevLayer], 1)
-					TprevLayerAll = tf.concat([TprevLayerAll, TprevLayer], 1)
+					TMaxPrevLayerAll = tf.concat([TMaxPrevLayerAll, TMaxPrevLayer], 1)
+					TMinPrevLayerAll = tf.concat([TMinPrevLayerAll, TMinPrevLayer], 1)
 
 			#combination vars;
 			if(performSummationOfSequentialInputs):
@@ -418,14 +428,16 @@ def neuralNetworkPropagationSANI(x):
 						if(not allowMultipleContributingSubinputsPerSequentialInput):
 							#printShape(TprevLayerAll, "TprevLayerAll")
 							#printShape(CseqCrossLayer, "CseqCrossLayer")
-							TseqInput = tf.gather(TprevLayerAll, CseqCrossLayer, axis=1)
+							TMaxSeqInput = tf.gather(TMaxPrevLayerAll, CseqCrossLayer, axis=1)
+							TMinSeqInput = tf.gather(TMinPrevLayerAll, CseqCrossLayer, axis=1)
 					else:
 						AseqInput = tf.gather(AprevLayer, Cseq[generateParameterNameSeq(l, s, "Cseq")], axis=1)
 						if(allowMultipleContributingSubinputsPerSequentialInput):
 							if((resetSequentialInputsIfOnlyFirstInputValid) and (s == 0)):
 								AseqInputTadjusted = tf.gather(tf.multiply(AprevLayer, tf.dtypes.cast(TprevLayer, tf.float32)), Cseq[generateParameterNameSeq(l, s, "Cseq")], axis=1)
 						if(not allowMultipleContributingSubinputsPerSequentialInput):
-							TseqInput = tf.gather(TprevLayer, Cseq[generateParameterNameSeq(l, s, "Cseq")], axis=1)
+							TMaxSeqInput = tf.gather(TMaxPrevLayer, Cseq[generateParameterNameSeq(l, s, "Cseq")], axis=1)
+							TMinSeqInput = tf.gather(TMinPrevLayer, Cseq[generateParameterNameSeq(l, s, "Cseq")], axis=1)
 				else:
 					if(supportSkipLayers):
 						AseqInput = AprevLayerAll
@@ -433,22 +445,24 @@ def neuralNetworkPropagationSANI(x):
 							if((resetSequentialInputsIfOnlyFirstInputValid) and (s == 0)):
 								AseqInputTadjusted = tf.multiply(AprevLayerAll, tf.dtypes.cast(TprevLayerAll, tf.float32))
 						if(not allowMultipleContributingSubinputsPerSequentialInput):
-							TseqInput = TprevLayerAll
+							TMaxSeqInput = TMaxPrevLayerAll
+							TMinSeqInput = TMinPrevLayerAll
 					else:
 						AseqInput = AprevLayer
 						if(allowMultipleContributingSubinputsPerSequentialInput):
 							if((resetSequentialInputsIfOnlyFirstInputValid) and (s == 0)):
 								AseqInputTadjusted = tf.multiply(AprevLayer, tf.dtypes.cast(TprevLayer, tf.float32))
 						if(not allowMultipleContributingSubinputsPerSequentialInput):
-							TseqInput = TprevLayer
+							TMaxSeqInput = TMaxPrevLayer
+							TMinSeqInput = TMinPrevLayer
 		
 									
 				#calculate validation matrix based upon sequentiality requirements
 				#if Vseq[s-1] is True and Vseq[s] is False;
-					#OLD: and Tseq[s-1] < w [this condition is guaranteed by processing s in reverse]
+					#OLD: and TMaxSeq[s-1] < w [this condition is guaranteed by processing s in reverse]
 				if(s > 0):
 					VseqTemp = Vseq[generateParameterNameSeq(l, s-1, "Vseq")]
-					#VseqTemp = tf.math.logical_and(VseqTemp, tf.math.logical_less(Tseq[generateParameterNameSeq(l, s-1, "Tseq")], w))
+					#VseqTemp = tf.math.logical_and(VseqTemp, tf.math.logical_less(TMaxSeq[generateParameterNameSeq(l, s-1, "TMaxSeq")], w))
 					VseqTemp = tf.math.logical_and(VseqTemp, tf.math.logical_not(Vseq[generateParameterNameSeq(l, s, "Vseq")]))
 				else:
 					if(resetSequentialInputsIfOnlyFirstInputValid):
@@ -477,15 +491,25 @@ def neuralNetworkPropagationSANI(x):
 							#ensure that T continguous constraint is met;
 							#NO: take the max subinput pathway only (ie matrix mult but with max() rather than sum() for each dot product)
 							if(s > 0):
-								#1. first select the AseqInput inputs that have T[l-1] contiguous with Tseq[l, s-1]:
-								TseqPlus1 = Tseq[generateParameterNameSeq(l, s-1, "Tseq")]+1
+								#1. first select the AseqInput inputs that have TMaxSeq[l, s] contiguous with TMaxSeq[l, s-1]:
+								TMaxSeqPrevPlus1 = TMaxSeq[generateParameterNameSeq(l, s-1, "TMaxSeq")]+1
 
+								numberSubinputsPerSequentialInput = calculateNumberSubinputsPerSequentialInput(s)
 								multiples = tf.constant([1,numberSubinputsPerSequentialInput,1], tf.int32)
 
-								TseqPlus1Tiled = tf.tile(tf.reshape(TseqPlus1, [batchSize, 1, n_h[l]]), multiples)
-								TseqInputThreshold = tf.math.equal(TseqInput, TseqPlus1Tiled)
+								if(enforceTcontiguityBetweenSequentialInputs):
+									TMaxSeqPrevPlus1Tiled = tf.tile(tf.reshape(TMaxSeqPrevPlus1, [batchSize, 1, n_h[l]]), multiples)
+									TMinSeqInputThreshold = tf.math.equal(TMinSeqInput, TMaxSeqPrevPlus1Tiled)
+									AseqInputTthresholded = tf.multiply(AseqInput, tf.dtypes.cast(TMinSeqInputThreshold, tf.float32))
+									
+									TMinSeqInputThresholded = TMaxSeqPrevPlus1
+									
+								if(enforceTcontiguityTakeEncapsulatedSubinputWithMaxTvalueEqualsW):
+									TMaxSeqInputThreshold = tf.math.equal(TMaxSeqInput, w)	#CHECKTHIS
+									AseqInputTthresholded = tf.multiply(AseqInput, tf.dtypes.cast(TMaxSeqInputThreshold, tf.float32))
+								
+									TMaxSeqInputThresholded = tf.math.reduce_max(TMaxSeqInput, axis=1)	#CHECKTHIS - ensure equal to w
 
-								AseqInputTthresholded = tf.multiply(AseqInput, tf.dtypes.cast(TseqInputThreshold, tf.float32))
 								AseqInput = AseqInputTthresholded
 
 								#VseqFloatTiled = tf.tile(tf.reshape(VseqFloat, [batchSize, 1, n_h[l]]), multiples)
@@ -493,20 +517,42 @@ def neuralNetworkPropagationSANI(x):
 							else:
 								if(resetSequentialInputsIfOnlyFirstInputValid):
 									#NO: ZseqHypotheticalResetThreshold = 1 	#always reset if valid first input (CHECKTHIS)	#dummy variable
-									#only reset first sequential input if TseqInput > T[l]
-
-									Ttiled = tf.tile(tf.reshape(T[generateParameterName(l, "T")], [batchSize, 1, n_h[l]]), multiples)
+									#only reset first sequential input if TMaxSeqInput > TMax[l]
+									
+									numberSubinputsPerSequentialInput = calculateNumberSubinputsPerSequentialInput(s)
+									multiples = tf.constant([1,numberSubinputsPerSequentialInput,1], tf.int32)
+									
+									TMaxtiled = tf.tile(tf.reshape(TMax[generateParameterName(l, "TMax")], [batchSize, 1, n_h[l]]), multiples)
 									VseqTiled = tf.tile(tf.reshape(Vseq[generateParameterNameSeq(l, s, "Vseq")], [batchSize, 1, n_h[l]]), multiples)
 
-									ZseqHypotheticalResetThreshold = tf.math.logical_or(tf.math.logical_not(VseqTiled), tf.math.greater(TseqInput, tf.dtypes.cast(Ttiled, tf.int32)))
-
+									ZseqHypotheticalResetThreshold = tf.math.logical_or(tf.math.logical_not(VseqTiled), tf.math.greater(TMaxSeqInput, tf.dtypes.cast(TMaxtiled, tf.int32)))
 									AseqInputTthresholded = tf.multiply(AseqInput, tf.dtypes.cast(ZseqHypotheticalResetThreshold, tf.float32))
+
+									if(enforceTcontiguityTakeEncapsulatedSubinputWithMinTvalue):
+										TMinSeqInputThresholdIndices = tf.dtypes.cast(tf.math.argmin(TMinSeqInput, axis=1), tf.int32)
+										
+										#AseqInput shape: batchSize*numSubinputs*numNeuronsOnLayer
+										AseqInputReordedAxes = tf.transpose(AseqInput, [0, 2, 1])
+										AseqInputReordedAxesFlattened = tf.reshape(AseqInputReordedAxes, [AseqInputReordedAxes.shape[0]*AseqInputReordedAxes.shape[1], AseqInputReordedAxes.shape[2]])
+										idx_0 = tf.reshape(tf.range(AseqInputReordedAxesFlattened.shape[0]), TMinSeqInputThresholdIndices.shape)
+										indices=tf.stack([idx_0,TMinSeqInputThresholdIndices],axis=-1)
+										AseqInputTthresholded = tf.gather(AseqInputReordedAxesFlattened, indices)
+
+										TMinSeqInputThresholded = tf.math.reduce_min(TMinSeqInput, axis=1)
+	
+									if(enforceTcontiguityTakeEncapsulatedSubinputWithMaxTvalueEqualsW):
+										TMaxSeqInputThreshold = tf.math.equal(TMaxSeqInput, w)	#CHECKTHIS
+										AseqInputTthresholded = tf.multiply(AseqInput, tf.dtypes.cast(TMaxSeqInputThreshold, tf.float32))
+									
+										TMaxSeqInputThresholded = tf.math.reduce_max(TMaxSeqInput, axis=1)	#CHECKTHIS - ensure equal to w
+
 									AseqInput = AseqInputTthresholded
 
 
 						#2. take the AseqInput with the highest weighting
 						if(performSummationOfSubInputsWeighted):
 							multiplesSeq = tf.constant([batchSize,1,1], tf.int32)
+							numberSubinputsPerSequentialInput = calculateNumberSubinputsPerSequentialInput(s)
 							WseqTiled = tf.tile(tf.reshape(Wseq[generateParameterNameSeq(l, s, "Wseq")], [1, numberSubinputsPerSequentialInput, n_h[l]]), multiplesSeq)
 							AseqInputWeighted = tf.multiply(AseqInput, WseqTiled)
 						else:
@@ -521,17 +567,17 @@ def neuralNetworkPropagationSANI(x):
 				else:
 					#ensure that T continguous constraint is met;
 					if(s > 0):
-						#1. first select the AseqInput inputs that have T[l-1] contiguous with Tseq[l, s-1]:
+						#1. first select the AseqInput inputs that have TMaxSeq[l, s] contiguous with TMaxSeq[l, s-1]:
 						
-						TseqPlus1 = Tseq[generateParameterNameSeq(l, s-1, "Tseq")]+1
-						TseqInputThreshold = tf.math.equal(TseqInput, TseqPlus1)
+						TMaxSeqPrevPlus1 = TMaxSeq[generateParameterNameSeq(l, s-1, "TMaxSeq")]+1
+						TseqInputThreshold = tf.math.equal(TMinSeqInput, TMaxSeqPrevPlus1)
 
 						AseqInputTthresholded = tf.multiply(AseqInput, tf.dtypes.cast(TseqInputThreshold, tf.float32))
 						AseqInput = AseqInputTthresholded
 					else:
-						#only reset first sequential input if TseqInput > T[l]
+						#only reset first sequential input if TMaxSeqInput > T[l]
 
-						ZseqHypotheticalResetThreshold = tf.math.logical_or(tf.math.logical_not(Vseq[generateParameterNameSeq(l, s, "Vseq")]), tf.math.greater(TseqInput, tf.dtypes.cast(T[generateParameterName(l, "T")], tf.int32)))
+						ZseqHypotheticalResetThreshold = tf.math.logical_or(tf.math.logical_not(Vseq[generateParameterNameSeq(l, s, "Vseq")]), tf.math.greater(TMaxSeqInput, tf.dtypes.cast(T[generateParameterName(l, "T")], tf.int32)))
 
 						AseqInputTthresholded = tf.multiply(AseqInput, tf.dtypes.cast(ZseqHypotheticalResetThreshold, tf.float32))
 						AseqInput = AseqInputTthresholded
@@ -553,7 +599,7 @@ def neuralNetworkPropagationSANI(x):
 							#ensure that T continguous constraint is met;
 							
 							#calculate output for layer sequential input s
-							#old slow: only factor in inputs that have changed since the component was originally activated; if Torigin > Tseq[s]
+							#old slow: only factor in inputs that have changed since the component was originally activated; if Torigin > TMaxSeq[s]
 							#new: only factor in inputs if ZseqHypotheticalTadjusted > ZseqTadjusted+1
 							ZseqHypotheticalTadjusted = tf.add(tf.matmul(AseqInputTadjusted, Wseq[generateParameterNameSeq(l, s, "Wseq")]), Bseq[generateParameterNameSeq(l, s, "Bseq")])
 							ZseqHypotheticalTadjusted = tf.divide(ZseqHypotheticalTadjusted, AseqInputTadjusted.shape[1])	#normalise T adjustment
@@ -562,13 +608,17 @@ def neuralNetworkPropagationSANI(x):
 							ZseqPassThresold = tf.math.logical_and(ZseqPassThresold, ZseqHypotheticalTadjustedResetThreshold)	#ensures that if reset is required, Tadjusted threshold is met
 				
 				ZseqPassThresoldInt = tf.dtypes.cast(ZseqPassThresold, tf.int32)
-				TseqPassThresoldUpdatedValues = tf.multiply(ZseqPassThresoldInt, w)
-				
 				ZseqPassThresoldNot = tf.math.logical_not(ZseqPassThresold)
 				ZseqPassThresoldNotInt = tf.dtypes.cast(ZseqPassThresoldNot, tf.int32)
-				TseqUpdated = tf.multiply(Tseq[generateParameterNameSeq(l, s, "Tseq")], ZseqPassThresoldNotInt)
-				TseqUpdated = tf.add(TseqUpdated, TseqPassThresoldUpdatedValues)
 				
+				TMaxSeqPassThresoldUpdatedValues = tf.multiply(ZseqPassThresoldInt, TMaxSeqInputThresholded)
+				TMaxSeqUpdated = tf.multiply(TMaxSeq[generateParameterNameSeq(l, s, "TMaxSeq")], ZseqPassThresoldNotInt)
+				TMaxSeqUpdated = tf.add(TMaxSeqUpdated, TMaxSeqPassThresoldUpdatedValues)
+				
+				TMinSeqPassThresoldUpdatedValues = tf.multiply(ZseqPassThresoldInt, TMinSeqInputThresholded)
+				TMinSeqUpdated = tf.multiply(TMinSeq[generateParameterNameSeq(l, s, "TMinSeq")], ZseqPassThresoldNotInt)
+				TMinSeqUpdated = tf.add(TMinSeqUpdated, TMinSeqPassThresoldUpdatedValues)
+			
 				#calculate updated validation matrix
 				VseqUpdated = tf.math.logical_or(Vseq[generateParameterNameSeq(l, s, "Vseq")], ZseqPassThresold)
 				
@@ -578,20 +628,22 @@ def neuralNetworkPropagationSANI(x):
 					for s2 in range(numberOfSequentialInputs):
 						Vseq[generateParameterNameSeq(l, s2, "Vseq")] = tf.dtypes.cast(tf.multiply(tf.dtypes.cast(Vseq[generateParameterNameSeq(l, s2, "Vseq")], tf.int32), tf.dtypes.cast(tf.math.logical_not(resetRequiredMatrix), tf.int32)), tf.bool)
 						if(not doNotResetNeuronOutputUntilAllSequentialInputsActivated):
-							Tseq[generateParameterNameSeq(l, s2, "Tseq")] = tf.multiply(Tseq[generateParameterNameSeq(l, s2, "Tseq")], tf.dtypes.cast(tf.math.logical_not(resetRequiredMatrix), tf.int32))
+							TMaxSeq[generateParameterNameSeq(l, s2, "TMaxSeq")] = tf.multiply(TMaxSeq[generateParameterNameSeq(l, s2, "TMaxSeq")], tf.dtypes.cast(tf.math.logical_not(resetRequiredMatrix), tf.int32))
+							TMinSeq[generateParameterNameSeq(l, s2, "TMinSeq")] = tf.multiply(TMinSeq[generateParameterNameSeq(l, s2, "TMinSeq")], tf.dtypes.cast(tf.math.logical_not(resetRequiredMatrix), tf.int32))
 							Zseq[generateParameterNameSeq(l, s2, "Zseq")] = tf.multiply(Zseq[generateParameterNameSeq(l, s2, "Zseq")], tf.dtypes.cast(tf.math.logical_not(resetRequiredMatrix), tf.float32))
 							Aseq[generateParameterNameSeq(l, s2, "Aseq")] = tf.multiply(Aseq[generateParameterNameSeq(l, s2, "Aseq")], tf.dtypes.cast(tf.math.logical_not(resetRequiredMatrix), tf.float32))
-					sequentialActivationFound[generateParameterName(l, "sequentialActivationFound")] = tf.dtypes.cast(tf.multiply(tf.dtypes.cast(sequentialActivationFound[generateParameterName(l, "sequentialActivationFound")], tf.int32), tf.dtypes.cast(tf.math.logical_not(resetRequiredMatrix), tf.int32)), tf.bool)
+					sequentialActivationFound[generateParameterName(l, "sequentialActivationFound")] = tf.math.logical_and(sequentialActivationFound[generateParameterName(l, "sequentialActivationFound")], tf.math.logical_not(resetRequiredMatrix))
 					if(not doNotResetNeuronOutputUntilAllSequentialInputsActivated):
 						Z[generateParameterName(l, "Z")] = tf.multiply(Z[generateParameterName(l, "Z")], tf.dtypes.cast(tf.math.logical_not(resetRequiredMatrix), tf.float32))
 						A[generateParameterName(l, "A")] = tf.multiply(A[generateParameterName(l, "A")], tf.dtypes.cast(tf.math.logical_not(resetRequiredMatrix), tf.float32))
-						T[generateParameterName(l, "T")] = tf.multiply(T[generateParameterName(l, "T")], tf.dtypes.cast(tf.math.logical_not(resetRequiredMatrix), tf.int32))
+						TMax[generateParameterName(l, "TMax")] = tf.multiply(TMax[generateParameterName(l, "TMax")], tf.dtypes.cast(tf.math.logical_not(resetRequiredMatrix), tf.int32))
+						TMin[generateParameterName(l, "TMin")] = tf.multiply(TMin[generateParameterName(l, "TMin")], tf.dtypes.cast(tf.math.logical_not(resetRequiredMatrix), tf.int32))
 
 				#store updated validation matrix
 				Vseq[generateParameterNameSeq(l, s, "Vseq")] = VseqUpdated
-				Tseq[generateParameterNameSeq(l, s, "Tseq")] = TseqUpdated
-				sequentialActivationFound[generateParameterName(l, "sequentialActivationFound")] = tf.math.logical_and(sequentialActivationFound[generateParameterName(l, "sequentialActivationFound")], Vseq[generateParameterNameSeq(l, s, "Vseq")])
-				
+				TMaxSeq[generateParameterNameSeq(l, s, "TMaxSeq")] = TMaxSeqUpdated
+				TMinSeq[generateParameterNameSeq(l, s, "TMinSeq")] = TMinSeqUpdated
+				sequentialActivationFound[generateParameterName(l, "sequentialActivationFound")] = tf.math.logical_or(sequentialActivationFound[generateParameterName(l, "sequentialActivationFound")], ZseqPassThresold)
 				
 				#calculate thresholded output
 				ZseqThresholded = tf.multiply(ZseqHypothetical, tf.dtypes.cast(ZseqPassThresoldInt, tf.float32))
@@ -642,7 +694,8 @@ def neuralNetworkPropagationSANI(x):
 					ZseqLast = Zseq[generateParameterNameSeq(l, s, "Zseq")]
 					AseqLast = Aseq[generateParameterNameSeq(l, s, "Aseq")]
 					VseqLast = Vseq[generateParameterNameSeq(l, s, "Vseq")]
-					TseqLast = Tseq[generateParameterNameSeq(l, s, "Tseq")]
+					TMaxSeqLast = TMaxSeq[generateParameterNameSeq(l, s, "TMaxSeq")]
+					TMinSeqLast = TMinSeq[generateParameterNameSeq(l, s, "TMinSeq")]
 								
 			if(performSummationOfSequentialInputs):
 				if(sequentialInputCombinationModeSummation == 1):
@@ -685,10 +738,12 @@ def neuralNetworkPropagationSANI(x):
 			A[generateParameterName(l, "A")] = A1
 			Z[generateParameterName(l, "Z")] = Z1
 			
-			T[generateParameterName(l, "T")] = TseqLast
+			TMax[generateParameterName(l, "TMax")] = TMaxSeqLast
+			TMin[generateParameterName(l, "TMin")] = TMinSeqLast
 			
 			AprevLayer = A[generateParameterName(l, "A")]
-			TprevLayer = T[generateParameterName(l, "T")]
+			TMaxPrevLayer = TMax[generateParameterName(l, "TMax")]
+			TMinPrevLayer = TMin[generateParameterName(l, "TMin")]
 	
 	#return tf.nn.softmax(Z1)
 	return tf.nn.sigmoid(Z1)	#binary classification
@@ -713,29 +768,24 @@ def defineNeuralNetworkParametersSANI():
 			if(useSparseTensors):
 				if(allowMultipleSubinputsPerSequentialInput):
 				
-					if(firstSequentialInputHasOnlyOneSubinput and s==0):
-						numberSubinputsPerSequentialInputAdjusted = 1
-					elif(lastSequentialInputHasOnlyOneSubinput and s==numberOfSequentialInputs-1):
-						numberSubinputsPerSequentialInputAdjusted = 1
-					else:
-						numberSubinputsPerSequentialInputAdjusted = numberSubinputsPerSequentialInput
+					numberSubinputsPerSequentialInput = calculateNumberSubinputsPerSequentialInput(s)
 					
 					if(supportSkipLayers):
 						#neuronIndex = np.random.randint(0, n_h_cumulativeNP[l-1]+1, n_h[l])
-						CseqNP = np.zeros((numberSubinputsPerSequentialInputAdjusted, n_h[l]))
-						CseqLayerNP = np.random.randint(0, l, (numberSubinputsPerSequentialInputAdjusted, n_h[l]))	#this can be modified to make local/distant connections more probable
-						for i in range(numberSubinputsPerSequentialInputAdjusted):
+						CseqNP = np.zeros((numberSubinputsPerSequentialInput, n_h[l]))
+						CseqLayerNP = np.random.randint(0, l, (numberSubinputsPerSequentialInput, n_h[l]))	#this can be modified to make local/distant connections more probable
+						for i in range(numberSubinputsPerSequentialInput):
 							for j in range(n_h[l]):
 								l2 = CseqLayerNP[i, j]
 								CseqNP[i,j] = np.random.randint(0, n_h[l2], 1)
 						Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNP, dtype=tf.int32)
 						CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")] = tf.Variable(CseqLayerNP, dtype=tf.int32)
 					else:
-						CseqNP = np.random.randint(0, n_h[l-1]+1, (numberSubinputsPerSequentialInputAdjusted, n_h[l]))	#note +1 is required because np.random.randint generates int between min and max-1
+						CseqNP = np.random.randint(0, n_h[l-1]+1, (numberSubinputsPerSequentialInput, n_h[l]))	#note +1 is required because np.random.randint generates int between min and max-1
 						Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNP, dtype=tf.int32)
 
 					if(performSummationOfSubInputsWeighted):
-						WseqNP = np.random.rand(numberSubinputsPerSequentialInputAdjusted, n_h[l])
+						WseqNP = np.random.rand(numberSubinputsPerSequentialInput, n_h[l])
 						Wseq[generateParameterNameSeq(l, s, "Wseq")] = tf.Variable(WseqNP, dtype=tf.float32)
 						Bseq[generateParameterNameSeq(l, s, "Bseq")] = tf.Variable(tf.zeros(n_h[l]), dtype=tf.float32)
 				else:
@@ -768,7 +818,18 @@ def defineNeuralNetworkParametersSANI():
 	if(supportSkipLayers):
 		n_h_cumulative['n_h_cumulative'] = tf.Variable(n_h_cumulativeNP, dtype=tf.int32)
 
-def printShape(tensor, tensorName):
-	print(tensorName + ".shape = ")
-	print(tensor.shape)
+	
+def calculateNumberSubinputsPerSequentialInput(s):
+
+	if(oneSequentialInputHasOnlyOneSubinput):
+		if(firstSequentialInputHasOnlyOneSubinput and s==0):
+			numberSubinputsPerSequentialInput = 1
+		elif(lastSequentialInputHasOnlyOneSubinput and s==numberOfSequentialInputs-1):
+			numberSubinputsPerSequentialInput = 1
+		else:
+			numberSubinputsPerSequentialInput = maxNumberSubinputsPerSequentialInput
+	else:
+		numberSubinputsPerSequentialInput = maxNumberSubinputsPerSequentialInput
+	
+	return numberSubinputsPerSequentialInput
 	

@@ -603,8 +603,3 @@ def defineNeuralNetworkParametersSANI():
 			  
 	if(supportSkipLayers):
 		n_h_cumulative['n_h_cumulative'] = tf.Variable(n_h_cumulativeNP, dtype=tf.int32)
-
-def printShape(tensor, tensorName):
-	print(tensorName + ".shape = ")
-	print(tensor.shape)
-	

@@ -12,7 +12,7 @@ see SANItf2.py
 
 # Description
 
-Train an artificial neural network (ANN or SANI)
+Global definitions
 
 - Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
 
