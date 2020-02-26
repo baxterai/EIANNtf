@@ -40,4 +40,4 @@ def printAverage(tensor, tensorName, indentation):
 	indentationString = ""
 	for i in range(indentation):
 		indentationString = indentationString + "\t"
-	#print(indentationString + tensorName + "Average: %f" % (tensorAverage))
+	print(indentationString + tensorName + "Average: %f" % (tensorAverage))
