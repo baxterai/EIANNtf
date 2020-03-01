@@ -18,3 +18,8 @@ Global definitions
 
 """
 
+
+testHarness = False
+if(testHarness):
+	testHarnessNumSentences = 1	#fixed
+	testHarnessNumWords = 3

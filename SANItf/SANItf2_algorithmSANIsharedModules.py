@@ -316,7 +316,7 @@ def neuralNetworkPropagationSANI(x):
 			#AseqSum	#combination variable
 		#else:
 			#if(supportSkipLayers):
-				#Wseq #weights of connections (dim: n_h_cumulativeNP[l-1]*n_h[l])
+				#Wseq #weights of connections (dim: n_h_cumulativeNP[l]*n_h[l])
 			#else:
 				#Wseq #weights of connections (dim: n_h[l-1]*n_h[l])
 	#else:
@@ -458,10 +458,7 @@ def neuralNetworkPropagationSANI(x):
 				if(useSparseTensors):
 					if(supportSkipLayers):
 					
-						if(l == 1):
-							CseqCrossLayerBase = 0
-						else:
-							CseqCrossLayerBase = tf.gather(n_h_cumulative['n_h_cumulative'], CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")])
+						CseqCrossLayerBase = tf.gather(n_h_cumulative['n_h_cumulative'], CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")])
 						CseqCrossLayer = tf.add(Cseq[generateParameterNameSeq(l, s, "Cseq")], CseqCrossLayerBase)
 						#printShape(AprevLayerAll, "AprevLayerAll")
 						#printShape(CseqCrossLayer, "CseqCrossLayer")						
@@ -547,7 +544,7 @@ def neuralNetworkPropagationSANI(x):
 									TMinSeqInputThreshold = tf.math.equal(TMinSeqInput, TMaxSeqPrevPlus1Tiled)
 									AseqInputTthresholded = tf.multiply(AseqInput, tf.dtypes.cast(TMinSeqInputThreshold, tf.float32))
 									
-									TMinSeqInputThresholded = TMaxSeqPrevPlus1
+									TMinSeqInputThresholded = TMinSeqPrev	#note this is recording the min of the sequence, not the sequential input	#OLD: TMaxSeqPrevPlus1
 									
 									AseqInput = AseqInputTthresholded
 									
@@ -875,9 +872,8 @@ def defineNeuralNetworkParametersSANI():
 	global n_h_cumulative
 	
 	if(supportSkipLayers):
-		n_h_cumulativeNP = np.zeros((numberOfLayers+1), dtype=int)
-		n_h_cumulativeNP[0] = n_h[0]
-		#print("n_h_cumulativeNP[0] = ", n_h_cumulativeNP[0])
+		n_h_cumulativeNP = np.zeros((numberOfLayers+2), dtype=int)
+		n_h_cumulativeNP[0] = 0	#first row always set to 0 for indexing purposes
 		
 	for l in range(1, numberOfLayers+1):
 		#print("\tl = " + str(l))
@@ -889,7 +885,7 @@ def defineNeuralNetworkParametersSANI():
 					numberSubinputsPerSequentialInput = calculateNumberSubinputsPerSequentialInput(s)
 					
 					if(supportSkipLayers):
-						#neuronIndex = np.random.randint(0, n_h_cumulativeNP[l-1]+1, n_h[l])
+						#neuronIndex = np.random.randint(0, n_h_cumulativeNP[l]+1, n_h[l])
 						CseqNP = np.zeros((numberSubinputsPerSequentialInput, n_h[l]))
 						CseqLayerNP = np.random.randint(0, l, (numberSubinputsPerSequentialInput, n_h[l]))	#this can be modified to make local/distant connections more probable
 						for i in range(numberSubinputsPerSequentialInput):
@@ -913,7 +909,7 @@ def defineNeuralNetworkParametersSANI():
 				
 				else:
 					if(supportSkipLayers):
-						#neuronIndex = np.random.randint(0, n_h_cumulativeNP[l-1]+1, n_h[l])
+						#neuronIndex = np.random.randint(0, n_h_cumulativeNP[l]+1, n_h[l])
 						CseqNP = np.zeros((n_h[l]))
 						CseqLayerNP = np.random.randint(0, l, n_h[l])	#this can be modified to make local/distant connections more probable
 						for index, l2 in enumerate(CseqLayerNP):
@@ -925,7 +921,7 @@ def defineNeuralNetworkParametersSANI():
 						Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNP, dtype=tf.int32)
 			else:
 				if(supportSkipLayers):
-					Wseq[generateParameterNameSeq(l, s, "Wseq")] = tf.Variable(randomNormal([n_h_cumulativeNP[l-1], n_h[l]], dtype=tf.float32))
+					Wseq[generateParameterNameSeq(l, s, "Wseq")] = tf.Variable(randomNormal([n_h_cumulativeNP[l], n_h[l]], dtype=tf.float32))
 					Bseq[generateParameterNameSeq(l, s, "Bseq")] = tf.Variable(tf.zeros(n_h[l]), dtype=tf.float32)
 				else:
 					Wseq[generateParameterNameSeq(l, s, "Wseq")] = tf.Variable(randomNormal([n_h[l-1], n_h[l]], dtype=tf.float32))
@@ -941,9 +937,11 @@ def defineNeuralNetworkParametersSANI():
 			BR[generateParameterName(l, "BR")] = tf.Variable(tf.zeros(n_h[l]), tf.float32)
 								
 		if(supportSkipLayers):
-			n_h_cumulativeNP[l] = n_h_cumulativeNP[l-1] + n_h[l]
+			n_h_cumulativeNP[l] = n_h_cumulativeNP[l-1] + n_h[l-1]
 			  
 	if(supportSkipLayers):
+		n_h_cumulativeNP[numberOfLayers+1] = n_h_cumulativeNP[numberOfLayers] + n_h[numberOfLayers]	#not used
+		
 		n_h_cumulative['n_h_cumulative'] = tf.Variable(n_h_cumulativeNP, dtype=tf.int32)
 
 	

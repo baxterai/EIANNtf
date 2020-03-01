@@ -26,7 +26,7 @@ import tensorflow as tf
 import numpy as np
 
 import sys
-#np.set_printoptions(threshold=sys.maxsize)
+np.set_printoptions(threshold=sys.maxsize)
 
 import SANItf2_globalDefs
 
@@ -256,7 +256,7 @@ for e in range(numEpochs):
 		shuffleSize = datasetNumExamples	#10*batchSize
 		trainData = tf.data.Dataset.from_tensor_slices((train_x, train_y))
 		trainData = trainData.repeat().shuffle(shuffleSize).batch(batchSize).prefetch(1)	#do not repeat
-
+		
 		for batchIndex, (batchX, batchY) in enumerate(trainData.take(trainingSteps), 1):
 
 			if(algorithm == "ANN"):
@@ -269,7 +269,8 @@ for e in range(numEpochs):
 					print("batchIndex: %i, loss: %f, accuracy: %f" % (batchIndex, loss, acc))
 			else:
 				#learning algorithm not yet implemented:
-				pred = neuralNetworkPropagation(batchX)
+				if(batchSize > 1):
+					pred = neuralNetworkPropagation(batchX)
 				
 				if(batchIndex % displayStep == 0):
 					pred = neuralNetworkPropagation(batchX)
@@ -277,7 +278,7 @@ for e in range(numEpochs):
 					print("batchIndex: %i, accuracy: %f" % (batchIndex, acc))
 
 		if(algorithm == "ANN"):
-			pred = neuralNetworkPropagation(test_x)
+			pred = neuralNetworkPropagation(test_x)	#test_x batch may be too large to propagate simultaneously and require subdivision
 			print("Test Accuracy: %f" % calculateAccuracy(pred, test_y))
 		else:
 			#learning algorithm not yet implemented:

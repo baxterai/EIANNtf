@@ -126,6 +126,7 @@ percentageDatasetTrain = 80.0	#ie 80% train, 20% test
 
 datasetType1alreadyNormalised = True	#if True, assume that the dataset includes values between 0 and 1 only
 datasetType2alreadyNormalised = False	#if True, assume that the dataset includes values between 0 and 1 only
+datasetType3alreadyNormalised = True	#if True, assume that the dataset includes values between 0 and 1 only
 
 numberOfFeaturesPerWord = 53	#last feature identifies word as out of sentence padding (out of sentence padding is not expected by loadDatasetType3 as each row only contains data of a specific sentence length; out of sentence padding will be applied by SANItf2_loadDataset after data is read)
 optimiseFeedLength = True
@@ -142,7 +143,7 @@ else:
 #  print('User uploaded file "{name}" with length {length} bytes'.format(
 #		name=fn, length=len(uploaded[fn])))
 
-
+storeRowLengths = False
 
 def iter_loadtxt(filename, delimiter=',', skiprows=0, dtype=float, normaliseRowLengthWithPad=False, normaliseRowLengthWithPadLimit=False, padCharacter='0', maxRowLength=100, minRowLength=0):
 	
@@ -163,7 +164,18 @@ def iter_loadtxt(filename, delimiter=',', skiprows=0, dtype=float, normaliseRowL
 					if(numberOfItems > iter_loadtxt.maxNumberOfItemsPerRow):
 						iter_loadtxt.maxNumberOfItemsPerRow = numberOfItems
 		print("iter_loadtxt.maxNumberOfItemsPerRow = ", iter_loadtxt.maxNumberOfItemsPerRow)
-					
+	
+	if(storeRowLengths):
+		num_lines = 0
+		with open(filename, 'r') as infile:
+			for line in f:
+        			num_lines += 1		
+		rowLengthsArray = np.zeros(num_lines, dtype=int)
+		with open(filename, 'r') as infile:
+			for count, line in enumerate(f):
+				line = line.rstrip().split(delimiter)
+				rowLengthsArray[count] = len(line)
+														
 	def iter_func():
 		with open(filename, 'r') as infile:
 			for _ in range(skiprows):
@@ -193,7 +205,10 @@ def iter_loadtxt(filename, delimiter=',', skiprows=0, dtype=float, normaliseRowL
 
 	data = np.fromiter(iter_func(), dtype=dtype)
 	data = data.reshape((-1, iter_loadtxt.rowlength))
-	return data
+	if(storeRowLengths):
+		return data, rowLengthsArray
+	else:
+		return data
 	
 def hotEncode(y, maxY):
 	yHotEncoded = np.zeros(maxY)
@@ -324,6 +339,8 @@ def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSun
 	
 	#parameters;
 	getDataAsBinary = False	#boolean type does not allow padding	
+	getDataAsInt = True
+		
 	padExamples = True
 	cropExamples = True
 	if(cropExamples):
@@ -352,22 +369,36 @@ def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSun
 	if(getDataAsBinary):
 		dataType = bool
 	else:
-		dataType = float
+		if(getDataAsInt):
+			dataType = int
+		else:
+			dataType = float
+	
+	if(getDataAsBinary):
+		xPOStagActive = True
+		xPOStagInactive = False	
+	else:
+		xPOStagActive = 1
+		xPOStagInactive = 0
+			
+	if(SANItf2_globalDefs.testHarness):	
+		#1 0 0 ... 0 0   0 1 0 ... 0 0 0  0 0 1 ... 0 0 1 			
+		line = np.zeros((SANItf2_globalDefs.testHarnessNumWords*numberOfFeaturesPerWord), dataType)
+		for w in range(SANItf2_globalDefs.testHarnessNumWords):
+			line[numberOfFeaturesPerWord*w+w] = xPOStagActive
 		
-	all_X = iter_loadtxt(datasetFileNameX, delimiter=' ', normaliseRowLengthWithPad=True, normaliseRowLengthWithPadLimit=True, padCharacter=paddingCharacter, maxRowLength=maximumNumFeatures, minRowLength=minimumNumFeatures, dtype=dataType)
+		template = [paddingCharacter] * maximumNumFeatures
+		template[:len(line)] = line
+		all_X = np.expand_dims(template, 0)
+	else:
+		all_X = iter_loadtxt(datasetFileNameX, delimiter=' ', normaliseRowLengthWithPad=True, normaliseRowLengthWithPadLimit=True, padCharacter=paddingCharacter, maxRowLength=maximumNumFeatures, minRowLength=minimumNumFeatures, dtype=dataType)
 	
 	if(onlyAddPOSunambiguousInputToTrain):
 		
 		datasetNumExamples = all_X.shape[0]
 		datasetNumFeatures = all_X.shape[1]
-		all_Xunambiguous = np.empty((0, datasetNumFeatures), float)
+		all_Xunambiguous = np.empty((0, datasetNumFeatures), dataType)
 		
-		if(getDataAsBinary):
-			xPOStagActive = True
-			xPOStagInactive = False	
-		else:
-			xPOStagActive = 1
-			xPOStagInactive = 0
 		eIndex = 0
 		for e in range(datasetNumExamples):
 		
@@ -520,12 +551,17 @@ def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSun
 		all_Y = np.ones(datasetNumExamples, dtype=dataType)
 		#all_Y = np.expand_dims(all_Y, axis=0)
 
-	datasetNumExamplesTrain = int(float(datasetNumExamples)*percentageDatasetTrain/100.0)
-	datasetNumExamplesTest = int(float(datasetNumExamples)*(100.0-percentageDatasetTrain)/100.0)
+	if(SANItf2_globalDefs.testHarness):
+		datasetNumExamplesTrain = datasetNumExamples
+		datasetNumExamplesTest = 0
+	else:
+		datasetNumExamplesTrain = int(float(datasetNumExamples)*percentageDatasetTrain/100.0)
+		datasetNumExamplesTest = int(float(datasetNumExamples)*(100.0-percentageDatasetTrain)/100.0)
+
 	
 	all_Ynormalised = all_Y
 	
-	if(datasetType1alreadyNormalised):
+	if(datasetType3alreadyNormalised):
 		all_Xnormalised = all_X
 	else:
 		#normalise x data between 0.0 and 1.0:
@@ -540,9 +576,14 @@ def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSun
 	train_y = all_Ynormalised[0:datasetNumExamplesTrain]
 	test_y = all_Ynormalised[-datasetNumExamplesTest:]
 	
+	#print(train_x)
+	
 	if(not getDataAsBinary):	
 		# Convert x/y data to float32/uint8.
-		train_x, test_x = np.array(train_x, np.float32), np.array(test_x, np.float32)
+		if(getDataAsInt):
+			train_x, test_x = np.array(train_x, np.int32), np.array(test_x, np.int32)
+		else:
+			train_x, test_x = np.array(train_x, np.float32), np.array(test_x, np.float32)
 		train_y, test_y = np.array(train_y, np.uint8), np.array(test_y, np.uint8)
 		#https://www.tensorflow.org/api_docs/python/tf/keras/datasets/mnist/load_data?version=stable
 		#https://medium.com/@HojjatA/could-not-find-valid-device-for-node-while-eagerly-executing-8f2ff588d1e
