@@ -12,7 +12,7 @@ python3 SANItf2.py
 
 # Description
 
-Train an artificial neural network (ANN or SANI)
+Train an artificial neural network (ANN or SANI or CANN)
 
 - Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
 
@@ -30,7 +30,8 @@ np.set_printoptions(threshold=sys.maxsize)
 
 import SANItf2_globalDefs
 
-algorithm = "SANI"
+algorithm = "CANN"
+#algorithm = "SANI"
 #algorithm = "ANN"
 if(algorithm == "SANI"):
 	algorithmSANI = "sharedModulesBinary"
@@ -44,6 +45,8 @@ if(algorithm == "SANI"):
 		import SANItf2_algorithmSANIsharedModulesBinary as SANItf2_algorithmSANI
 elif(algorithm == "ANN"):
 	import SANItf2_algorithmANN
+elif(algorithm == "CANN"):
+	import SANItf2_algorithmCANN
 
 import SANItf2_loadDataset
 
@@ -79,6 +82,9 @@ if(algorithm == "SANI"):
 elif(algorithm == "ANN"):
 	#dataset = "POStagSequence"
 	dataset = "NewThyroid"
+elif(algorithm == "CANN"):
+	#dataset = "POStagSequence"
+	dataset = "NewThyroid"
 
 if(debugUseSmallDataset):
 	datasetFileNameXstart = "XtrainBatchSmall"
@@ -99,6 +105,8 @@ def neuralNetworkPropagation(x):
 		pred = SANItf2_algorithmSANI.neuralNetworkPropagationSANI(x)
 	elif(algorithm == "ANN"):
 		pred = SANItf2_algorithmANN.neuralNetworkPropagationANN(x)
+	elif(algorithm == "CANN"):
+		pred = SANItf2_algorithmCANN.neuralNetworkPropagationTrainCANN(x, train=True)
 	return pred
 	
 def crossEntropy(y_pred, y_true):
@@ -206,6 +214,10 @@ elif(algorithm == "ANN"):
 	learningRate, trainingSteps, batchSize, displayStep = SANItf2_algorithmANN.defineTrainingParametersANN(dataset, trainMultipleFiles)
 	SANItf2_algorithmANN.defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles)
 	SANItf2_algorithmANN.defineNeuralNetworkParametersANN()
+elif(algorithm == "CANN"):
+	learningRate, trainingSteps, batchSize, displayStep = SANItf2_algorithmCANN.defineTrainingParametersCANN(dataset, trainMultipleFiles)
+	SANItf2_algorithmCANN.defineNetworkParametersCANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles)
+	SANItf2_algorithmCANN.defineNeuralNetworkParametersCANN()
 		
 		
 #define epochs:
@@ -267,7 +279,10 @@ for e in range(numEpochs):
 					loss = crossEntropy(pred, batchY)
 					acc = calculateAccuracy(pred, batchY)
 					print("batchIndex: %i, loss: %f, accuracy: %f" % (batchIndex, loss, acc))
-			else:
+			elif(algorithm == "CANN"):
+				#learning algorithm embedded in forward propagation
+				pred = neuralNetworkPropagation(batchX)
+			elif(algorithm == "SANI"):
 				#learning algorithm not yet implemented:
 				if(batchSize > 1):
 					pred = neuralNetworkPropagation(batchX)
