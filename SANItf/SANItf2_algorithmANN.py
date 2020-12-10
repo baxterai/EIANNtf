@@ -30,6 +30,7 @@ B = {}
 #Network parameters
 n_h = []
 numberOfLayers = 0
+numberOfNetworks = 0
 
 
 def defineTrainingParametersANN(dataset, trainMultipleFiles):
@@ -52,11 +53,13 @@ def defineTrainingParametersANN(dataset, trainMultipleFiles):
 	return learningRate, trainingSteps, batchSize, displayStep
 	
 
-def defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles):
+def defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
 
 	global n_h
 	global numberOfLayers
-
+	global numberOfNetworks
+	numberOfNetworks = numberOfNetworksSet
+	
 	if(trainMultipleFiles):
 		n_x = num_input_neurons #datasetNumFeatures
 		n_y = num_output_neurons  #datasetNumClasses
@@ -92,14 +95,18 @@ def defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNum
 		n_h_3 = n_y
 		n_h = [n_h_0, n_h_1, n_h_2, n_h_3]
 		numberOfLayers = 3
+		
+	return numberOfLayers
 	
 	
-def neuralNetworkPropagationANN(x):
+def neuralNetworkPropagationANN(x, networkIndex=1):
+			
+	#print("numberOfLayers", numberOfLayers)
 	
 	AprevLayer = x
 	for l in range(1, numberOfLayers+1):
 		#print("l = " + str(l))
-		Z = tf.add(tf.matmul(AprevLayer, W[generateParameterName(l, "W")]), B[generateParameterName(l, "B")])
+		Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
 		A = tf.nn.sigmoid(Z)
 		AprevLayer = A
 	
@@ -107,11 +114,15 @@ def neuralNetworkPropagationANN(x):
 
 def defineNeuralNetworkParametersANN():
 
+	print("numberOfNetworks", numberOfNetworks)
+	
 	randomNormal = tf.initializers.RandomNormal()
 	
-	for l in range(1, numberOfLayers+1):
+	for networkIndex in range(1, numberOfNetworks+1):
+			
+		for l in range(1, numberOfLayers+1):
 
-		W[generateParameterName(l, "W")] = tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
-		B[generateParameterName(l, "B")] = tf.Variable(tf.zeros(n_h[l]))
+			W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
+			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
 
 
