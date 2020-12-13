@@ -41,16 +41,19 @@ def defineTrainingParametersANN(dataset, trainMultipleFiles):
 		elif(dataset == "NewThyroid"):
 			trainingSteps = 1000
 		batchSize = 100
+		numEpochs = 10
 	else:
 		learningRate = 0.001
 		if(dataset == "POStagSequence"):
 			trainingSteps = 10000
+			numEpochs = 1
 		elif(dataset == "NewThyroid"):
 			trainingSteps = 1000
+			numEpochs = 10
 		batchSize = 1000
 	displayStep = 100
-	
-	return learningRate, trainingSteps, batchSize, displayStep
+			
+	return learningRate, trainingSteps, batchSize, displayStep, numEpochs
 	
 
 def defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):

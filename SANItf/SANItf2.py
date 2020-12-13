@@ -32,6 +32,7 @@ np.set_printoptions(threshold=sys.maxsize)
 import SANItf2_operations
 from SANItf2_operations import generateParameterNameNetwork
 import SANItf2_globalDefs
+from numpy import random
 
 #algorithm = "ANN"
 algorithm = "SUANN"
@@ -237,53 +238,50 @@ num_output_neurons = datasetNumClasses
 if(algorithm == "SANI"):
 	if(dataset == "POStagSentence"):
 		SANItf2_algorithmSANI.defineTrainingParametersSANIsharedModules(numberOfFeaturesPerWord, paddingTagIndex)
-	learningRate, trainingSteps, batchSize, displayStep = SANItf2_algorithmSANI.defineTrainingParametersSANI(dataset, trainMultipleFiles)
+	learningRate, trainingSteps, batchSize, displayStep, numEpochs = SANItf2_algorithmSANI.defineTrainingParametersSANI(dataset, trainMultipleFiles)
 	SANItf2_algorithmSANI.defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, useSmallSentenceLengths)
 	SANItf2_algorithmSANI.defineNeuralNetworkParametersSANI()
 elif(algorithm == "ANN"):
-	learningRate, trainingSteps, batchSize, displayStep = SANItf2_algorithmANN.defineTrainingParametersANN(dataset, trainMultipleFiles)
+	learningRate, trainingSteps, batchSize, displayStep, numEpochs = SANItf2_algorithmANN.defineTrainingParametersANN(dataset, trainMultipleFiles)
 	numberOfLayers = SANItf2_algorithmANN.defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
 	SANItf2_algorithmANN.defineNeuralNetworkParametersANN()
 elif(algorithm == "CANN"):
-	learningRate, trainingSteps, batchSize, displayStep = SANItf2_algorithmCANN.defineTrainingParametersCANN(dataset, trainMultipleFiles)
+	learningRate, trainingSteps, batchSize, displayStep, numEpochs = SANItf2_algorithmCANN.defineTrainingParametersCANN(dataset, trainMultipleFiles)
 	numberOfLayers = SANItf2_algorithmCANN.defineNetworkParametersCANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
 	SANItf2_algorithmCANN.defineNeuralNetworkParametersCANN()
 elif(algorithm == "SUANN"):
-	learningRate, trainingSteps, batchSize, displayStep = SANItf2_algorithmSUANN.defineTrainingParametersSUANN(dataset, trainMultipleFiles)
+	learningRate, trainingSteps, batchSize, displayStep, numEpochs = SANItf2_algorithmSUANN.defineTrainingParametersSUANN(dataset, trainMultipleFiles)
 	numberOfLayers = SANItf2_algorithmSUANN.defineNetworkParametersSUANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
 	SANItf2_algorithmSUANN.defineNeuralNetworkParametersSUANN()		
 		
 #define epochs:
 			
-numEpochs = -1
 fileIndexFirst = -1
 fileIndexLast = -1
 if(trainMultipleFiles):
-	numEpochs = 10
 	fileIndexFirst = 0
 	if(useSmallSentenceLengths):
 		fileIndexLast = 11
 	else:
 		fileIndexLast = 1202
 else:
-	if(dataset == "NewThyroid"):
-		if(algorithm == "ANN"):
-			numEpochs = 10
-		elif(algorithm == "CANN"):
-			numEpochs = 10	#100
-		elif(algorithm == "SUANN"):
-			numEpochs = 10	#100
-	else:
-		numEpochs = 1
 	fileIndexFirst = 0 
 	fileIndexLast = 0
 
-
+if(algorithm == "SUANN"):
+	noisySampleGeneration, noisySampleGenerationNumSamples, noiseStandardDeviation = SANItf2_algorithmSUANN.getNoisySampleGenerationNumSamples()
+	if(noisySampleGeneration):
+		batchXmultiples = tf.constant([noisySampleGenerationNumSamples, 1], tf.int32)
+		batchYmultiples = tf.constant([noisySampleGenerationNumSamples], tf.int32)
+		randomNormal = tf.initializers.RandomNormal()	#tf.initializers.RandomUniform(minval=-1, maxval=1)
+		
 # Stochastic gradient descent optimizer.
 optimizer = tf.optimizers.SGD(learningRate)
-
+	
 for e in range(numEpochs):
 
+	print("epoch e = ", e)
+	
 	fileIndexArray = np.arange(fileIndexFirst, fileIndexLast+1, 1)
 	#print("fileIndexArray = " + str(fileIndexArray))
 	np.random.shuffle(fileIndexArray)
@@ -312,7 +310,19 @@ for e in range(numEpochs):
 		trainData = trainData.repeat().shuffle(shuffleSize).batch(batchSize).prefetch(1)	#do not repeat
 				
 		for batchIndex, (batchX, batchY) in enumerate(trainData.take(trainingSteps), 1):
-
+	
+			if(algorithm == "SUANN"):
+				if(noisySampleGeneration):
+					if(batchSize != 1):	#batchX.shape[0]
+						print("error: noisySampleGeneration && batchSize != 1")
+						exit()
+					batchX = tf.tile(batchX, batchXmultiples)
+					batchY = tf.tile(batchY, batchYmultiples)
+					batchXnoise = tf.math.multiply(tf.constant(randomNormal(batchX.shape), tf.float32), noiseStandardDeviation)
+					batchX = tf.math.add(batchX, batchXnoise)
+					#print("batchX = ", batchX)
+					#print("batchY = ", batchY)
+					
 			predNetworkAverage = tf.Variable(tf.zeros(datasetNumClasses))
 			
 			for networkIndex in range(1, numberOfNetworks+1):

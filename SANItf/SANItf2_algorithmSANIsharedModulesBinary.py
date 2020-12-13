@@ -143,20 +143,23 @@ def defineTrainingParametersSANI(dataset, trainMultipleFiles):
 	if(SANItf2_globalDefs.testHarness):	
 		learningRate = 0.001
 		trainingSteps = 1
+		numEpochs = 1
 	else:
 		if(trainMultipleFiles):
 			learningRate = 0.001
 			if(dataset == "POStagSentence"):
 				trainingSteps = 10000
+			numEpochs = 10
 		else:
 			learningRate = 0.001
 			if(dataset == "POStagSentence"):
 				trainingSteps = 10000
+			numEpochs = 1
 
 	batchSize = 1	#4	#32	#128	#256
 	displayStep = 1
 
-	return learningRate, trainingSteps, batchSize, displayStep
+	return learningRate, trainingSteps, batchSize, displayStep, numEpochs
 	
 def defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, useSmallSentenceLengths):
 	

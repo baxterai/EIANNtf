@@ -22,23 +22,50 @@ import tensorflow as tf
 import numpy as np
 from SANItf2_operations import *	#generateParameterNameSeq, generateParameterName, defineNetworkParameters
 import SANItf2_operations
-#from SANItf2_operations import generateParameterNameNetwork
 import SANItf2_globalDefs
 import math
 from numpy import random
 
-maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.8	#0.8	#10
 
-numberOfSubsetsTrialledPerBaseParameter = 10	#will affect speed
+biologicalConstraints = True	#batchSize=1, _?
 
-generateNetworkNonlinearConvergence = False
+useBatch = True
+noisySampleGeneration = False
+noisySampleGenerationNumSamples = 0
+noiseStandardDeviation = 0
+
+if(biologicalConstraints):
+	useBinaryWeights = True	#increases stochastically updated training speed, but reduces final accuracy
+	if(useBinaryWeights):	
+		averageTotalInput = -1
+		useBinaryWeightsReduceMemoryWithBool = True	#can use bool instead of float32 to limit memory required, but requires casting to float32 for matrix multiplications
+	numberOfSubsetsTrialledPerBaseParameter = 1
+	parameterUpdateSubsetSize = 1
+	if(not useBinaryWeights):
+		useBatch = False
+		noisySampleGeneration = True	#possible biological replacement for input data batchSize > 1 (provides better performance than standard input data batchSize == 1, but less performance than input data batchSize > 10+)
+		if(noisySampleGeneration):
+			noisySampleGenerationNumSamples = 10
+			noiseStandardDeviation = 0.03
+else:
+	updateParameterSubsetSimultaneously = False	#current tests indiciate this is not required/beneficial with significantly high batch size
+	if(updateParameterSubsetSimultaneously):
+		numberOfSubsetsTrialledPerBaseParameter = 10	#decreases speed, but provides more robust parameter updates
+		parameterUpdateSubsetSize = 5	#decreases speed, but provides more robust parameter updates
+	else:
+		numberOfSubsetsTrialledPerBaseParameter = 1
+		parameterUpdateSubsetSize = 1	
+
+if(useBinaryWeights):	
+	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 5	#binary weighted network requires more parameters than float32 weighted network (a network with non linear convergence is generated for this purpose)
+	generateNetworkNonlinearConvergence = True
+else:
+	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.8	#0.8	#10
+	generateNetworkNonlinearConvergence = False
+	
 if(generateNetworkNonlinearConvergence):
 	networkDivergenceType = "nonLinearConverging"
-	if(applyNeuronThresholdBias):
-		#this will affect the optimimum convergence angle
-		networkOptimumConvergenceAngle = 0.5+applyNeuronThresholdBiasValue
-	else:
-		networkOptimumConvergenceAngle = 0.5	#if angle > 0.5, then more obtuse triange, if < 0.5 then more acute triangle	#fractional angle between 0 and 90 degrees
+	networkOptimumConvergenceAngle = 0.5	#if angle > 0.5, then more obtuse triange, if < 0.5 then more acute triangle	#fractional angle between 0 and 90 degrees
 	networkDivergence = 1.0-networkOptimumConvergenceAngle 
 	#required for Logarithms with a Fraction as Base:
 	networkDivergenceNumerator = int(networkDivergence*10)
@@ -46,6 +73,7 @@ if(generateNetworkNonlinearConvergence):
 else:
 	networkDivergenceType = "linearConverging"
 	#networkDivergenceType = "linearDivergingThenConverging"	#not yet coded
+	
 	
 
 W = {}
@@ -72,6 +100,9 @@ batchSize = 0
 
 #randomNormal = tf.initializers.RandomNormal()
 
+def getNoisySampleGenerationNumSamples():
+	return noisySampleGeneration, noisySampleGenerationNumSamples, noiseStandardDeviation
+	
 def defineTrainingParametersSUANN(dataset, trainMultipleFiles):
 
 	global learningRate
@@ -85,16 +116,26 @@ def defineTrainingParametersSUANN(dataset, trainMultipleFiles):
 		elif(dataset == "NewThyroid"):
 			trainingSteps = 1000
 		batchSize = 100
+		numEpochs = 10
 	else:
-		learningRate = 0.001
+		if(biologicalConstraints):
+			learningRate = 0.01
+		else:
+			learningRate = 0.001
 		if(dataset == "POStagSequence"):
 			trainingSteps = 10000
 		elif(dataset == "NewThyroid"):
 			trainingSteps = 1000
-		batchSize = 10	#1	#10	#1000	#temporarily reduce batch size for visual debugging (array length) purposes)
-	displayStep = 100
+		if(useBatch):
+			batchSize = 100
+			numEpochs = 10
+		else:
+			batchSize = 1
+			numEpochs = 100
 	
-	return learningRate, trainingSteps, batchSize, displayStep
+	displayStep = 100
+
+	return learningRate, trainingSteps, batchSize, displayStep, numEpochs
 	
 
 def defineNetworkParametersSUANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
@@ -174,16 +215,33 @@ def defineNetworkParametersSUANN(num_input_neurons, num_output_neurons, datasetN
 	
 	
 def neuralNetworkPropagationSUANN(x, networkIndex=1):
-			
+	
+	global averageTotalInput
+		
 	AprevLayer = x
-	 
+
+	if(useBinaryWeights):	
+		if(averageTotalInput == -1):
+			averageTotalInput = tf.math.reduce_mean(x)
+			print("averageTotalInput = ", averageTotalInput)
+			 
+	#print("x = ", x)
+	
 	for l in range(1, numberOfLayers+1):
 	
 		#print("l = " + str(l))
-
-		Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-		A = relu(Z)
-		#A = tf.nn.relu(Z)
+		
+		if(useBinaryWeights):
+			if(useBinaryWeightsReduceMemoryWithBool):
+				Wfloat = tf.dtypes.cast(W[generateParameterNameNetwork(networkIndex, l, "W")], dtype=tf.float32)
+				Bfloat = tf.dtypes.cast(B[generateParameterNameNetwork(networkIndex, l, "B")], dtype=tf.float32)
+				Z = tf.add(tf.matmul(AprevLayer, Wfloat), Bfloat)
+			else:
+				Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
+			A = reluCustom(Z, n_h[l-1])
+		else:
+			Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
+			A = reluCustom(Z)
 			
 		AprevLayer = A
 			
@@ -198,7 +256,7 @@ def neuralNetworkPropagationSUANNtest(x, y, networkIndex=1):
 	
 	return loss, acc
 	
-def neuralNetworkPropagationSUANNtrain(x, y=None, networkIndex=1, parameterUpdateSubsetSize=1):
+def neuralNetworkPropagationSUANNtrain(x, y=None, networkIndex=1):
 
 	#print("batchSize = ", batchSize)
 	#print("learningRate = ", learningRate)
@@ -209,7 +267,12 @@ def neuralNetworkPropagationSUANNtrain(x, y=None, networkIndex=1, parameterUpdat
 	print("lossStart = ", lossStart)
 	
 	#ensure that an update is tried at least once for each parameter of the network during each training iteration:
-		
+	
+	if(not useBinaryWeights):
+		variationDirections = 1
+	else:
+		variationDirections = 2
+	
 	for l in range(1, numberOfLayers+1):
 		
 		#print("l = ", l)
@@ -222,7 +285,7 @@ def neuralNetworkPropagationSUANNtrain(x, y=None, networkIndex=1, parameterUpdat
 					parameterTypeWorB = 0
 				else:
 					parameterTypeWorB = 1
-				for variationDirectionInt in range(2):
+				for variationDirectionInt in range(variationDirections):
 	
 					networkParameterIndexBase = (parameterTypeWorB, l, hIndexCurrentLayer, hIndexPreviousLayer, variationDirectionInt)
 			
@@ -247,24 +310,43 @@ def neuralNetworkPropagationSUANNtrain(x, y=None, networkIndex=1, parameterUpdat
 						for s in range(0, parameterUpdateSubsetSize):
 							networkParameterIndex = currentSubsetOfParameters[s]
 							
-							if(networkParameterIndex[NETWORK_PARAM_INDEX_VARIATION_DIRECTION] == 1):
-								variationDiff = learningRate
-							else:
-								variationDiff = -learningRate							
+							if(not useBinaryWeights):
+								if(networkParameterIndex[NETWORK_PARAM_INDEX_VARIATION_DIRECTION] == 1):
+									variationDiff = learningRate
+								else:
+									variationDiff = -learningRate							
 														
 							if(networkParameterIndex[NETWORK_PARAM_INDEX_TYPE] == 1):
-								Wnp = W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")].numpy()
-								currentVal = Wnp[networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]]
+								#Wnp = W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")].numpy()
+								#currentVal = Wnp[networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]]
+								currentVal = W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")][networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].numpy()
+								
 								#print("currentVal = ", currentVal)
 								#print("W1 = ", W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")])
-								
-								W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")][networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(currentVal + variationDiff)
+								if(useBinaryWeights):
+									if(useBinaryWeightsReduceMemoryWithBool):
+										newVal = not currentVal
+									else:
+										newVal = float(not bool(currentVal))
+										#print("newVal = ", newVal)
+								else:
+									newVal = currentVal + variationDiff
+								W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")][networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
 						
 								#print("W2 = ", W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")])
 							else:
-								Bnp = B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")].numpy()
-								currentVal = Bnp[networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]]
-								B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(currentVal + variationDiff)
+								#Bnp = B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")].numpy()
+								#currentVal = Bnp[networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]]
+								currentVal = B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].numpy()
+								
+								if(useBinaryWeights):
+									if(useBinaryWeightsReduceMemoryWithBool):
+										newVal = not currentVal
+									else:
+										newVal = float(not bool(currentVal))
+								else:
+									newVal = currentVal + variationDiff
+								B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
 			
 						loss, acc = neuralNetworkPropagationSUANNtest(x, y, networkIndex)
 						#print("loss = ", loss)
@@ -272,7 +354,7 @@ def neuralNetworkPropagationSUANNtrain(x, y=None, networkIndex=1, parameterUpdat
 						if(loss < lossBase):
 							accuracyImprovementDetected = True
 							lossBase = loss
-							#print("(loss < lossBase): loss = ", loss)						
+							#print("\t(loss < lossBase): loss = ", loss)						
 						
 						if accuracyImprovementDetected:
 							#print("accuracyImprovementDetected")
@@ -313,15 +395,28 @@ def getRandomNetworkParameter(networkIndex, currentSubsetOfParameters):
 	
 
 def defineNeuralNetworkParametersSUANN():
-
-	randomNormal = tf.initializers.RandomNormal()
+	
+	tf.random.set_seed(5);
+	if(useBinaryWeights):
+		if(useBinaryWeightsReduceMemoryWithBool):
+			dtype=tf.dtypes.bool
+		else:
+			dtype=tf.dtypes.float32
+	else:
+		#randomNormal = tf.initializers.RandomNormal()
+		dtype=tf.dtypes.float32
 	
 	for networkIndex in range(1, numberOfNetworks+1):
 	
 		for l in range(1, numberOfLayers+1):
 
-			W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
-			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
+			if(useBinaryWeights):
+				Wint = tf.random.uniform([n_h[l-1], n_h[l]], minval=0, maxval=2, dtype=tf.dtypes.int32)		#The lower bound minval is included in the range, while the upper bound maxval is excluded.
+				W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(tf.dtypes.cast(Wint, dtype=dtype))
+				#print("W[generateParameterNameNetwork(networkIndex, l, W)] = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
+			else:
+				W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(tf.random.normal([n_h[l-1], n_h[l]], dtype=dtype))		#tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
+			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l], dtype=dtype))
 			
 			Wbackup[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(W[generateParameterNameNetwork(networkIndex, l, "W")])
 			Bbackup[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(B[generateParameterNameNetwork(networkIndex, l, "B")])
@@ -330,9 +425,21 @@ def defineNeuralNetworkParametersSUANN():
 			#print(Wbackup[generateParameterNameNetwork(networkIndex, l, "W")])
 			#exit()
 
-def relu(Z):
+def reluCustom(Z, prevLayerSize=None):
 	
-	A = tf.nn.relu(Z)
+	if(useBinaryWeights):	
+		#offset required because negative weights are not used:
+		Zoffset = tf.ones(Z.shape)
+		Zoffset = tf.multiply(Zoffset, averageTotalInput)
+		Zoffset = tf.multiply(Zoffset, prevLayerSize/2)
+		#print("Zoffset = ", Zoffset)
+		Z = tf.subtract(Z, Zoffset) 
+		A = tf.nn.relu(Z)
+	else:
+		A = tf.nn.relu(Z)
+	
+	#print("Z = ", Z)
+	#print("A = ", A)
 	
 	return A
 

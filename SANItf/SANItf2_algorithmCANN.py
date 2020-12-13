@@ -109,6 +109,7 @@ def defineTrainingParametersCANN(dataset, trainMultipleFiles):
 		elif(dataset == "NewThyroid"):
 			trainingSteps = 1000
 		batchSize = 100
+		numEpochs = 10
 	else:
 		learningRate = 0.001
 		forgetRate = 0.001
@@ -117,9 +118,14 @@ def defineTrainingParametersCANN(dataset, trainMultipleFiles):
 		elif(dataset == "NewThyroid"):
 			trainingSteps = 1000
 		batchSize = 10	#1	#10	#1000	#temporarily reduce batch size for visual debugging (array length) purposes)
-	displayStep = 100
+		if(dataset == "NewThyroid"):
+			numEpochs = 10
+		else:
+			numEpochs = 1
 	
-	return learningRate, trainingSteps, batchSize, displayStep
+	displayStep = 100
+				
+	return learningRate, trainingSteps, batchSize, displayStep, numEpochs
 	
 
 def defineNetworkParametersCANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
