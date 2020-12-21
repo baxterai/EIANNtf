@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""SANItf2_algorithmCANN.py
+"""ANNtf2_algorithmSUANN.py
 
 # Requirements:
 Python 3 and Tensorflow 2.1+ 
@@ -8,7 +8,7 @@ Python 3 and Tensorflow 2.1+
 MIT License
 
 # Usage:
-see SANItf2.py
+see ANNtf2.py
 
 # Description
 
@@ -20,9 +20,9 @@ Define fully connected stochastically updated artificial neural network (SUANN)
 
 import tensorflow as tf
 import numpy as np
-from SANItf2_operations import *	#generateParameterNameSeq, generateParameterName, defineNetworkParameters
-import SANItf2_operations
-import SANItf2_globalDefs
+from ANNtf2_operations import *	#generateParameterNameSeq, generateParameterName, defineNetworkParameters
+import ANNtf2_operations
+import ANNtf2_globalDefs
 import math
 from numpy import random
 
@@ -119,7 +119,10 @@ def defineTrainingParametersSUANN(dataset, trainMultipleFiles):
 		numEpochs = 10
 	else:
 		if(biologicalConstraints):
-			learningRate = 0.01
+			if(useBatch):
+				learningRate = 0.01
+			else:
+				learningRate = 0.001
 		else:
 			learningRate = 0.001
 		if(dataset == "POStagSequence"):
@@ -212,7 +215,39 @@ def defineNetworkParametersSUANN(num_input_neurons, num_output_neurons, datasetN
 	print("defineNetworkParametersSUANN, n_h = ", n_h)
 
 	return numberOfLayers
+
+
+def defineNeuralNetworkParametersSUANN():
 	
+	tf.random.set_seed(5);
+	if(useBinaryWeights):
+		if(useBinaryWeightsReduceMemoryWithBool):
+			dtype=tf.dtypes.bool
+		else:
+			dtype=tf.dtypes.float32
+	else:
+		#randomNormal = tf.initializers.RandomNormal()
+		dtype=tf.dtypes.float32
+	
+	for networkIndex in range(1, numberOfNetworks+1):
+	
+		for l in range(1, numberOfLayers+1):
+
+			if(useBinaryWeights):
+				Wint = tf.random.uniform([n_h[l-1], n_h[l]], minval=0, maxval=2, dtype=tf.dtypes.int32)		#The lower bound minval is included in the range, while the upper bound maxval is excluded.
+				W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(tf.dtypes.cast(Wint, dtype=dtype))
+				#print("W[generateParameterNameNetwork(networkIndex, l, W)] = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
+			else:
+				W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(tf.random.normal([n_h[l-1], n_h[l]], dtype=dtype))		#tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
+			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l], dtype=dtype))
+			
+			Wbackup[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(W[generateParameterNameNetwork(networkIndex, l, "W")])
+			Bbackup[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(B[generateParameterNameNetwork(networkIndex, l, "B")])
+	
+			#print(W[generateParameterNameNetwork(networkIndex, l, "W")])
+			#print(Wbackup[generateParameterNameNetwork(networkIndex, l, "W")])
+			#exit()
+				
 	
 def neuralNetworkPropagationSUANN(x, networkIndex=1):
 	
@@ -251,8 +286,8 @@ def neuralNetworkPropagationSUANN(x, networkIndex=1):
 def neuralNetworkPropagationSUANNtest(x, y, networkIndex=1):
 
 	pred = neuralNetworkPropagationSUANN(x, networkIndex)
-	loss = SANItf2_operations.crossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=False)
-	acc = SANItf2_operations.calculateAccuracy(pred, y)
+	loss = ANNtf2_operations.crossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=False)
+	acc = ANNtf2_operations.calculateAccuracy(pred, y)
 	
 	return loss, acc
 	
@@ -392,38 +427,7 @@ def getRandomNetworkParameter(networkIndex, currentSubsetOfParameters):
 			
 	return networkParameterIndex
 
-	
 
-def defineNeuralNetworkParametersSUANN():
-	
-	tf.random.set_seed(5);
-	if(useBinaryWeights):
-		if(useBinaryWeightsReduceMemoryWithBool):
-			dtype=tf.dtypes.bool
-		else:
-			dtype=tf.dtypes.float32
-	else:
-		#randomNormal = tf.initializers.RandomNormal()
-		dtype=tf.dtypes.float32
-	
-	for networkIndex in range(1, numberOfNetworks+1):
-	
-		for l in range(1, numberOfLayers+1):
-
-			if(useBinaryWeights):
-				Wint = tf.random.uniform([n_h[l-1], n_h[l]], minval=0, maxval=2, dtype=tf.dtypes.int32)		#The lower bound minval is included in the range, while the upper bound maxval is excluded.
-				W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(tf.dtypes.cast(Wint, dtype=dtype))
-				#print("W[generateParameterNameNetwork(networkIndex, l, W)] = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
-			else:
-				W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(tf.random.normal([n_h[l-1], n_h[l]], dtype=dtype))		#tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
-			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l], dtype=dtype))
-			
-			Wbackup[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(W[generateParameterNameNetwork(networkIndex, l, "W")])
-			Bbackup[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(B[generateParameterNameNetwork(networkIndex, l, "B")])
-	
-			#print(W[generateParameterNameNetwork(networkIndex, l, "W")])
-			#print(Wbackup[generateParameterNameNetwork(networkIndex, l, "W")])
-			#exit()
 
 def reluCustom(Z, prevLayerSize=None):
 	
@@ -435,6 +439,11 @@ def reluCustom(Z, prevLayerSize=None):
 		#print("Zoffset = ", Zoffset)
 		Z = tf.subtract(Z, Zoffset) 
 		A = tf.nn.relu(Z)
+		#AaboveZero = tf.math.greater(A, 0)
+		#AaboveZeroFloat = tf.dtypes.cast(AaboveZero, dtype=tf.dtypes.float32)
+		#ZoffsetRestore = AaboveZeroFloat*Zoffset
+		#print("ZoffsetRestore = ", ZoffsetRestore)
+		#A = tf.add(A, ZoffsetRestore)
 	else:
 		A = tf.nn.relu(Z)
 	

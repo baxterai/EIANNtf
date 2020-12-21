@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""SANItf2_globalDefs.py
+"""ANNtf2_globalDefs.py
 
 # Requirements:
 Python 3 and Tensorflow 2.1+ 
@@ -8,7 +8,7 @@ Python 3 and Tensorflow 2.1+
 MIT License
 
 # Usage:
-see SANItf2.py
+see ANNtf2.py
 
 # Description
 

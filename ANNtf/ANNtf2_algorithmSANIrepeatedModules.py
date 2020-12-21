@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""SANItf2_algorithmSANIrepeatedModules.py
+"""ANNtf2_algorithmSANIrepeatedModules.py
 
 # Requirements:
 Python 3 and Tensorflow 2.1+ 
@@ -8,7 +8,7 @@ Python 3 and Tensorflow 2.1+
 MIT License
 
 # Usage:
-see SANItf2.py
+see ANNtf2.py
 
 # Description:
 
@@ -22,8 +22,8 @@ Neural modules cannot be shared between different areas of input sequence.
 
 import tensorflow as tf
 import numpy as np
-from SANItf2_operations import * #generateParameterNameSeq, generateParameterName
-import SANItf2_globalDefs
+from ANNtf2_operations import * #generateParameterNameSeq, generateParameterName
+import ANNtf2_globalDefs
 
 
 veryLargeInt = 99999999
@@ -175,7 +175,66 @@ def defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNu
 	numberOfLayers = len(n_h)-1
 	numberOfSequentialInputs = 2	#3
 	
+
+def defineNeuralNetworkParametersSANI():
+
+	randomNormal = tf.initializers.RandomNormal()
+		
+	global n_h_cumulative
 	
+	if(supportSkipLayers):
+		n_h_cumulativeNP = np.zeros((numberOfLayers+2), dtype=int)
+		n_h_cumulativeNP[0] = 0	#first row always set to 0 for indexing purposes
+		
+	for l in range(1, numberOfLayers+1):
+		for s in range(numberOfSequentialInputs):
+			if(allowMultipleSubinputsPerSequentialInput):
+				if(supportSkipLayers):
+					#neuronIndex = np.random.randint(0, n_h_cumulativeNP[l]+1, n_h[l])
+					CseqNP = np.zeros((numberSubinputsPerSequentialInput, n_h[l]))
+					CseqLayerNP = np.random.randint(0, l, (numberSubinputsPerSequentialInput, n_h[l]))	#this can be modified to make local/distant connections more probable
+					for i in range(numberSubinputsPerSequentialInput):
+						for j in range(n_h[l]):
+							l2 = CseqLayerNP[i, j]
+							CseqNP[i,j] = np.random.randint(0, n_h[l2], 1)
+					Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNP, dtype=tf.int32)
+					CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")] = tf.Variable(CseqLayerNP, dtype=tf.int32)
+				else:
+					CseqNP = np.random.randint(0, n_h[l-1]+1, (numberSubinputsPerSequentialInput, n_h[l]))	#note +1 is required because np.random.randint generates int between min and max-1
+					Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNP, dtype=tf.int32)
+
+				if(performSummationOfSubInputsWeighted):
+					WseqNP = np.random.rand(numberSubinputsPerSequentialInput, n_h[l])
+					Wseq[generateParameterNameSeq(l, s, "Wseq")] = tf.Variable(WseqNP, dtype=tf.float32)
+					Bseq[generateParameterNameSeq(l, s, "Bseq")] = tf.Variable(tf.zeros(n_h[l]), dtype=tf.float32)
+			else:
+				if(supportSkipLayers):
+					#neuronIndex = np.random.randint(0, n_h_cumulativeNP[l]+1, n_h[l])
+					CseqNP = np.zeros((n_h[l]))
+					CseqLayerNP = np.random.randint(0, l, n_h[l])	#this can be modified to make local/distant connections more probable
+					for index, l2 in enumerate(CseqLayerNP):
+						CseqNP[index] = np.random.randint(0, n_h[l2], 1)
+					Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNP, dtype=tf.int32)
+					CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")] = tf.Variable(CseqLayerNP, dtype=tf.int32)
+				else:
+					CseqNP = np.random.randint(0, n_h[l-1]+1, n_h[l])	#note +1 is required because np.random.randint generates int between min and max-1
+					Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNP, dtype=tf.int32)
+
+		if(performSummationOfSequentialInputsWeighted):	
+			W[generateParameterName(l, "W")] = tf.Variable(randomNormal([numberOfSequentialInputs, n_h[l]], dtype=tf.float32))	#randomNormal	#note the architecture of this weight matrix is different than a normal weight matrix. Every set of numberOfSequentialInputs (e.g. 3) represents a unique set of sequential neuron inputs (artificial neurons), and are mapped to an independent neuron (real neuron)
+			if(allowMultipleSubinputsPerSequentialInput):
+				B[generateParameterName(l, "B")] = tf.Variable(tf.zeros(n_h[l]), tf.float32)
+				
+		if(supportSkipLayers):
+			n_h_cumulativeNP[l] = n_h_cumulativeNP[l-1] + n_h[l-1]
+			  
+	if(supportSkipLayers):
+		n_h_cumulativeNP[numberOfLayers+1] = n_h_cumulativeNP[numberOfLayers] + n_h[numberOfLayers]	#not used
+		
+		n_h_cumulative['n_h_cumulative'] = tf.Variable(n_h_cumulativeNP, dtype=tf.int32)
+
+
+
 def neuralNetworkPropagationSANI(x):
 		
 	batchSize = x.shape[0]
@@ -545,59 +604,3 @@ def neuralNetworkPropagationSANI(x):
 
 	
 
-def defineNeuralNetworkParametersSANI():
-
-	randomNormal = tf.initializers.RandomNormal()
-		
-	global n_h_cumulative
-	
-	if(supportSkipLayers):
-		n_h_cumulativeNP = np.zeros((numberOfLayers+2), dtype=int)
-		n_h_cumulativeNP[0] = 0	#first row always set to 0 for indexing purposes
-		
-	for l in range(1, numberOfLayers+1):
-		for s in range(numberOfSequentialInputs):
-			if(allowMultipleSubinputsPerSequentialInput):
-				if(supportSkipLayers):
-					#neuronIndex = np.random.randint(0, n_h_cumulativeNP[l]+1, n_h[l])
-					CseqNP = np.zeros((numberSubinputsPerSequentialInput, n_h[l]))
-					CseqLayerNP = np.random.randint(0, l, (numberSubinputsPerSequentialInput, n_h[l]))	#this can be modified to make local/distant connections more probable
-					for i in range(numberSubinputsPerSequentialInput):
-						for j in range(n_h[l]):
-							l2 = CseqLayerNP[i, j]
-							CseqNP[i,j] = np.random.randint(0, n_h[l2], 1)
-					Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNP, dtype=tf.int32)
-					CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")] = tf.Variable(CseqLayerNP, dtype=tf.int32)
-				else:
-					CseqNP = np.random.randint(0, n_h[l-1]+1, (numberSubinputsPerSequentialInput, n_h[l]))	#note +1 is required because np.random.randint generates int between min and max-1
-					Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNP, dtype=tf.int32)
-
-				if(performSummationOfSubInputsWeighted):
-					WseqNP = np.random.rand(numberSubinputsPerSequentialInput, n_h[l])
-					Wseq[generateParameterNameSeq(l, s, "Wseq")] = tf.Variable(WseqNP, dtype=tf.float32)
-					Bseq[generateParameterNameSeq(l, s, "Bseq")] = tf.Variable(tf.zeros(n_h[l]), dtype=tf.float32)
-			else:
-				if(supportSkipLayers):
-					#neuronIndex = np.random.randint(0, n_h_cumulativeNP[l]+1, n_h[l])
-					CseqNP = np.zeros((n_h[l]))
-					CseqLayerNP = np.random.randint(0, l, n_h[l])	#this can be modified to make local/distant connections more probable
-					for index, l2 in enumerate(CseqLayerNP):
-						CseqNP[index] = np.random.randint(0, n_h[l2], 1)
-					Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNP, dtype=tf.int32)
-					CseqLayer[generateParameterNameSeq(l, s, "CseqLayer")] = tf.Variable(CseqLayerNP, dtype=tf.int32)
-				else:
-					CseqNP = np.random.randint(0, n_h[l-1]+1, n_h[l])	#note +1 is required because np.random.randint generates int between min and max-1
-					Cseq[generateParameterNameSeq(l, s, "Cseq")] = tf.Variable(CseqNP, dtype=tf.int32)
-
-		if(performSummationOfSequentialInputsWeighted):	
-			W[generateParameterName(l, "W")] = tf.Variable(randomNormal([numberOfSequentialInputs, n_h[l]], dtype=tf.float32))	#randomNormal	#note the architecture of this weight matrix is different than a normal weight matrix. Every set of numberOfSequentialInputs (e.g. 3) represents a unique set of sequential neuron inputs (artificial neurons), and are mapped to an independent neuron (real neuron)
-			if(allowMultipleSubinputsPerSequentialInput):
-				B[generateParameterName(l, "B")] = tf.Variable(tf.zeros(n_h[l]), tf.float32)
-				
-		if(supportSkipLayers):
-			n_h_cumulativeNP[l] = n_h_cumulativeNP[l-1] + n_h[l-1]
-			  
-	if(supportSkipLayers):
-		n_h_cumulativeNP[numberOfLayers+1] = n_h_cumulativeNP[numberOfLayers] + n_h[numberOfLayers]	#not used
-		
-		n_h_cumulative['n_h_cumulative'] = tf.Variable(n_h_cumulativeNP, dtype=tf.int32)

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""SANItf2_algorithmANN.py
+"""ANNtf2_algorithmANN.py
 
 # Requirements:
 Python 3 and Tensorflow 2.1+ 
@@ -8,7 +8,7 @@ Python 3 and Tensorflow 2.1+
 MIT License
 
 # Usage:
-see SANItf2.py
+see ANNtf2.py
 
 # Description
 
@@ -20,8 +20,8 @@ Define fully connected artificial neural network (ANN)
 
 import tensorflow as tf
 import numpy as np
-from SANItf2_operations import *	#generateParameterNameSeq, generateParameterName, defineNetworkParameters
-import SANItf2_globalDefs
+from ANNtf2_operations import *	#generateParameterNameSeq, generateParameterName, defineNetworkParameters
+import ANNtf2_globalDefs
 
 W = {}
 B = {}
@@ -101,6 +101,20 @@ def defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNum
 		
 	return numberOfLayers
 	
+
+def defineNeuralNetworkParametersANN():
+
+	print("numberOfNetworks", numberOfNetworks)
+	
+	randomNormal = tf.initializers.RandomNormal()
+	
+	for networkIndex in range(1, numberOfNetworks+1):
+			
+		for l in range(1, numberOfLayers+1):
+
+			W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
+			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
+
 	
 def neuralNetworkPropagationANN(x, networkIndex=1):
 			
@@ -115,17 +129,5 @@ def neuralNetworkPropagationANN(x, networkIndex=1):
 	
 	return tf.nn.softmax(Z)
 
-def defineNeuralNetworkParametersANN():
-
-	print("numberOfNetworks", numberOfNetworks)
-	
-	randomNormal = tf.initializers.RandomNormal()
-	
-	for networkIndex in range(1, numberOfNetworks+1):
-			
-		for l in range(1, numberOfLayers+1):
-
-			W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
-			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
 
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""SANItf2_loadDataset.py
+"""ANNtf2_loadDataset.py
 
 # Requirements:
 Python 3 and Tensorflow 2.1+ 
@@ -8,7 +8,7 @@ Python 3 and Tensorflow 2.1+
 MIT License
 
 # Usage:
-see SANItf2.py
+see ANNtf2.py
 
 # Description:
 
@@ -116,7 +116,7 @@ Provide dataset load functions
 import tensorflow as tf
 import numpy as np
 from numpy import genfromtxt
-import SANItf2_globalDefs
+import ANNtf2_globalDefs
 
 GIA_PREPROCESSOR_POS_TYPE_ARRAY_NUMBER_OF_TYPES = 52
 GIA_PREPROCESSOR_POS_TAGGER_DATABASE_POS_NUMBER_OF_TYPES = GIA_PREPROCESSOR_POS_TYPE_ARRAY_NUMBER_OF_TYPES+1	#includes GIA_PREPROCESSOR_POS_TAGGER_DATABASE_POS_INDEX_OUT_OF_SENTENCE_BOUNDS
@@ -128,7 +128,7 @@ datasetType1alreadyNormalised = True	#if True, assume that the dataset includes 
 datasetType2alreadyNormalised = False	#if True, assume that the dataset includes values between 0 and 1 only
 datasetType3alreadyNormalised = True	#if True, assume that the dataset includes values between 0 and 1 only
 
-numberOfFeaturesPerWord = 53	#last feature identifies word as out of sentence padding (out of sentence padding is not expected by loadDatasetType3 as each row only contains data of a specific sentence length; out of sentence padding will be applied by SANItf2_loadDataset after data is read)
+numberOfFeaturesPerWord = 53	#last feature identifies word as out of sentence padding (out of sentence padding is not expected by loadDatasetType3 as each row only contains data of a specific sentence length; out of sentence padding will be applied by ANNtf2_loadDataset after data is read)
 optimiseFeedLength = True
 if(optimiseFeedLength):
 	paddingTagIndex = 9	#out of sentence features will be padded with this character
@@ -381,10 +381,10 @@ def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSun
 		xPOStagActive = 1
 		xPOStagInactive = 0
 			
-	if(SANItf2_globalDefs.testHarness):	
+	if(ANNtf2_globalDefs.testHarness):	
 		#1 0 0 ... 0 0   0 1 0 ... 0 0 0  0 0 1 ... 0 0 1 			
-		line = np.zeros((SANItf2_globalDefs.testHarnessNumWords*numberOfFeaturesPerWord), dataType)
-		for w in range(SANItf2_globalDefs.testHarnessNumWords):
+		line = np.zeros((ANNtf2_globalDefs.testHarnessNumWords*numberOfFeaturesPerWord), dataType)
+		for w in range(ANNtf2_globalDefs.testHarnessNumWords):
 			line[numberOfFeaturesPerWord*w+w] = xPOStagActive
 		
 		template = [paddingCharacter] * maximumNumFeatures
@@ -551,7 +551,7 @@ def loadDatasetType3(datasetFileNameX, generatePOSunambiguousInput, onlyAddPOSun
 		all_Y = np.ones(datasetNumExamples, dtype=dataType)
 		#all_Y = np.expand_dims(all_Y, axis=0)
 
-	if(SANItf2_globalDefs.testHarness):
+	if(ANNtf2_globalDefs.testHarness):
 		datasetNumExamplesTrain = datasetNumExamples
 		datasetNumExamplesTest = 0
 	else:

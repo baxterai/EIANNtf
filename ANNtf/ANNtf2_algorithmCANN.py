@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""SANItf2_algorithmCANN.py
+"""ANNtf2_algorithmCANN.py
 
 # Requirements:
 Python 3 and Tensorflow 2.1+ 
@@ -8,7 +8,7 @@ Python 3 and Tensorflow 2.1+
 MIT License
 
 # Usage:
-see SANItf2.py
+see ANNtf2.py
 
 # Description
 
@@ -20,8 +20,8 @@ Define fully connected classification artificial neural network (CANN) - unsuper
 
 import tensorflow as tf
 import numpy as np
-from SANItf2_operations import *	#generateParameterNameSeq, generateParameterName, defineNetworkParameters
-import SANItf2_globalDefs
+from ANNtf2_operations import *	#generateParameterNameSeq, generateParameterName, defineNetworkParameters
+import ANNtf2_globalDefs
 import math
 
 debugHebbianForwardPropOnlyTrainFinalSupervisedLayer = False
@@ -200,7 +200,19 @@ def defineNetworkParametersCANN(num_input_neurons, num_output_neurons, datasetNu
 	print("defineNetworkParametersCANN, n_h = ", n_h)
 
 	return numberOfLayers
+
+
+def defineNeuralNetworkParametersCANN():
+
+	randomNormal = tf.initializers.RandomNormal()
 	
+	for networkIndex in range(1, numberOfNetworks+1):
+	
+		for l in range(1, numberOfLayers+1):
+
+			W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
+			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
+				
 	
 def neuralNetworkPropagationCANN(x, networkIndex=1):
 			
@@ -337,19 +349,7 @@ def trainLayerCANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackp
 				if(backpropCustomOnlyUpdateWeightsThatContributedTowardsTarget):
 					Alayers[l-1] = AprevLayerLearn	#deactivate AprevLayer during backprop based on threshold (to prevent non contributing activation paths to be learnt)
 		
-			
-
-
-def defineNeuralNetworkParametersCANN():
-
-	randomNormal = tf.initializers.RandomNormal()
-	
-	for networkIndex in range(1, numberOfNetworks+1):
-	
-		for l in range(1, numberOfLayers+1):
-
-			W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
-			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
+		
 
 def reluCustom(Z, train):
 
