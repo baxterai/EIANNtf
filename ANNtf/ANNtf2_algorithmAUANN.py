@@ -59,7 +59,7 @@ onlyTrainNeuronsIfActivationContributionAboveThreshold = True	#theshold neurons 
 if(onlyTrainNeuronsIfActivationContributionAboveThreshold):
 	onlyTrainNeuronsIfActivationContributionAboveThresholdValue = 0.1
 
-biologicalConstraints = True	#batchSize=1, _?
+biologicalConstraints = False	#batchSize=1, _?
 
 #learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
 useBatch = True
@@ -82,6 +82,8 @@ if(biologicalConstraints):
 		if(noisySampleGeneration):
 			noisySampleGenerationNumSamples = 10
 			noiseStandardDeviation = 0.03
+else:
+	useBinaryWeights = False
 	
 if(useBinaryWeights):	
 	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 5	#binary weighted network requires more parameters than float32 weighted network (a network with non linear convergence is generated for this purpose)
@@ -440,14 +442,14 @@ def neuralNetworkPropagationAUANNtrain(x, y, exemplarsX, exemplarsY, currentClas
 				#AboolNegInt = tf.dtypes.cast(AboolNeg, tf.int32)
 				AboolNegFloat = tf.dtypes.cast(AboolNeg, tf.float32)
 				AcoincidenceMatrixForget = tf.matmul(tf.transpose(AprevLayerLearn), AboolNegFloat)
-				Wmod2 = tf.square(AcoincidenceMatrixForget*forgetRate)	#square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
+				Wmod2 = tf.square(AcoincidenceMatrixForget)/batchSize*forgetRate	#tf.square(AcoincidenceMatrixForget) - square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
 				#print("Wmod2 = ", Wmod2)
 				W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2
 			else:
 				AcoincidenceMatrixIsZero = tf.math.equal(AcoincidenceMatrix, 0)
 				#AcoincidenceMatrixIsZeroInt = tf.dtypes.cast(AcoincidenceMatrixIsZero, tf.int32)
 				AcoincidenceMatrixIsZeroFloat = tf.dtypes.cast(AcoincidenceMatrixIsZero, dtype=tf.float32)
-				Wmod2 = tf.square(AcoincidenceMatrixIsZeroFloat*forgetRate)	#square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
+				Wmod2 = tf.square(AcoincidenceMatrixIsZeroFloat)/batchSize*forgetRate	#tf.square(AcoincidenceMatrixIsZeroFloat) - square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
 				#print("Wmod2 = ", Wmod2)
 				W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2
 
@@ -489,7 +491,21 @@ def reluCustom(Z, prevLayerSize=None):
  
 
 
-def generateTFtrainDataFromNParraysAUANN(train_x, train_y, networkIndex, shuffleSize, batchSize, datasetNumClasses, generateClassTargetExemplars):
+def generateTFtrainDataFromNParraysAUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses):
+
+	trainDataList = []
+	
+	for classTarget in range(datasetNumClasses):
+			
+		train_xClassFiltered, train_yClassFiltered = filterNParraysByClassTarget(train_x, train_y, classTargetFilterIndex=classTarget)
+		trainDataUnbatched = generateTFtrainDataUnbatchedFromNParrays(train_xClassFiltered, train_yClassFiltered)
+		trainData = generateTFtrainDataFromTrainDataUnbatched(trainDataUnbatched, shuffleSize, batchSize)
+		trainDataList.append(trainData)
+		
+	return trainDataList
+		
+		
+def generateTFexemplarDataFromNParraysAUANN(train_x, train_y, networkIndex, shuffleSize, batchSize, datasetNumClasses, generateClassTargetExemplars):
 
 	global classTargetExemplarsXList
 	global classTargetExemplarsYList
@@ -498,7 +514,6 @@ def generateTFtrainDataFromNParraysAUANN(train_x, train_y, networkIndex, shuffle
 
 	#print("generateClassTargetExemplars = ", generateClassTargetExemplars)
 
-	trainDataList = []
 	exemplarDataList = []
 	
 	if(generateClassTargetExemplars):
@@ -512,8 +527,6 @@ def generateTFtrainDataFromNParraysAUANN(train_x, train_y, networkIndex, shuffle
 			
 		train_xClassFiltered, train_yClassFiltered = filterNParraysByClassTarget(train_x, train_y, classTargetFilterIndex=classTarget)
 		trainDataUnbatched = generateTFtrainDataUnbatchedFromNParrays(train_xClassFiltered, train_yClassFiltered)
-		trainData = generateTFtrainDataFromTrainDataUnbatched(trainDataUnbatched, shuffleSize, batchSize)
-		trainDataList.append(trainData)
 		
 		if(generateClassTargetExemplars):
 		
@@ -579,7 +592,7 @@ def generateTFtrainDataFromNParraysAUANN(train_x, train_y, networkIndex, shuffle
 		exemplarData = generateTFtrainDataFromNParrays(classTargetExemplarsXList[classTarget], classTargetExemplarsYList[classTarget], shuffleSize, batchSize)
 		exemplarDataList.append(exemplarData)	
 	
-	return trainDataList, exemplarDataList
+	return exemplarDataList
 
 
 def appendToClassTargetExemplarsList(classTargetExemplarsXList, classTargetExemplarsYList, classTarget, exemplarToAddX, exemplarToAddY):

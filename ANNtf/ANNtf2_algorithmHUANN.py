@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""ANNtf2_algorithmCANN.py
+"""ANNtf2_algorithmHUANN.py
 
 # Requirements:
 Python 3 and Tensorflow 2.1+ 
@@ -12,7 +12,7 @@ see ANNtf2.py
 
 # Description
 
-Define fully connected classification artificial neural network (CANN) - unsupervised hebbian learning
+Define fully connected hebbian update artificial neural network (HUANN)
 
 - Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
 
@@ -95,7 +95,7 @@ forgetRate = 0.0
 batchSize = 0
 
 
-def defineTrainingParametersCANN(dataset, trainMultipleFiles):
+def defineTrainingParametersHUANN(dataset, trainMultipleFiles):
 
 	global learningRate
 	global forgetRate
@@ -128,7 +128,7 @@ def defineTrainingParametersCANN(dataset, trainMultipleFiles):
 	return learningRate, trainingSteps, batchSize, displayStep, numEpochs
 	
 
-def defineNetworkParametersCANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+def defineNetworkParametersHUANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
 
 	global n_h
 	global numberOfLayers
@@ -188,21 +188,21 @@ def defineNetworkParametersCANN(num_input_neurons, num_output_neurons, datasetNu
 			previousNumberLayerNeurons = n_h_x
 		elif(networkDivergenceType == "linearDivergingThenConverging"):
 			#not yet coded
-			print("defineNetworkParametersCANN error: linearDivergingThenConverging not yet coded")
+			print("defineNetworkParametersHUANN error: linearDivergingThenConverging not yet coded")
 			exit()
 		else:
-			print("defineNetworkParametersCANN error: unknown networkDivergenceType")
+			print("defineNetworkParametersHUANN error: unknown networkDivergenceType")
 			exit()
 
 	n_h_last = n_y
 	n_h.append(n_h_last)
 	
-	print("defineNetworkParametersCANN, n_h = ", n_h)
+	print("defineNetworkParametersHUANN, n_h = ", n_h)
 
 	return numberOfLayers
 
 
-def defineNeuralNetworkParametersCANN():
+def defineNeuralNetworkParametersHUANN():
 
 	randomNormal = tf.initializers.RandomNormal()
 	
@@ -214,7 +214,7 @@ def defineNeuralNetworkParametersCANN():
 			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
 				
 	
-def neuralNetworkPropagationCANN(x, networkIndex=1):
+def neuralNetworkPropagationHUANN(x, networkIndex=1):
 			
 	AprevLayer = x
 	 
@@ -230,7 +230,7 @@ def neuralNetworkPropagationCANN(x, networkIndex=1):
 	return tf.nn.softmax(Z)
 	
 	
-def neuralNetworkPropagationCANNtrain(x, y=None, networkIndex=1, trainHebbianForwardprop=False, trainHebbianBackprop=False, trainHebbianLastLayerSupervision=False):
+def neuralNetworkPropagationHUANNtrain(x, y=None, networkIndex=1, trainHebbianForwardprop=False, trainHebbianBackprop=False, trainHebbianLastLayerSupervision=False):
 
 	#print("batchSize = ", batchSize)
 	#print("learningRate = ", learningRate)
@@ -257,7 +257,7 @@ def neuralNetworkPropagationCANNtrain(x, y=None, networkIndex=1, trainHebbianFor
 			A = tf.clip_by_value(A, clip_value_min=-1.0, clip_value_max=1.0)
 
 		if(trainHebbianForwardprop):
-			trainLayerCANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackprop=trainHebbianBackprop, trainHebbianLastLayerSupervision=trainHebbianLastLayerSupervision)
+			trainLayerHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackprop=trainHebbianBackprop, trainHebbianLastLayerSupervision=trainHebbianLastLayerSupervision)
 
 		AprevLayer = A
 	
@@ -269,12 +269,12 @@ def neuralNetworkPropagationCANNtrain(x, y=None, networkIndex=1, trainHebbianFor
 			AprevLayer = Alayers[l-1]
 			A = Alayers[l]
 			
-			trainLayerCANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackprop=trainHebbianBackprop, trainHebbianLastLayerSupervision=trainHebbianLastLayerSupervision)
+			trainLayerHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackprop=trainHebbianBackprop, trainHebbianLastLayerSupervision=trainHebbianLastLayerSupervision)
 							
 	return tf.nn.softmax(Z)
 
 
-def trainLayerCANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackprop=False, trainHebbianLastLayerSupervision=False):
+def trainLayerHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackprop=False, trainHebbianLastLayerSupervision=False):
 
 		#print("train")
 		isLastLayerSupervision = False
@@ -329,14 +329,14 @@ def trainLayerCANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackp
 					#AboolNegInt = tf.dtypes.cast(AboolNeg, tf.int32)
 					AboolNegFloat = tf.dtypes.cast(AboolNeg, tf.float32)
 					AcoincidenceMatrixForget = tf.matmul(tf.transpose(AprevLayerLearn), AboolNegFloat)
-					Wmod2 = tf.square(AcoincidenceMatrixForget*forgetRate)	#square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
+					Wmod2 = tf.square(AcoincidenceMatrixForget)/batchSize*forgetRate	#tf.square(AcoincidenceMatrixForget) - square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
 					#print("Wmod2 = ", Wmod2)
 					W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2
 				else:
 					AcoincidenceMatrixIsZero = tf.math.equal(AcoincidenceMatrix, 0)
 					#AcoincidenceMatrixIsZeroInt = tf.dtypes.cast(AcoincidenceMatrixIsZero, tf.int32)
 					AcoincidenceMatrixIsZeroFloat = tf.dtypes.cast(AcoincidenceMatrixIsZero, dtype=tf.float32)
-					Wmod2 = tf.square(AcoincidenceMatrixIsZeroFloat*forgetRate)	#square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
+					Wmod2 = tf.square(AcoincidenceMatrixIsZeroFloat)/batchSize*forgetRate	#tf.square(AcoincidenceMatrixIsZeroFloat) - square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
 					#print("Wmod2 = ", Wmod2)
 					W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2
 

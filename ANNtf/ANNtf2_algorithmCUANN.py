@@ -1,0 +1,450 @@
+# -*- coding: utf-8 -*-
+"""ANNtf2_algorithmCUANN.py
+
+# Requirements:
+Python 3 and Tensorflow 2.1+ 
+
+# License:
+MIT License
+
+# Usage:
+see ANNtf2.py
+
+# Description
+
+Define fully connected common (activation path) update artificial neural network (CUANN)
+
+- Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
+
+"""
+
+import tensorflow as tf
+import numpy as np
+from ANNtf2_operations import *
+import ANNtf2_operations
+import ANNtf2_globalDefs
+import math
+from numpy import random
+
+sparsityLevel = 1.0	#probability of initial strong neural connection per neuron in layer
+
+
+learningRate = 0.005
+enableForgetting = False
+if(enableForgetting):
+	enableForgettingRestrictToAPrevAndNotAConnections = True	#True	#this ensures that only connections between active lower layer neurons and unactive higher layer exemplar neurons are suppressed
+	forgetRate = 0.1	#CHECKTHIS
+
+applyWmaxCap = False	#max W = 1
+if(applyWmaxCap):
+	applyWmaxCapValue = 1.0
+applyAmaxCap = False	#max A = 1
+if(applyAmaxCap):
+	applyAmaxCapValue = 1.0
+	
+onlyTrainNeuronsIfActivationContributionAboveThreshold1 = True
+if(onlyTrainNeuronsIfActivationContributionAboveThreshold1):
+	onlyTrainNeuronsIfActivationContributionAboveThreshold1Value = 0.5
+onlyTrainNeuronsIfActivationContributionAboveThreshold2 = True	#theshold neurons which will be positively biased, and those which will be negatively (above a = 0 as it is currently) 
+if(onlyTrainNeuronsIfActivationContributionAboveThreshold2):
+	onlyTrainNeuronsIfActivationContributionAboveThreshold2Value = 0.5
+
+biologicalConstraints = False	#batchSize=1, _?
+
+#learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
+useBatch = True
+if(useBatch):
+	batchSize = 10
+else:
+	batchSize = 1	
+
+noisySampleGeneration = False
+noisySampleGenerationNumSamples = 0
+noiseStandardDeviation = 0
+
+if(biologicalConstraints):
+	useBinaryWeights = True	#increases stochastically updated training speed, but reduces final accuracy
+	if(useBinaryWeights):	
+		averageTotalInput = -1
+		useBinaryWeightsReduceMemoryWithBool = False	#can use bool instead of float32 to limit memory required, but requires casting to float32 for matrix multiplications
+	if(not useBatch):
+		noisySampleGeneration = False	#possible biological replacement for input data batchSize > 1 (provides better performance than standard input data batchSize == 1, but less performance than input data batchSize > 10+)
+		if(noisySampleGeneration):
+			noisySampleGenerationNumSamples = 10
+			noiseStandardDeviation = 0.03
+else:
+	useBinaryWeights = False
+	
+if(useBinaryWeights):	
+	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 5	#binary weighted network requires more parameters than float32 weighted network (a network with non linear convergence is generated for this purpose)
+	generateNetworkNonlinearConvergence = True
+else:
+	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.8	#0.8	#10
+	generateNetworkNonlinearConvergence = False
+	
+if(generateNetworkNonlinearConvergence):
+	networkDivergenceType = "nonLinearConverging"
+	networkOptimumConvergenceAngle = 0.5	#if angle > 0.5, then more obtuse triange, if < 0.5 then more acute triangle	#fractional angle between 0 and 90 degrees
+	networkDivergence = 1.0-networkOptimumConvergenceAngle 
+	#required for Logarithms with a Fraction as Base:
+	networkDivergenceNumerator = int(networkDivergence*10)
+	networkDivergenceDenominator = 10
+else:
+	networkDivergenceType = "linearConverging"
+	#networkDivergenceType = "linearDivergingThenConverging"	#not yet coded
+	
+	
+
+W = {}
+B = {}
+#Atrace = {}
+
+
+NETWORK_PARAM_INDEX_TYPE = 0
+NETWORK_PARAM_INDEX_LAYER = 1
+NETWORK_PARAM_INDEX_H_CURRENT_LAYER = 2
+NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER = 3
+NETWORK_PARAM_INDEX_VARIATION_DIRECTION = 4
+
+
+#Network parameters
+n_h = []
+numberOfLayers = 0
+numberOfNetworks = 0
+datasetNumClasses = 0
+
+#randomNormal = tf.initializers.RandomNormal()
+	
+def getNoisySampleGenerationNumSamples():
+	return noisySampleGeneration, noisySampleGenerationNumSamples, noiseStandardDeviation
+	
+def defineTrainingParametersCUANN(dataset, trainMultipleFiles):
+	
+	if(trainMultipleFiles):
+		if(dataset == "POStagSequence"):
+			trainingSteps = 10000
+		elif(dataset == "NewThyroid"):
+			trainingSteps = 1000
+		numEpochs = 10
+	else:
+		if(dataset == "POStagSequence"):
+			trainingSteps = 10000
+		elif(dataset == "NewThyroid"):
+			trainingSteps = 1000
+		if(useBatch):
+			numEpochs = 10
+		else:
+			numEpochs = 100
+	
+	displayStep = 100
+
+	return learningRate, trainingSteps, batchSize, displayStep, numEpochs
+	
+
+def defineNetworkParametersCUANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+
+	global n_h
+	global numberOfLayers
+	global numberOfNetworks
+	global datasetNumClasses
+	global classTargetExemplarsDynamicOutputNeuronIndexList
+	
+	numberOfNetworks = numberOfNetworksSet
+
+	if((networkDivergenceType == "linearConverging") or (networkDivergenceType == "nonLinearConverging")):
+		firstHiddenLayerNumberNeurons = int(num_input_neurons*maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons)
+	
+	if(generateNetworkNonlinearConvergence):
+		#(networkDivergenceType == "nonLinearConverging")
+		#num_output_neurons = firstHiddenLayerNumberNeurons * networkDivergence^numLayers [eg 5 = 100*0.6^x]
+		#if a^c = b, then c = log_a(b)
+		b = float(num_output_neurons)/firstHiddenLayerNumberNeurons
+		#numLayers = math.log(b, networkDivergence)
+		
+		#now log_a(x) = log_b(x)/log_b(a)
+		#therefore log_a1/a2(b) = log_a2(b)/log_a2(a1/a2) = log_a2(b)/(log_a2(a1) - b)
+		numberOfLayers = math.log(b, networkDivergenceDenominator)/math.log(float(networkDivergenceNumerator)/networkDivergenceDenominator, networkDivergenceDenominator)
+		numberOfLayers = int(numberOfLayers)+1	#plus input layer
+		
+		print("numberOfLayers = ", numberOfLayers)
+		
+	else:
+		if(dataset == "POStagSequence"):
+			if(trainMultipleFiles):
+				numberOfLayers = 6
+			else:
+				numberOfLayers = 3
+		elif(dataset == "NewThyroid"):
+			if(trainMultipleFiles):
+				numberOfLayers = 6	#trainMultipleFiles should affect number of neurons/parameters in network
+			else:
+				numberOfLayers = 3
+
+	n_x = num_input_neurons #datasetNumFeatures
+	n_y = num_output_neurons  #datasetNumClasses
+	datasetNumClasses = n_y
+	n_h_first = n_x
+	previousNumberLayerNeurons = n_h_first
+	n_h.append(n_h_first)
+
+	for l in range(1, numberOfLayers):	#for every hidden layer
+		if(networkDivergenceType == "linearConverging"):
+			if(l == 1):
+				n_h_x = firstHiddenLayerNumberNeurons
+			else:
+				n_h_x = int((firstHiddenLayerNumberNeurons-num_output_neurons) * ((l-1)/(numberOfLayers-2)) + num_output_neurons)
+			#previousNumberLayerNeurons = n_h_x
+			n_h.append(n_h_x)
+		elif(networkDivergenceType == "nonLinearConverging"):
+			if(l == 1):
+				n_h_x = firstHiddenLayerNumberNeurons
+			else:
+				n_h_x = int(previousNumberLayerNeurons*networkDivergence)
+			n_h.append(n_h_x)
+			previousNumberLayerNeurons = n_h_x
+		elif(networkDivergenceType == "linearDivergingThenConverging"):
+			#not yet coded
+			print("defineNetworkParametersCUANN error: linearDivergingThenConverging not yet coded")
+			exit()
+		else:
+			print("defineNetworkParametersCUANN error: unknown networkDivergenceType")
+			exit()
+
+	n_h_last = n_y
+	n_h.append(n_h_last)
+	
+	print("defineNetworkParametersCUANN, n_h = ", n_h)
+
+	#classTargetExemplarsDynamicOutputNeuronIndexList = [-1] * num_output_neurons
+
+	return numberOfLayers
+
+def defineNeuralNetworkParametersCUANN():
+	
+	tf.random.set_seed(5);
+	if(useBinaryWeights):
+		if(useBinaryWeightsReduceMemoryWithBool):
+			dtype=tf.dtypes.bool
+		else:
+			dtype=tf.dtypes.float32
+	else:
+		#randomNormal = tf.initializers.RandomNormal()
+		dtype=tf.dtypes.float32
+	
+	for networkIndex in range(1, numberOfNetworks+1):
+	
+		for l in range(1, numberOfLayers+1):
+
+			if(useBinaryWeights):
+				Wint = tf.random.uniform([n_h[l-1], n_h[l]], minval=0, maxval=2, dtype=tf.dtypes.int32)		#The lower bound minval is included in the range, while the upper bound maxval is excluded.
+				W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(tf.dtypes.cast(Wint, dtype=dtype))
+				#print("W[generateParameterNameNetwork(networkIndex, l, W)] = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
+			else:
+				W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(tf.random.normal([n_h[l-1], n_h[l]], stddev=sparsityLevel, dtype=dtype))		#tf.Variable(randomNormal([n_h[l-1], n_h[l]]))	
+				#note stddev=sparsityLevel: a weakly tailed distribution for sparse activated network (such that the majority of weights are close to zero)
+			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l], dtype=dtype))
+			
+			#Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")] = tf.Variable(tf.zeros(n_h[l], dtype=tf.dtypes.float32))
+
+	
+	
+def neuralNetworkPropagationCUANN(x, networkIndex=1, recordAtrace=False):
+	
+	global averageTotalInput
+		
+	AprevLayer = x
+
+	if(useBinaryWeights):
+		if(averageTotalInput == -1):
+			averageTotalInput = tf.math.reduce_mean(x)
+			print("averageTotalInput = ", averageTotalInput)
+			 
+	#print("x = ", x)
+	
+	for l in range(1, numberOfLayers+1):
+	
+		#print("l = " + str(l))
+		
+		if(useBinaryWeights):
+			if(useBinaryWeightsReduceMemoryWithBool):
+				Wfloat = tf.dtypes.cast(W[generateParameterNameNetwork(networkIndex, l, "W")], dtype=tf.float32)
+				Bfloat = tf.dtypes.cast(B[generateParameterNameNetwork(networkIndex, l, "B")], dtype=tf.float32)
+				Z = tf.add(tf.matmul(AprevLayer, Wfloat), Bfloat)
+			else:
+				Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
+			A = reluCustom(Z, n_h[l-1])
+		else:
+			Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
+			A = reluCustom(Z)
+
+		if(applyAmaxCap):
+			A = tf.clip_by_value(A, clip_value_min=-applyAmaxCapValue, clip_value_max=applyAmaxCapValue)
+					
+		#if(recordAtrace):
+		#	if(onlyTrainNeuronsIfActivationContributionAboveThreshold1):
+		#		#apply threshold to A
+		#		AAboveThreshold = tf.math.greater(A, onlyTrainNeuronsIfActivationContributionAboveThreshold1Value)
+		#		AAboveThresholdFloat = tf.dtypes.cast(AAboveThreshold, dtype=tf.float32)
+		#		ALearn = A*AAboveThresholdFloat
+		#	else:
+		#		ALearn = A
+		#	#print("ALearn.shape = ", ALearn.shape)
+		#	
+		#	Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")] = ALearn
+			
+		AprevLayer = A
+		
+	pred = tf.nn.softmax(Z)
+	
+	#print("neuralNetworkPropagationCUANN pred.shape = ", pred.shape)	
+
+	return pred
+	
+
+def neuralNetworkPropagationCUANNtest(x, y, networkIndex=1):
+
+	pred = neuralNetworkPropagationCUANN(x, networkIndex)
+	loss = ANNtf2_operations.crossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=False)
+	acc = ANNtf2_operations.calculateAccuracy(pred, y)
+	
+	return loss, acc
+	
+def neuralNetworkPropagationCUANNtrain(x, y, networkIndex=1):	#currentClassTarget
+	
+	#debug:
+	#print("batchSize = ", batchSize)
+	#print("learningRate = ", learningRate)
+	#print("x = ", x)
+	
+	#important notes;
+	#the highest layer output (A) being forward propagated from x is never used during training, as the output neuron actually being trained is defined in y
+		
+	#predExemplars = neuralNetworkPropagationCUANN(exemplarsX, networkIndex, recordAtrace=True)	#record exemplar activation traces
+	
+	AprevLayer = x
+
+	for l in range(1, numberOfLayers+1):
+
+		#print("l = " + str(l))
+		#print("W[generateParameterNameNetwork(networkIndex, l, W)] = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
+		
+		if(useBinaryWeights):
+			if(useBinaryWeightsReduceMemoryWithBool):
+				Wfloat = tf.dtypes.cast(W[generateParameterNameNetwork(networkIndex, l, "W")], dtype=tf.float32)
+				Bfloat = tf.dtypes.cast(B[generateParameterNameNetwork(networkIndex, l, "B")], dtype=tf.float32)
+				Z = tf.add(tf.matmul(AprevLayer, Wfloat), Bfloat)
+			else:
+				Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
+			A = reluCustom(Z, n_h[l-1])
+		else:
+			Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
+			A = reluCustom(Z)		
+
+		if(applyAmaxCap):
+			A = tf.clip_by_value(A, clip_value_min=-applyAmaxCapValue, clip_value_max=applyAmaxCapValue)
+
+		if(l == numberOfLayers):
+			A = tf.one_hot(y, depth=datasetNumClasses) #replace final layer A with y values during train (discard forward propagation values)
+			#print("A.shape = ", A.shape)
+	
+		if(onlyTrainNeuronsIfActivationContributionAboveThreshold1):
+			#apply threshold to AprevLayer
+			AaboveThreshold = tf.math.greater(A, onlyTrainNeuronsIfActivationContributionAboveThreshold1Value)
+			AaboveThresholdFloat = tf.dtypes.cast(AaboveThreshold, dtype=tf.float32)
+			Alearn = A*AaboveThresholdFloat
+		else:
+			Alearn = A		
+		if(onlyTrainNeuronsIfActivationContributionAboveThreshold2):
+			#apply threshold to AprevLayer
+			AprevLayerAboveThreshold = tf.math.greater(AprevLayer, onlyTrainNeuronsIfActivationContributionAboveThreshold2Value)
+			AprevLayerAboveThresholdFloat = tf.dtypes.cast(AprevLayerAboveThreshold, dtype=tf.float32)
+			AprevLayerLearn = AprevLayer*AprevLayerAboveThresholdFloat
+		else:
+			AprevLayerLearn = AprevLayer
+
+		#update weights based on hebbian learning rule
+		#strengthen those connections that link the previous layer neuron to the exemplar activation trace for the class target (and weaken those that did not)
+
+		#associate all successfully fired neurons [in AprevLayerLearn] with exemplar higher level neurons [Alearn] previously identified during exemplar activation trace
+		#CHECKTHIS: note this is currently only a unidirectional association (to exemplar activation tree, and not from exemplar activation tree)
+
+		AcoincidenceMatrix = tf.matmul(tf.transpose(AprevLayerLearn), A)
+		Wmod = AcoincidenceMatrix/batchSize*learningRate
+		#print("AcoincidenceMatrix = ", AcoincidenceMatrix)
+		#print("Wmod = ", Wmod)
+		#print("W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
+		W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] + Wmod	#apply weight update
+
+		if(enableForgetting):	#this isn't necessarily required for highly sparsely activated network + low shot learning
+			if(enableForgettingRestrictToAPrevAndNotAConnections):
+				AboolNeg = tf.math.equal(Alearn, 0.0)	#Abool = tf.math.greater(Alearn, 0.0), AboolNeg = tf.math.logical_not(Abool)
+				#print("Abool = ",Abool)
+				#AboolNegInt = tf.dtypes.cast(AboolNeg, tf.int32)
+				AboolNegFloat = tf.dtypes.cast(AboolNeg, tf.float32)
+				AcoincidenceMatrixForget = tf.matmul(tf.transpose(AprevLayerLearn), AboolNegFloat)
+				Wmod2 = AcoincidenceMatrixForget/batchSize*forgetRate	#tf.square(AcoincidenceMatrixForget) - square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
+				#print("Wmod2 = ", Wmod2)
+				W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2
+			else:
+				AcoincidenceMatrixIsZero = tf.math.equal(AcoincidenceMatrix, 0)
+				#AcoincidenceMatrixIsZeroInt = tf.dtypes.cast(AcoincidenceMatrixIsZero, tf.int32)
+				AcoincidenceMatrixIsZeroFloat = tf.dtypes.cast(AcoincidenceMatrixIsZero, dtype=tf.float32)
+				Wmod2 = AcoincidenceMatrixIsZeroFloat/batchSize*forgetRate	#tf.square(AcoincidenceMatrixIsZeroFloat) - square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
+				#print("Wmod2 = ", Wmod2)
+				W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2
+
+		if(applyWmaxCap):
+			W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.clip_by_value(W[generateParameterNameNetwork(networkIndex, l, "W")], clip_value_min=-applyWmaxCapValue, clip_value_max=applyWmaxCapValue)
+				
+		AprevLayer = A	#Alearn
+
+	#clear Atrace;
+	#for l in range(1, numberOfLayers+1):
+	#	Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")] = 0	#tf.zeros(n_h[l])
+		
+	pred = neuralNetworkPropagationCUANN(x, networkIndex)
+	
+	return pred
+
+	
+
+def reluCustom(Z, prevLayerSize=None):
+	
+	if(useBinaryWeights):	
+		#offset required because negative weights are not used:
+		Zoffset = tf.ones(Z.shape)
+		Zoffset = tf.multiply(Zoffset, averageTotalInput)
+		Zoffset = tf.multiply(Zoffset, prevLayerSize/2)
+		#print("Zoffset = ", Zoffset)
+		Z = tf.subtract(Z, Zoffset) 
+		A = tf.nn.relu(Z)
+		#AaboveZero = tf.math.greater(A, 0)
+		#AaboveZeroFloat = tf.dtypes.cast(AaboveZero, dtype=tf.dtypes.float32)
+		#ZoffsetRestore = AaboveZeroFloat*Zoffset
+		#print("ZoffsetRestore = ", ZoffsetRestore)
+		#A = tf.add(A, ZoffsetRestore)
+	else:
+		A = tf.nn.relu(Z)
+	
+	#print("Z = ", Z)
+	#print("A = ", A)
+	
+	return A
+
+ 
+
+
+def generateTFtrainDataFromNParraysCUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses):
+
+	trainDataList = []
+	
+	for classTarget in range(datasetNumClasses):
+			
+		train_xClassFiltered, train_yClassFiltered = filterNParraysByClassTarget(train_x, train_y, classTargetFilterIndex=classTarget)
+		trainDataUnbatched = generateTFtrainDataUnbatchedFromNParrays(train_xClassFiltered, train_yClassFiltered)
+		trainData = generateTFtrainDataFromTrainDataUnbatched(trainDataUnbatched, shuffleSize, batchSize)
+		trainDataList.append(trainData)
+		
+	return trainDataList
+		
+
