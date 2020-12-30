@@ -56,23 +56,6 @@ else:
 		numberOfSubsetsTrialledPerBaseParameter = 1
 		parameterUpdateSubsetSize = 1	
 
-if(useBinaryWeights):	
-	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 5	#binary weighted network requires more parameters than float32 weighted network (a network with non linear convergence is generated for this purpose)
-	generateNetworkNonlinearConvergence = True
-else:
-	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.8	#0.8	#10
-	generateNetworkNonlinearConvergence = False
-	
-if(generateNetworkNonlinearConvergence):
-	networkDivergenceType = "nonLinearConverging"
-	networkOptimumConvergenceAngle = 0.5	#if angle > 0.5, then more obtuse triange, if < 0.5 then more acute triangle	#fractional angle between 0 and 90 degrees
-	networkDivergence = 1.0-networkOptimumConvergenceAngle 
-	#required for Logarithms with a Fraction as Base:
-	networkDivergenceNumerator = int(networkDivergence*10)
-	networkDivergenceDenominator = 10
-else:
-	networkDivergenceType = "linearConverging"
-	#networkDivergenceType = "linearDivergingThenConverging"	#not yet coded
 	
 	
 
@@ -113,7 +96,7 @@ def defineTrainingParametersSUANN(dataset, trainMultipleFiles):
 		learningRate = 0.0001
 		if(dataset == "POStagSequence"):
 			trainingSteps = 10000
-		elif(dataset == "NewThyroid"):
+		elif(dataset == "SmallDataset"):
 			trainingSteps = 1000
 		batchSize = 100
 		numEpochs = 10
@@ -127,7 +110,7 @@ def defineTrainingParametersSUANN(dataset, trainMultipleFiles):
 			learningRate = 0.001
 		if(dataset == "POStagSequence"):
 			trainingSteps = 10000
-		elif(dataset == "NewThyroid"):
+		elif(dataset == "SmallDataset"):
 			trainingSteps = 1000
 		if(useBatch):
 			batchSize = 100
@@ -148,72 +131,8 @@ def defineNetworkParametersSUANN(num_input_neurons, num_output_neurons, datasetN
 	global numberOfNetworks
 	global datasetNumClasses
 	
-	numberOfNetworks = numberOfNetworksSet
-
-	if((networkDivergenceType == "linearConverging") or (networkDivergenceType == "nonLinearConverging")):
-		firstHiddenLayerNumberNeurons = int(num_input_neurons*maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons)
+	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet)
 	
-	if(generateNetworkNonlinearConvergence):
-		#(networkDivergenceType == "nonLinearConverging")
-		#num_output_neurons = firstHiddenLayerNumberNeurons * networkDivergence^numLayers [eg 5 = 100*0.6^x]
-		#if a^c = b, then c = log_a(b)
-		b = float(num_output_neurons)/firstHiddenLayerNumberNeurons
-		#numLayers = math.log(b, networkDivergence)
-		
-		#now log_a(x) = log_b(x)/log_b(a)
-		#therefore log_a1/a2(b) = log_a2(b)/log_a2(a1/a2) = log_a2(b)/(log_a2(a1) - b)
-		numberOfLayers = math.log(b, networkDivergenceDenominator)/math.log(float(networkDivergenceNumerator)/networkDivergenceDenominator, networkDivergenceDenominator)
-		numberOfLayers = int(numberOfLayers)+1	#plus input layer
-		
-		print("numberOfLayers = ", numberOfLayers)
-		
-	else:
-		if(dataset == "POStagSequence"):
-			if(trainMultipleFiles):
-				numberOfLayers = 6
-			else:
-				numberOfLayers = 3
-		elif(dataset == "NewThyroid"):
-			if(trainMultipleFiles):
-				numberOfLayers = 6	#trainMultipleFiles should affect number of neurons/parameters in network
-			else:
-				numberOfLayers = 3
-
-	n_x = num_input_neurons #datasetNumFeatures
-	n_y = num_output_neurons  #datasetNumClasses
-	datasetNumClasses = n_y
-	n_h_first = n_x
-	previousNumberLayerNeurons = n_h_first
-	n_h.append(n_h_first)
-
-	for l in range(1, numberOfLayers):	#for every hidden layer
-		if(networkDivergenceType == "linearConverging"):
-			if(l == 1):
-				n_h_x = firstHiddenLayerNumberNeurons
-			else:
-				n_h_x = int((firstHiddenLayerNumberNeurons-num_output_neurons) * ((l-1)/(numberOfLayers-2)) + num_output_neurons)
-			#previousNumberLayerNeurons = n_h_x
-			n_h.append(n_h_x)
-		elif(networkDivergenceType == "nonLinearConverging"):
-			if(l == 1):
-				n_h_x = firstHiddenLayerNumberNeurons
-			else:
-				n_h_x = int(previousNumberLayerNeurons*networkDivergence)
-			n_h.append(n_h_x)
-			previousNumberLayerNeurons = n_h_x
-		elif(networkDivergenceType == "linearDivergingThenConverging"):
-			#not yet coded
-			print("defineNetworkParametersSUANN error: linearDivergingThenConverging not yet coded")
-			exit()
-		else:
-			print("defineNetworkParametersSUANN error: unknown networkDivergenceType")
-			exit()
-
-	n_h_last = n_y
-	n_h.append(n_h_last)
-	
-	print("defineNetworkParametersSUANN, n_h = ", n_h)
-
 	return numberOfLayers
 
 

@@ -21,6 +21,7 @@ Define fully connected artificial neural network (ANN)
 import tensorflow as tf
 import numpy as np
 from ANNtf2_operations import *	#generateParameterNameSeq, generateParameterName, defineNetworkParameters
+import ANNtf2_operations
 import ANNtf2_globalDefs
 
 W = {}
@@ -38,7 +39,7 @@ def defineTrainingParametersANN(dataset, trainMultipleFiles):
 		learningRate = 0.0001
 		if(dataset == "POStagSequence"):
 			trainingSteps = 10000
-		elif(dataset == "NewThyroid"):
+		elif(dataset == "SmallDataset"):
 			trainingSteps = 1000
 		batchSize = 100
 		numEpochs = 10
@@ -47,7 +48,7 @@ def defineTrainingParametersANN(dataset, trainMultipleFiles):
 		if(dataset == "POStagSequence"):
 			trainingSteps = 10000
 			numEpochs = 1
-		elif(dataset == "NewThyroid"):
+		elif(dataset == "SmallDataset"):
 			trainingSteps = 1000
 			numEpochs = 10
 		batchSize = 1000
@@ -56,7 +57,20 @@ def defineTrainingParametersANN(dataset, trainMultipleFiles):
 	return learningRate, trainingSteps, batchSize, displayStep, numEpochs
 	
 
+
 def defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+
+	global n_h
+	global numberOfLayers
+	global numberOfNetworks
+	
+	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet)
+	#OLD: numberOfLayers = defineNetworkParametersANNlegacy(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet)
+	
+	return numberOfLayers
+	
+	
+def defineNetworkParametersANNlegacy(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
 
 	global n_h
 	global numberOfLayers
@@ -73,7 +87,7 @@ def defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNum
 			n_h_3 = int(datasetNumFeatures)
 			n_h_4 = int(datasetNumFeatures/2)
 			n_h_5 = int(datasetNumFeatures/4)
-		elif(dataset == "NewThyroid"):
+		elif(dataset == "SmallDataset"):
 			n_h_1 = 4
 			n_h_2 = 4
 		else:
@@ -89,7 +103,7 @@ def defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNum
 		if(dataset == "POStagSequence"):
 			n_h_1 = int(datasetNumFeatures*3) # 1st layer number of neurons.
 			n_h_2 = int(datasetNumFeatures/2) # 2nd layer number of neurons.
-		elif(dataset == "NewThyroid"):
+		elif(dataset == "SmallDataset"):
 			n_h_1 = 4
 			n_h_2 = 4
 		else:

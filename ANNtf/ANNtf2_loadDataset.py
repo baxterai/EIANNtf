@@ -77,7 +77,7 @@ Provide dataset load functions
 	./GIAgeneratePOStaggerDatabase.exe -dbpostaggerfolder "/home/rich/source/GIAPOStaggerDatabase" -lrp -lrpfolder "/home/rich/source/source/LRPdata" -wikiDumpFolder "/home/rich/soft/wiki/output" (-wikiDumpFileBatchIndex X)
 	this creates XtrainBatchXXXX.dat and YtrainBatchXXXX.dat
 	```
-## Dataset type 2 example - NewThyroid (trainBatchXXXX.dat - aka NewThyroid.data): 
+## Dataset type 2 example - SmallDataset (trainBatchXXXX.dat - aka SmallDataset.data): 
 
 	This example dataset is medical data relating to the diagnosis of thyroid disease.
 
@@ -113,10 +113,14 @@ Provide dataset load functions
 	
 """
 
+import os
+import csv
 import tensorflow as tf
 import numpy as np
 from numpy import genfromtxt
 import ANNtf2_globalDefs
+
+datasetFolderRelative = "datasets"
 
 GIA_PREPROCESSOR_POS_TYPE_ARRAY_NUMBER_OF_TYPES = 52
 GIA_PREPROCESSOR_POS_TAGGER_DATABASE_POS_NUMBER_OF_TYPES = GIA_PREPROCESSOR_POS_TYPE_ARRAY_NUMBER_OF_TYPES+1	#includes GIA_PREPROCESSOR_POS_TAGGER_DATABASE_POS_INDEX_OUT_OF_SENTENCE_BOUNDS
@@ -145,7 +149,82 @@ else:
 
 storeRowLengths = False
 
+def createFileAbsPath(fileName):
+	scriptFolder = os.path.dirname(__file__) #<-- absolute dir the script is in
+	relFilePath = datasetFolderRelative + '/' + fileName
+	absFilePath = os.path.join(scriptFolder, relFilePath)
+	return absFilePath
+
+def loadtxtBasic(filename, delimiter=','):
+	absFilePath = createFileAbsPath(filename)
+	data = genfromtxt(absFilePath, delimiter=',')
+	#print("data = ", data)
+	return data
+	
+def loadtxt(filename, delimiter=',', classColumnFirst=True, numeriseClassColumn=True):
+
+	
+	absFilePath = createFileAbsPath(filename)
+
+	#print("absFilePath = ", absFilePath)
+
+	dtype=float
+	classNamesDict = {}
+	classIndexMax = 1
+	
+	#print("classColumnFirst = ", classColumnFirst)
+	
+	dataList = []
+	with open(absFilePath, 'r') as file:
+		#lines = file.read().split(',')
+		reader = csv.reader(file)
+		for row in reader:
+
+			#print("row1 = ", row)
+
+			if(numeriseClassColumn):
+				#for rowIndex in len(lines):
+					#row = lines[rowIndex]
+				if(classColumnFirst):
+					className = row[0]
+				else:
+					className = row[-1]
+				#print("className = ", className)
+									
+				if className in classNamesDict:
+					classIndex = classNamesDict[className]
+				else:
+					classNamesDict[className] = classIndexMax
+					classIndex = classIndexMax
+					classIndexMax += 1
+					
+				#print("classIndex = ", classIndex)
+				
+				
+				if(classColumnFirst):
+					row[0] = str(classIndex)
+				else:
+					row[-1] = str(classIndex)
+					
+			#print("row2 = ", row)
+			
+			dataList.append(row)
+							
+			numberOfClasses = len(classNamesDict.keys())
+				
+				
+	data = np.array(dataList, dtype=dtype)
+	#data = data.reshape((-1, iter_loadtxt.rowlength))
+
+	#print("dataList = ", dataList)
+	#print("data = ", data)
+
+	return data
+
+
 def iter_loadtxt(filename, delimiter=',', skiprows=0, dtype=float, normaliseRowLengthWithPad=False, normaliseRowLengthWithPadLimit=False, padCharacter='0', maxRowLength=100, minRowLength=0):
+	
+	absFilePath = createFileAbsPath(filename)
 	
 	normaliseRowLengthWithPadLimitDisgard = False
 	if(normaliseRowLengthWithPad):
@@ -155,7 +234,7 @@ def iter_loadtxt(filename, delimiter=',', skiprows=0, dtype=float, normaliseRowL
 			iter_loadtxt.maxNumberOfItemsPerRow = maxRowLength
 			iter_loadtxt.minNumberOfItemsPerRow = minRowLength
 		else:
-			with open(filename, 'r') as infile:
+			with open(absFilePath, 'r') as infile:
 				for _ in range(skiprows):
 					next(infile)
 				for line in infile:
@@ -167,17 +246,17 @@ def iter_loadtxt(filename, delimiter=',', skiprows=0, dtype=float, normaliseRowL
 	
 	if(storeRowLengths):
 		num_lines = 0
-		with open(filename, 'r') as infile:
+		with open(absFilePath, 'r') as infile:
 			for line in f:
         			num_lines += 1		
 		rowLengthsArray = np.zeros(num_lines, dtype=int)
-		with open(filename, 'r') as infile:
+		with open(absFilePath, 'r') as infile:
 			for count, line in enumerate(f):
 				line = line.rstrip().split(delimiter)
 				rowLengthsArray[count] = len(line)
 														
 	def iter_func():
-		with open(filename, 'r') as infile:
+		with open(absFilePath, 'r') as infile:
 			for _ in range(skiprows):
 				next(infile)
 			for line in infile:
@@ -268,11 +347,13 @@ def loadDatasetType1(datasetFileNameX, datasetFileNameY):
 
 	return datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y
 
+	
+def loadDatasetType2(datasetFileName, classColumnFirst=True):
 
-def loadDatasetType2(datasetFileName):
-
-	#dataRaw = genfromtxt(datasetFileName, delimiter=',')
-	dataRaw = iter_loadtxt(datasetFileName, delimiter=',')
+	numeriseClassColumn = True
+	
+	#dataRaw = loadtxtBasic(datasetFileName, delimiter=',')
+	dataRaw = loadtxt(datasetFileName, delimiter=',', classColumnFirst=classColumnFirst, numeriseClassColumn=numeriseClassColumn)
 	
 	datasetNumExamples = dataRaw.shape[0]
 	#print (dataRaw)
@@ -281,9 +362,15 @@ def loadDatasetType2(datasetFileName):
 	dataRawRandomised = dataRaw
 	np.random.shuffle(dataRawRandomised)
 	#print (dataRawRandomised)
-	all_X = dataRawRandomised[:,1:]
-	all_Y = dataRawRandomised[:,0]
-
+	if(classColumnFirst):
+		all_X = dataRawRandomised[:,1:]
+		all_Y = dataRawRandomised[:,0]
+	else:
+		all_X = dataRawRandomised[:,0:-1]
+		all_Y = dataRawRandomised[:,-1]		
+	#print("all_X = ", all_X)
+	#print("all_Y = ", all_Y)
+		
 	datasetNumExamplesTrain = int(float(datasetNumExamples)*percentageDatasetTrain/100.0)
 	datasetNumExamplesTest = int(float(datasetNumExamples)*(100.0-percentageDatasetTrain)/100.0)
 		
@@ -309,7 +396,10 @@ def loadDatasetType2(datasetFileName):
 	test_x = all_Xnormalised[-datasetNumExamplesTest:, :]
 	train_y = all_Ynormalised[0:datasetNumExamplesTrain]
 	test_y = all_Ynormalised[-datasetNumExamplesTest:]
-	
+
+	#print("train_x = ", train_x)
+	#print("train_y = ", train_y)
+		
 	#hot encode y data (not required):
 	#all_Yhotencoded = np.zeros((datasetNumExamples, maxY))
 	#for i in range(datasetNumExamples):	#for every row (ie example) in all_Y
@@ -318,6 +408,8 @@ def loadDatasetType2(datasetFileName):
 	#	all_Yhotencoded[i] = yHotEncoded
 	#train_y = all_Yhotencoded[0:datasetNumExamplesTrain, :]
 	#test_y = all_Yhotencoded[-datasetNumExamplesTest:, :]
+
+	print("datasetNumClasses = ", datasetNumClasses)
 
 	#print(datasetNumExamplesTrain)
 	#print(datasetNumExamplesTest)

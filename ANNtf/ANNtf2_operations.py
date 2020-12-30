@@ -21,8 +21,34 @@ SANI operations
 import tensorflow as tf
 import numpy as np
 import ANNtf2_globalDefs
+import math
 
-
+#if(useBinaryWeights) or if(generateFirstLayerSDR)
+generateLargeNetwork = True
+if(generateLargeNetwork):
+	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 2.0	#3.0
+	generateNetworkNonlinearConvergence = True
+else:
+	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.8
+	generateNetworkNonlinearConvergence = False
+	
+if(generateNetworkNonlinearConvergence):
+	networkDivergenceType = "nonLinearConverging"
+	
+	#if(applyNeuronThresholdBias):
+	#	#this will affect the optimimum convergence angle
+	#	networkOptimumConvergenceAngle = 0.5+applyNeuronThresholdBiasValue
+		
+	networkOptimumConvergenceAngle = 0.5	#if angle > 0.5, then more obtuse triange, if < 0.5 then more acute triangle	#fractional angle between 0 and 90 degrees
+	networkDivergence = 1.0-networkOptimumConvergenceAngle 
+	#required for Logarithms with a Fraction as Base:
+	networkDivergenceNumerator = int(networkDivergence*10)
+	networkDivergenceDenominator = 10
+else:
+	networkDivergenceType = "linearConverging"
+	#networkDivergenceType = "linearDivergingThenConverging"	#not yet coded
+	
+	
 
 def generateParameterNameNetwork(networkIndex, l, arrayName):
 	parameterName = "n" + str(networkIndex) + "l" + str(l) + arrayName
@@ -73,6 +99,7 @@ def filterNParraysByClassTarget(train_x, train_y, classTargetFilterIndex=-1):
 	return train_xFiltered, train_yFiltered
 
 def generateTFtrainDataFromNParrays(train_x, train_y, shuffleSize, batchSize):
+	#shuffleSize = shuffleBufferSize
 	trainDataUnbatched = generateTFtrainDataUnbatchedFromNParrays(train_x, train_y)
 	trainData = generateTFtrainDataFromTrainDataUnbatched(trainDataUnbatched, shuffleSize, batchSize)
 	return trainData
@@ -87,3 +114,80 @@ def generateTFtrainDataFromTrainDataUnbatched(trainDataUnbatched, shuffleSize, b
 	trainData = trainDataUnbatched.repeat().shuffle(shuffleSize).batch(batchSize).prefetch(1)	#do not repeat
 	return trainData
 
+
+def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+
+	#Network parameters
+	n_h = []
+	numberOfLayers = 0
+	numberOfNetworks = 0
+	datasetNumClasses = 0
+	
+	numberOfNetworks = numberOfNetworksSet
+
+	if((networkDivergenceType == "linearConverging") or (networkDivergenceType == "nonLinearConverging")):
+		firstHiddenLayerNumberNeurons = int(num_input_neurons*maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons)
+	
+	if(generateNetworkNonlinearConvergence):
+		#(networkDivergenceType == "nonLinearConverging")
+		#num_output_neurons = firstHiddenLayerNumberNeurons * networkDivergence^numLayers [eg 5 = 100*0.6^x]
+		#if a^c = b, then c = log_a(b)
+		b = float(num_output_neurons)/firstHiddenLayerNumberNeurons
+		#numLayers = math.log(b, networkDivergence)
+		
+		#now log_a(x) = log_b(x)/log_b(a)
+		#therefore log_a1/a2(b) = log_a2(b)/log_a2(a1/a2) = log_a2(b)/(log_a2(a1) - b)
+		numberOfLayers = math.log(b, networkDivergenceDenominator)/math.log(float(networkDivergenceNumerator)/networkDivergenceDenominator, networkDivergenceDenominator)
+		numberOfLayers = int(numberOfLayers)+1	#plus input layer
+		
+		print("numberOfLayers = ", numberOfLayers)
+		
+	else:
+		if(dataset == "POStagSequence"):
+			if(trainMultipleFiles):
+				numberOfLayers = 6
+			else:
+				numberOfLayers = 3
+		elif(dataset == "SmallDataset"):
+			if(trainMultipleFiles):
+				numberOfLayers = 6	#trainMultipleFiles should affect number of neurons/parameters in network
+			else:
+				numberOfLayers = 3
+
+	n_x = num_input_neurons #datasetNumFeatures
+	n_y = num_output_neurons  #datasetNumClasses
+	datasetNumClasses = n_y
+	n_h_first = n_x
+	previousNumberLayerNeurons = n_h_first
+	n_h.append(n_h_first)
+
+	for l in range(1, numberOfLayers):	#for every hidden layer
+		if(networkDivergenceType == "linearConverging"):
+			if(l == 1):
+				n_h_x = firstHiddenLayerNumberNeurons
+			else:
+				n_h_x = int((firstHiddenLayerNumberNeurons-num_output_neurons) * ((l-1)/(numberOfLayers-2)) + num_output_neurons)
+			#previousNumberLayerNeurons = n_h_x
+			n_h.append(n_h_x)
+		elif(networkDivergenceType == "nonLinearConverging"):
+			if(l == 1):
+				n_h_x = firstHiddenLayerNumberNeurons
+			else:
+				n_h_x = int(previousNumberLayerNeurons*networkDivergence)
+			n_h.append(n_h_x)
+			previousNumberLayerNeurons = n_h_x
+		elif(networkDivergenceType == "linearDivergingThenConverging"):
+			#not yet coded
+			print("defineNetworkParametersANN error: linearDivergingThenConverging not yet coded")
+			exit()
+		else:
+			print("defineNetworkParametersANN error: unknown networkDivergenceType")
+			exit()
+
+	n_h_last = n_y
+	n_h.append(n_h_last)
+	
+	print("defineNetworkParameters, n_h = ", n_h)
+	
+	return 	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses
+	

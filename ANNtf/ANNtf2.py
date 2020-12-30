@@ -32,11 +32,11 @@ from ANNtf2_operations import *
 import ANNtf2_globalDefs
 from numpy import random
 
-#algorithm = "ANN"
+algorithm = "ANN"
 #algorithm = "SUANN"
 #algorithm = "AUANN"
 #algorithm = "HUANN"
-algorithm = "CUANN"
+#algorithm = "CUANN"
 #algorithm = "SANI"
 
 costCrossEntropyWithLogits = False
@@ -67,7 +67,7 @@ import ANNtf2_loadDataset
 #learningRate, trainingSteps, batchSize, displayStep, numEpochs = -1
 
 #performance enhancements for development environment only: 
-debugUseSmallDataset = True	#def:False	#switch increases performance during development	#eg data-POStagSentence-smallBackup
+debugUseSmallPOStagSequenceDataset = True	#def:False	#switch increases performance during development	#eg data-POStagSentence-smallBackup
 useSmallSentenceLengths = True	#def:False	#switch increases performance during development	#eg data-simple-POStagSentence-smallBackup
 trainMultipleFiles = False	#def:True	#switch increases performance during development	#eg data-POStagSentence
 trainMultipleNetworks = False	#improve classification accuracy by averaging over multiple independently trained networks (test)
@@ -102,40 +102,62 @@ if(algorithm == "SANI"):
 		onlyAddPOSunambiguousInputToTrain = False	#True
 elif(algorithm == "ANN"):
 	#dataset = "POStagSequence"
-	dataset = "NewThyroid"
+	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 3	#default: 1
 elif(algorithm == "HUANN"):
 	#dataset = "POStagSequence"
-	dataset = "NewThyroid"
+	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 5	#default: 1
 	trainHebbianBackprop = False	#default: False
 elif(algorithm == "SUANN"):
 	#dataset = "POStagSequence"
-	dataset = "NewThyroid"
+	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 5	#default: 1
 elif(algorithm == "AUANN"):
 	#dataset = "POStagSequence"
-	dataset = "NewThyroid"
+	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 5	#default: 1
 elif(algorithm == "CUANN"):
 	#dataset = "POStagSequence"
-	dataset = "NewThyroid"
+	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 5	#default: 1
+
+if(dataset == "SmallDataset"):
+	#trainMultipleFiles = False	#required
+	smallDatasetDefinitionsHeader = {'index':0, 'name':1, 'fileName':2, 'classColumnFirst':3}	
+	smallDatasetDefinitions = [
+	(0, "New Thyroid", "new-thyroid.data", True),
+	(1, "Swedish Auto Insurance", "UNAVAILABLE.txt", False),	#AutoInsurSweden.txt BAD
+	(2, "Wine Quality Dataset", "winequality-whiteFormatted.csv", False),
+	(3, "Pima Indians Diabetes Dataset", "pima-indians-diabetes.csv", False),
+	(4, "Sonar Dataset", "sonar.all-data", False),
+	(5, "Banknote Dataset", "data_banknote_authentication.txt", False),
+	(6, "Iris Flowers Dataset", "iris.data", False),
+	(7, "Abalone Dataset", "UNAVAILABLE", False),	#abaloneFormatted.data BAD
+	(8, "Ionosphere Dataset", "ionosphere.data", False),
+	(9, "Wheat Seeds Dataset", "seeds_datasetFormatted.txt", False),
+	(10, "Boston House Price Dataset", "UNAVAILABLE", False)	#housingFormatted.data BAD
+	]
+	smallDatasetIndex = 0 #default: 0 (New Thyroid)
+	datasetFileName = smallDatasetDefinitions[smallDatasetIndex][smallDatasetDefinitionsHeader['fileName']]
+	datasetClassColumnFirst = smallDatasetDefinitions[smallDatasetIndex][smallDatasetDefinitionsHeader['classColumnFirst']]
+	print("datasetFileName = ", datasetFileName)
+	print("datasetClassColumnFirst = ", datasetClassColumnFirst)
 			
-if(debugUseSmallDataset):
-	datasetFileNameXstart = "XtrainBatchSmall"
-	datasetFileNameYstart = "YtrainBatchSmall"
+if(debugUseSmallPOStagSequenceDataset):
+	datasetFileNameXstart = "XdatasetPartSmall"
+	datasetFileNameYstart = "YdatasetPartSmall"
 else:
-	datasetFileNameXstart = "XtrainBatch"
-	datasetFileNameYstart = "YtrainBatch"
+	datasetFileNameXstart = "XdatasetPart"
+	datasetFileNameYstart = "YdatasetPart"
 datasetFileNameXend = ".dat"
 datasetFileNameYend = ".dat"
-datasetFileNameStart = "trainBatch"
+datasetFileNameStart = "datasetPart"
 datasetFileNameEnd = ".dat"
 
 
@@ -251,17 +273,22 @@ if __name__ == "__main__":
 
 	fileIndexTemp = 0
 	fileIndexStr = str(fileIndexTemp).zfill(4)
-	datasetType1FileNameX = datasetFileNameXstart + fileIndexStr + datasetFileNameXend
-	datasetType1FileNameY = datasetFileNameYstart + fileIndexStr + datasetFileNameYend
-	datasetType2FileName = datasetFileNameStart + fileIndexStr + datasetFileNameEnd
+	if(dataset == "POStagSequence"):
+		datasetType1FileNameX = datasetFileNameXstart + fileIndexStr + datasetFileNameXend
+		datasetType1FileNameY = datasetFileNameYstart + fileIndexStr + datasetFileNameYend
+	elif(dataset == "SmallDataset"):
+		if(trainMultipleFiles):
+			datasetType2FileName = datasetFileNameStart + fileIndexStr + datasetFileNameEnd
+		else:
+			datasetType2FileName = datasetFileName
 
 	numberOfLayers = 0
 	if(dataset == "POStagSequence"):
 		datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
 	elif(dataset == "POStagSentence"):
 		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType3(datasetType1FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain, useSmallSentenceLengths)
-	elif(dataset == "NewThyroid"):
-		datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType2(datasetType2FileName)
+	elif(dataset == "SmallDataset"):
+		datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType2(datasetType2FileName, datasetClassColumnFirst)
 
 
 	#Model constants
@@ -299,17 +326,12 @@ if __name__ == "__main__":
 		
 	#define epochs:
 
-	fileIndexFirst = -1
-	fileIndexLast = -1
 	if(trainMultipleFiles):
 		fileIndexFirst = 0
 		if(useSmallSentenceLengths):
 			fileIndexLast = 11
 		else:
 			fileIndexLast = 1202
-	else:
-		fileIndexFirst = 0 
-		fileIndexLast = 0
 
 	noisySampleGeneration = False
 	if(algorithm == "SUANN"):
@@ -330,35 +352,41 @@ if __name__ == "__main__":
 
 		print("epoch e = ", e)
 
-		fileIndexArray = np.arange(fileIndexFirst, fileIndexLast+1, 1)
-		#print("fileIndexArray = " + str(fileIndexArray))
-		np.random.shuffle(fileIndexArray)
-		fileIndexShuffledArray = fileIndexArray
-		#print("fileIndexShuffledArray = " + str(fileIndexShuffledArray))
-
+		if(trainMultipleFiles):
+			fileIndexArray = np.arange(fileIndexFirst, fileIndexLast+1, 1)
+			#print("fileIndexArray = " + str(fileIndexArray))
+			np.random.shuffle(fileIndexArray)
+			fileIndexShuffledArray = fileIndexArray
+			#print("fileIndexShuffledArray = " + str(fileIndexShuffledArray))
+		else:
+			fileIndexShuffledArray = [0]
+			
 		for fileIndex in fileIndexShuffledArray:	#range(fileIndexFirst, fileIndexLast+1):
 
+			#print("fileIndex = ", fileIndex)
+			
 			datasetNumExamples = 0
 
 			fileIndexStr = str(fileIndex).zfill(4)
-			datasetType1FileNameX = datasetFileNameXstart + fileIndexStr + datasetFileNameXend
-			datasetType1FileNameY = datasetFileNameYstart + fileIndexStr + datasetFileNameYend
-			datasetType2FileName = datasetFileNameStart + fileIndexStr + datasetFileNameEnd
+			if(dataset == "POStagSequence"):
+				datasetType1FileNameX = datasetFileNameXstart + fileIndexStr + datasetFileNameXend
+				datasetType1FileNameY = datasetFileNameYstart + fileIndexStr + datasetFileNameYend
+			elif(dataset == "SmallDataset"):
+				if(trainMultipleFiles):
+					datasetType2FileName = datasetFileNameStart + fileIndexStr + datasetFileNameEnd
+				else:
+					datasetType2FileName = datasetFileName
 
 			if(dataset == "POStagSequence"):
 				datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = ANNtf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
 			if(dataset == "POStagSentence"):
 				numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = ANNtf2_loadDataset.loadDatasetType3(datasetType1FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain, useSmallSentenceLengths)
-			elif(dataset == "NewThyroid"):
-				datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = ANNtf2_loadDataset.loadDatasetType2(datasetType2FileName)
+			elif(dataset == "SmallDataset"):
+				datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = ANNtf2_loadDataset.loadDatasetType2(datasetType2FileName, datasetClassColumnFirst)
 
 			shuffleSize = datasetNumExamples	#heuristic: 10*batchSize
 			
-			#original iteration method:
-			#trainData = generateTFtrainDataFromNParrays(train_x, train_y, shuffleSize, batchSize):	
-			#for batchIndex, (batchX, batchY) in enumerate(trainData.take(trainingSteps), 1):	
-				
-			#new iteration method (only required for algorithm == "AUANN"):	
+			#new iteration method (only required for algorithm == "AUANN/CUANN"):	
 			datasetNumClassesActual = datasetNumClasses
 			trainDataIndex = 0
 			if(algorithm == "AUANN"):
@@ -390,9 +418,18 @@ if __name__ == "__main__":
 				trainDataListIterators = []
 				for trainData in trainDataList:
 					trainDataListIterators.append(iter(trainData))
+	
+			#original iteration method:
+			#trainData = generateTFtrainDataFromNParrays(train_x, train_y, shuffleSize, batchSize):	
+			#for batchIndex, (batchX, batchY) in enumerate(trainData.take(trainingSteps), 1):	
 					
-			for batchIndex in range(int(trainingSteps/batchSize)):	
+			#new iteration method:			
+			#print("trainingSteps = ", trainingSteps)
+			#print("batchSize = ", batchSize)
+			
+			for batchIndex in range(int(trainingSteps*shuffleSize*10/batchSize)):		#*5 is to normalise number of final training steps new iteration method in relative to original iteration method
 				(batchX, batchY) = trainDataListIterators[trainDataIndex].get_next()	#next(trainDataListIterators[trainDataIndex])
+				
 				batchYActual = batchY
 				if(algorithm == "AUANN"):
 					(exemplarsX, exemplarsY) = exemplarDataListIterators[trainDataIndex].get_next()
@@ -411,6 +448,10 @@ if __name__ == "__main__":
 
 				predNetworkAverage = tf.Variable(tf.zeros(datasetNumClasses))
 
+				#print("datasetNumClasses = ", datasetNumClasses)
+				#print("batchX.shape = ", batchX.shape)
+				#print("batchY.shape = ", batchY.shape)
+				
 				for networkIndex in range(1, numberOfNetworks+1):
 
 					if(algorithm == "ANN"):

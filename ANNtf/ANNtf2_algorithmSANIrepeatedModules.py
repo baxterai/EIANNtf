@@ -112,14 +112,14 @@ def defineTrainingParametersSANI(dataset, trainMultipleFiles):
 		learningRate = 0.001
 		if(dataset == "POStagSequence"):
 			trainingSteps = 10000
-		elif(dataset == "NewThyroid"):
+		elif(dataset == "SmallDataset"):
 			trainingSteps = 1000
 		numEpochs = 10
 	else:
 		learningRate = 0.001
 		if(dataset == "POStagSequence"):
 			trainingSteps = 10000
-		elif(dataset == "NewThyroid"):
+		elif(dataset == "SmallDataset"):
 			trainingSteps = 1000
 		numEpochs = 1
 
@@ -164,7 +164,7 @@ def defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNu
 			n_h_4 = int(datasetNumFeatures*100)
 			n_h_5 = n_y
 			n_h = [n_h_0, n_h_1, n_h_2, n_h_3, n_h_4, n_h_5]
-	elif(dataset == "NewThyroid"):
+	elif(dataset == "SmallDataset"):
 		n_h_1 = 4
 		n_h_2 = 4
 		n_h_3 = n_y

@@ -26,30 +26,15 @@ import ANNtf2_globalDefs
 import math
 from numpy import random
 
-sparsityLevel = 1.0	#probability of initial strong neural connection per neuron in layer
 
+debugWexplosion = True
+debugFastTrain = True
 
-learningRate = 0.005
-enableForgetting = False
+learningRate = 0.0001
+enableForgetting = True
 if(enableForgetting):
 	enableForgettingRestrictToAPrevAndNotAConnections = True	#True	#this ensures that only connections between active lower layer neurons and unactive higher layer exemplar neurons are suppressed
-	forgetRate = 0.1	#CHECKTHIS
-
-applyWmaxCap = False	#max W = 1
-if(applyWmaxCap):
-	applyWmaxCapValue = 1.0
-applyAmaxCap = False	#max A = 1
-if(applyAmaxCap):
-	applyAmaxCapValue = 1.0
-	
-onlyTrainNeuronsIfActivationContributionAboveThreshold1 = True
-if(onlyTrainNeuronsIfActivationContributionAboveThreshold1):
-	onlyTrainNeuronsIfActivationContributionAboveThreshold1Value = 0.5
-onlyTrainNeuronsIfActivationContributionAboveThreshold2 = True	#theshold neurons which will be positively biased, and those which will be negatively (above a = 0 as it is currently) 
-if(onlyTrainNeuronsIfActivationContributionAboveThreshold2):
-	onlyTrainNeuronsIfActivationContributionAboveThreshold2Value = 0.5
-
-biologicalConstraints = False	#batchSize=1, _?
+	forgetRate = learningRate	#CHECKTHIS
 
 #learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
 useBatch = True
@@ -57,6 +42,24 @@ if(useBatch):
 	batchSize = 10
 else:
 	batchSize = 1	
+	
+applyWmaxCap = True
+if(applyWmaxCap):
+	applyWmaxCapValue = 5.0	#max W = 1
+applyAmaxCap = False	
+if(applyAmaxCap):
+	applyAmaxCapValue = 5.0	#max A = 1
+	
+onlyTrainNeuronsIfActivationContributionAboveThreshold1 = False
+if(onlyTrainNeuronsIfActivationContributionAboveThreshold1):
+	onlyTrainNeuronsIfActivationContributionAboveThreshold1Value = 0.5
+onlyTrainNeuronsIfActivationContributionAboveThreshold2 = False	#theshold neurons which will be positively biased, and those which will be negatively (above a = 0 as it is currently) 
+if(onlyTrainNeuronsIfActivationContributionAboveThreshold2):
+	onlyTrainNeuronsIfActivationContributionAboveThreshold2Value = 0.5
+
+biologicalConstraints = False	#batchSize=1, _?
+
+sparsityLevel = 1.0	#probability of initial strong neural connection per neuron in layer
 
 noisySampleGeneration = False
 noisySampleGenerationNumSamples = 0
@@ -74,24 +77,7 @@ if(biologicalConstraints):
 			noiseStandardDeviation = 0.03
 else:
 	useBinaryWeights = False
-	
-if(useBinaryWeights):	
-	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 5	#binary weighted network requires more parameters than float32 weighted network (a network with non linear convergence is generated for this purpose)
-	generateNetworkNonlinearConvergence = True
-else:
-	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.8	#0.8	#10
-	generateNetworkNonlinearConvergence = False
-	
-if(generateNetworkNonlinearConvergence):
-	networkDivergenceType = "nonLinearConverging"
-	networkOptimumConvergenceAngle = 0.5	#if angle > 0.5, then more obtuse triange, if < 0.5 then more acute triangle	#fractional angle between 0 and 90 degrees
-	networkDivergence = 1.0-networkOptimumConvergenceAngle 
-	#required for Logarithms with a Fraction as Base:
-	networkDivergenceNumerator = int(networkDivergence*10)
-	networkDivergenceDenominator = 10
-else:
-	networkDivergenceType = "linearConverging"
-	#networkDivergenceType = "linearDivergingThenConverging"	#not yet coded
+
 	
 	
 
@@ -123,14 +109,20 @@ def defineTrainingParametersCUANN(dataset, trainMultipleFiles):
 	if(trainMultipleFiles):
 		if(dataset == "POStagSequence"):
 			trainingSteps = 10000
-		elif(dataset == "NewThyroid"):
-			trainingSteps = 1000
+		elif(dataset == "SmallDataset"):
+			if(debugFastTrain):
+				trainingSteps = batchSize
+			else:
+				trainingSteps = 1000
 		numEpochs = 10
 	else:
 		if(dataset == "POStagSequence"):
 			trainingSteps = 10000
-		elif(dataset == "NewThyroid"):
-			trainingSteps = 1000
+		elif(dataset == "SmallDataset"):
+			if(debugFastTrain):
+				trainingSteps = batchSize
+			else:
+				trainingSteps = 1000
 		if(useBatch):
 			numEpochs = 10
 		else:
@@ -147,75 +139,8 @@ def defineNetworkParametersCUANN(num_input_neurons, num_output_neurons, datasetN
 	global numberOfLayers
 	global numberOfNetworks
 	global datasetNumClasses
-	global classTargetExemplarsDynamicOutputNeuronIndexList
 	
-	numberOfNetworks = numberOfNetworksSet
-
-	if((networkDivergenceType == "linearConverging") or (networkDivergenceType == "nonLinearConverging")):
-		firstHiddenLayerNumberNeurons = int(num_input_neurons*maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons)
-	
-	if(generateNetworkNonlinearConvergence):
-		#(networkDivergenceType == "nonLinearConverging")
-		#num_output_neurons = firstHiddenLayerNumberNeurons * networkDivergence^numLayers [eg 5 = 100*0.6^x]
-		#if a^c = b, then c = log_a(b)
-		b = float(num_output_neurons)/firstHiddenLayerNumberNeurons
-		#numLayers = math.log(b, networkDivergence)
-		
-		#now log_a(x) = log_b(x)/log_b(a)
-		#therefore log_a1/a2(b) = log_a2(b)/log_a2(a1/a2) = log_a2(b)/(log_a2(a1) - b)
-		numberOfLayers = math.log(b, networkDivergenceDenominator)/math.log(float(networkDivergenceNumerator)/networkDivergenceDenominator, networkDivergenceDenominator)
-		numberOfLayers = int(numberOfLayers)+1	#plus input layer
-		
-		print("numberOfLayers = ", numberOfLayers)
-		
-	else:
-		if(dataset == "POStagSequence"):
-			if(trainMultipleFiles):
-				numberOfLayers = 6
-			else:
-				numberOfLayers = 3
-		elif(dataset == "NewThyroid"):
-			if(trainMultipleFiles):
-				numberOfLayers = 6	#trainMultipleFiles should affect number of neurons/parameters in network
-			else:
-				numberOfLayers = 3
-
-	n_x = num_input_neurons #datasetNumFeatures
-	n_y = num_output_neurons  #datasetNumClasses
-	datasetNumClasses = n_y
-	n_h_first = n_x
-	previousNumberLayerNeurons = n_h_first
-	n_h.append(n_h_first)
-
-	for l in range(1, numberOfLayers):	#for every hidden layer
-		if(networkDivergenceType == "linearConverging"):
-			if(l == 1):
-				n_h_x = firstHiddenLayerNumberNeurons
-			else:
-				n_h_x = int((firstHiddenLayerNumberNeurons-num_output_neurons) * ((l-1)/(numberOfLayers-2)) + num_output_neurons)
-			#previousNumberLayerNeurons = n_h_x
-			n_h.append(n_h_x)
-		elif(networkDivergenceType == "nonLinearConverging"):
-			if(l == 1):
-				n_h_x = firstHiddenLayerNumberNeurons
-			else:
-				n_h_x = int(previousNumberLayerNeurons*networkDivergence)
-			n_h.append(n_h_x)
-			previousNumberLayerNeurons = n_h_x
-		elif(networkDivergenceType == "linearDivergingThenConverging"):
-			#not yet coded
-			print("defineNetworkParametersCUANN error: linearDivergingThenConverging not yet coded")
-			exit()
-		else:
-			print("defineNetworkParametersCUANN error: unknown networkDivergenceType")
-			exit()
-
-	n_h_last = n_y
-	n_h.append(n_h_last)
-	
-	print("defineNetworkParametersCUANN, n_h = ", n_h)
-
-	#classTargetExemplarsDynamicOutputNeuronIndexList = [-1] * num_output_neurons
+	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet)
 
 	return numberOfLayers
 
@@ -325,8 +250,9 @@ def neuralNetworkPropagationCUANNtrain(x, y, networkIndex=1):	#currentClassTarge
 
 	for l in range(1, numberOfLayers+1):
 
-		#print("l = " + str(l))
-		#print("W[generateParameterNameNetwork(networkIndex, l, W)] = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
+		if(debugWexplosion):
+			print("l = " + str(l))
+			print("W[generateParameterNameNetwork(networkIndex, l, W)] = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
 		
 		if(useBinaryWeights):
 			if(useBinaryWeightsReduceMemoryWithBool):
