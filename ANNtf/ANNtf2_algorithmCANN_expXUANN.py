@@ -30,6 +30,8 @@ learningRate = 0.001
 
 debugWexplosion = False
 debugFastTrain = True
+debugVerifyGradientBackpropStopSub = False
+debugVerifyGradientBackpropStopFinalLayer = False
 
 objectiveTargetMinimiseDiffBetweenPositiveSamples = True
 
@@ -188,12 +190,12 @@ def neuralNetworkPropagationCANN(x, networkIndex=1, enableFinalLayerWeightUpdate
 		else:
 			Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
 			A = reluCustom(Z)
-			
-		AprevLayer = A
-		
+
 		if(enableFinalLayerWeightUpdatesOnly):
-			if(l < numberOfLayers-1):
-				AprevLayer = tf.stop_gradient(AprevLayer)
+			if(l < numberOfLayers):
+				A = tf.stop_gradient(A)
+		
+		AprevLayer = A
 		
 	pred = tf.nn.softmax(Z)
 	
@@ -235,8 +237,8 @@ def neuralNetworkPropagationCANNsub(x, samplePositiveX, sampleNegativeX, lTrain,
 				Z = tf.add(tf.matmul(AprevLayer[t], W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
 				A = reluCustom(Z)
 	
-			if(l < lTrain-1):
-				AprevLayer[t] = tf.stop_gradient(AprevLayer[t])
+			if(l < lTrain):
+				A = tf.stop_gradient(A)
 					
 			AprevLayer[t] = A
 							
@@ -279,6 +281,8 @@ def neuralNetworkPropagationCANN_test(x, y, networkIndex=1):
 	
 def neuralNetworkPropagationCANN_expXUANNtrain(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex=1):
 	for l in range(1, numberOfLayers):
+		if(debugVerifyGradientBackpropStopSub):
+			print("l = ", l)
 		executeOptimisationSub(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, l, networkIndex)
 	executeOptimisationFinal(x, y, networkIndex)
 
@@ -302,6 +306,10 @@ def executeOptimisationSub(x, y, samplePositiveX, samplePositiveY, sampleNegativ
 		#print("pred.shape = ", pred.shape)
 		#print("yIntermediaryArtificialTarget.shape = ", yIntermediaryArtificialTarget.shape)
 		loss = crossEntropy(pred, yIntermediaryArtificialTarget, yIntermediaryArtificialTargetNumClasses, costCrossEntropyWithLogits=True)	#single intermediary (per layer) output neuron used for training
+
+	if(debugVerifyGradientBackpropStopSub):
+		for l in range(1, numberOfLayers+1):
+			print("executeOptimisationFinal before: l = ", l, ", W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
 		
 	Wlist = []
 	Blist = []
@@ -314,6 +322,11 @@ def executeOptimisationSub(x, y, samplePositiveX, samplePositiveY, sampleNegativ
 	
 	gradients = g.gradient(loss, trainableVariables)
 	optimizer.apply_gradients(zip(gradients, trainableVariables))
+
+	if(debugVerifyGradientBackpropStopSub):
+		for l in range(1, numberOfLayers+1):
+			print("executeOptimisationFinal after: l = ", l, ", W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
+
 	
 def executeOptimisationFinal(x, y, networkIndex=1):
 
@@ -325,6 +338,11 @@ def executeOptimisationFinal(x, y, networkIndex=1):
 	Blist = []
 	#for l in range(1, numberOfLayers+1):
 	l = numberOfLayers
+	
+	if(debugVerifyGradientBackpropStopFinalLayer):
+		for l in range(1, numberOfLayers+1):
+			print("executeOptimisationFinal before: l = ", l, ", W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
+		
 	Wlist.append(W[generateParameterNameNetwork(networkIndex, l, "W")])
 	Blist.append(B[generateParameterNameNetwork(networkIndex, l, "B")])
 	
@@ -332,7 +350,11 @@ def executeOptimisationFinal(x, y, networkIndex=1):
 	
 	gradients = g.gradient(loss, trainableVariables)
 	optimizer.apply_gradients(zip(gradients, trainableVariables))
-	
+
+	if(debugVerifyGradientBackpropStopFinalLayer):
+		for l in range(1, numberOfLayers+1):
+			print("executeOptimisationFinal after: l = ", l, ", W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
+			
 	
 	
 def reluCustom(Z, prevLayerSize=None):
@@ -375,88 +397,3 @@ def generateTFtrainDataFromNParraysCANN_expXUANN(train_x, train_y, shuffleSize, 
 	return trainDataList
 		
 		
-
-
-
-
-#def neuralNetworkPropagationCANN-legacy(x, networkIndex=1, recordAtrace=False, traceIndex=-1):
-#	
-#	global averageTotalInput
-#		
-#	AprevLayer = x
-#
-#	if(useBinaryWeights):
-#		if(averageTotalInput == -1):
-#			averageTotalInput = tf.math.reduce_mean(x)
-#			print("averageTotalInput = ", averageTotalInput)
-#			 
-#	#print("x = ", x)
-#	
-#	for l in range(1, numberOfLayers+1):
-#	
-#		#print("l = " + str(l))
-#		
-#		if(useBinaryWeights):
-#			if(useBinaryWeightsReduceMemoryWithBool):
-#				Wfloat = tf.dtypes.cast(W[generateParameterNameNetwork(networkIndex, l, "W")], dtype=tf.float32)
-#				Bfloat = tf.dtypes.cast(B[generateParameterNameNetwork(networkIndex, l, "B")], dtype=tf.float32)
-#				Z = tf.add(tf.matmul(AprevLayer, Wfloat), Bfloat)
-#			else:
-#				Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-#			A = reluCustom(Z, n_h[l-1])
-#		else:
-#			Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-#			A = reluCustom(Z)
-#			
-#		if(recordAtrace):
-#		   if(onlyTrainNeuronsIfActivationContributionAboveThreshold1):
-#			   #apply threshold to A
-#			   AAboveThreshold = tf.math.greater(A, onlyTrainNeuronsIfActivationContributionAboveThreshold1Value)
-#			   AAboveThresholdFloat = tf.dtypes.cast(AAboveThreshold, dtype=tf.float32)
-#			   ALearn = A*AAboveThresholdFloat
-#		   else:
-#			   ALearn = A
-#		   #print("ALearn.shape = ", ALearn.shape)
-#		   Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")][traceIndex] = ALearn
-#			
-#		AprevLayer = A
-#		
-#	pred = tf.nn.softmax(Z)
-#	
-#	#print("neuralNetworkPropagationCANN pred.shape = ", pred.shape)	
-#
-#	return pred
-
-#def neuralNetworkPropagationCANN_expXUANNtrain-legacy(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex=1):	#currentClassTarget
-#	
-#	#debug:
-#	#print("batchSize = ", batchSize)
-#	#print("learningRate = ", learningRate)
-#	#print("x = ", x)
-#			
-#	predExemplars = neuralNetworkPropagationCANN_expXUANN(exemplarsX, networkIndex, recordAtrace=True, traceIndex=0)
-#	predExemplars = neuralNetworkPropagationCANN_expXUANN(samplePositiveX, networkIndex, recordAtrace=True, traceIndex=1)
-#	predExemplars = neuralNetworkPropagationCANN_expXUANN(sampleNegativeX, networkIndex, recordAtrace=True, traceIndex=2)
-#	
-#	AprevLayer = x
-#
-#	for l in range(1, numberOfLayers+1):
-#
-#		if(debugWexplosion):
-#			print("l = " + str(l))
-#			print("W[generateParameterNameNetwork(networkIndex, l, W)] = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
-#		
-#		
-#		
-#	#clear Atrace;
-#	for l in range(1, numberOfLayers+1):
-#		for t in range(numberOfTraces):
-#			Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")][traceIndex] = 0	#tf.zeros(n_h[l])
-#		
-#	pred = neuralNetworkPropagationCANN_expXUANN(x, networkIndex)
-#	
-#	return pred
-#
-	
-	
-	

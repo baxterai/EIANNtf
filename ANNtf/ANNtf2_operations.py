@@ -26,7 +26,7 @@ import math
 #if(useBinaryWeights) or if(generateFirstLayerSDR)
 generateLargeNetwork = True
 if(generateLargeNetwork):
-	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 2.0	#3.0
+	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 3.0	#2.0 #3.0
 	generateNetworkNonlinearConvergence = True
 else:
 	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.8
