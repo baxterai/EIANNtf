@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""ANNtf2_algorithmCUANN.py
+"""ANNtf2_algorithmCANN_expCUANN.py
 
 # Requirements:
 Python 3 and Tensorflow 2.1+ 
@@ -12,7 +12,7 @@ see ANNtf2.py
 
 # Description
 
-Define fully connected common (activation path) update artificial neural network (CUANN)
+Define fully connected common (activation path) update artificial neural network (CANN_expCUANN)
 
 - Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
 
@@ -86,13 +86,6 @@ B = {}
 #Atrace = {}
 
 
-NETWORK_PARAM_INDEX_TYPE = 0
-NETWORK_PARAM_INDEX_LAYER = 1
-NETWORK_PARAM_INDEX_H_CURRENT_LAYER = 2
-NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER = 3
-NETWORK_PARAM_INDEX_VARIATION_DIRECTION = 4
-
-
 #Network parameters
 n_h = []
 numberOfLayers = 0
@@ -104,7 +97,7 @@ datasetNumClasses = 0
 def getNoisySampleGenerationNumSamples():
 	return noisySampleGeneration, noisySampleGenerationNumSamples, noiseStandardDeviation
 	
-def defineTrainingParametersCUANN(dataset, trainMultipleFiles):
+def defineTrainingParametersCANN(dataset, trainMultipleFiles):
 	
 	if(trainMultipleFiles):
 		if(dataset == "POStagSequence"):
@@ -133,7 +126,7 @@ def defineTrainingParametersCUANN(dataset, trainMultipleFiles):
 	return learningRate, trainingSteps, batchSize, displayStep, numEpochs
 	
 
-def defineNetworkParametersCUANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+def defineNetworkParametersCANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
 
 	global n_h
 	global numberOfLayers
@@ -144,7 +137,7 @@ def defineNetworkParametersCUANN(num_input_neurons, num_output_neurons, datasetN
 
 	return numberOfLayers
 
-def defineNeuralNetworkParametersCUANN():
+def defineNeuralNetworkParametersCANN():
 	
 	tf.random.set_seed(5);
 	if(useBinaryWeights):
@@ -173,7 +166,7 @@ def defineNeuralNetworkParametersCUANN():
 
 	
 	
-def neuralNetworkPropagationCUANN(x, networkIndex=1, recordAtrace=False):
+def neuralNetworkPropagationCANN(x, networkIndex=1, recordAtrace=False):
 	
 	global averageTotalInput
 		
@@ -214,27 +207,26 @@ def neuralNetworkPropagationCUANN(x, networkIndex=1, recordAtrace=False):
 		#	else:
 		#		ALearn = A
 		#	#print("ALearn.shape = ", ALearn.shape)
-		#	
 		#	Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")] = ALearn
 			
 		AprevLayer = A
 		
 	pred = tf.nn.softmax(Z)
 	
-	#print("neuralNetworkPropagationCUANN pred.shape = ", pred.shape)	
+	#print("neuralNetworkPropagationCANN pred.shape = ", pred.shape)	
 
 	return pred
 	
 
-def neuralNetworkPropagationCUANNtest(x, y, networkIndex=1):
+def neuralNetworkPropagationCANN_test(x, y, networkIndex=1):
 
-	pred = neuralNetworkPropagationCUANN(x, networkIndex)
+	pred = neuralNetworkPropagationCANN(x, networkIndex)
 	loss = ANNtf2_operations.crossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=False)
 	acc = ANNtf2_operations.calculateAccuracy(pred, y)
 	
 	return loss, acc
 	
-def neuralNetworkPropagationCUANNtrain(x, y, networkIndex=1):	#currentClassTarget
+def neuralNetworkPropagationCANN_expCUANNtrain(x, y, networkIndex=1):	#currentClassTarget
 	
 	#debug:
 	#print("batchSize = ", batchSize)
@@ -244,7 +236,7 @@ def neuralNetworkPropagationCUANNtrain(x, y, networkIndex=1):	#currentClassTarge
 	#important notes;
 	#the highest layer output (A) being forward propagated from x is never used during training, as the output neuron actually being trained is defined in y
 		
-	#predExemplars = neuralNetworkPropagationCUANN(exemplarsX, networkIndex, recordAtrace=True)	#record exemplar activation traces
+	#predExemplars = neuralNetworkPropagationCANN_expCUANN(exemplarsX, networkIndex, recordAtrace=True)	#record exemplar activation traces
 	
 	AprevLayer = x
 
@@ -328,7 +320,7 @@ def neuralNetworkPropagationCUANNtrain(x, y, networkIndex=1):	#currentClassTarge
 	#for l in range(1, numberOfLayers+1):
 	#	Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")] = 0	#tf.zeros(n_h[l])
 		
-	pred = neuralNetworkPropagationCUANN(x, networkIndex)
+	pred = neuralNetworkPropagationCANN_expCUANN(x, networkIndex)
 	
 	return pred
 
@@ -360,7 +352,7 @@ def reluCustom(Z, prevLayerSize=None):
  
 
 
-def generateTFtrainDataFromNParraysCUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses):
+def generateTFtrainDataFromNParraysCANN_expCUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses):
 
 	trainDataList = []
 	

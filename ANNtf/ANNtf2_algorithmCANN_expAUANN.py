@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""ANNtf2_algorithmAUANN.py
+"""ANNtf2_algorithmCANN_expAUANN.py
 
 # Requirements:
 Python 3 and Tensorflow 2.1+ 
@@ -12,7 +12,7 @@ see ANNtf2.py
 
 # Description
 
-Define fully connected associative update artificial neural network (AUANN)
+Define fully connected associative (wrt exemplar) update artificial neural network (CANN_expAUANN)
 
 - Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
 
@@ -46,7 +46,7 @@ else:
 #firstLayerToAssociateNeuronsWithExemplar = 1
 #lastLayerToAssociateNeuronsWithExemplar = 1
 
-learningRate = 0.1	#AUANN is designed to use a high learning rate for 1-shot learning (by association with/update of exemplar contents)
+learningRate = 0.1	#CANN_expAUANN is designed to use a high learning rate for 1-shot learning (by association with/update of exemplar contents)
 enableForgetting = True
 if(enableForgetting):
 	enableForgettingRestrictToAPrevAndNotAConnections = True	#True	#this ensures that only connections between active lower layer neurons and unactive higher layer exemplar neurons are suppressed
@@ -108,7 +108,7 @@ datasetNumClasses = 0
 
 #randomNormal = tf.initializers.RandomNormal()
 
-def calculateOutputNeuronsAUANN(datasetNumClasses):
+def calculateOutputNeuronsCANN(datasetNumClasses):
 	num_output_neurons = datasetNumClasses
 	if(dynamicFinalLayerClassTargetAssignment):
 		num_output_neurons = datasetNumClasses * dynamicFinalLayerClassTargetAssignmentNumOutputNeuronsAsFractionOfNumClasses
@@ -118,7 +118,7 @@ def calculateOutputNeuronsAUANN(datasetNumClasses):
 def getNoisySampleGenerationNumSamples():
 	return noisySampleGeneration, noisySampleGenerationNumSamples, noiseStandardDeviation
 	
-def defineTrainingParametersAUANN(dataset, trainMultipleFiles):
+def defineTrainingParametersCANN(dataset, trainMultipleFiles):
 	
 	if(trainMultipleFiles):
 		if(dataset == "POStagSequence"):
@@ -141,7 +141,7 @@ def defineTrainingParametersAUANN(dataset, trainMultipleFiles):
 	return learningRate, trainingSteps, batchSize, displayStep, numEpochs
 	
 
-def defineNetworkParametersAUANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+def defineNetworkParametersCANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
 
 	global n_h
 	global numberOfLayers
@@ -155,7 +155,7 @@ def defineNetworkParametersAUANN(num_input_neurons, num_output_neurons, datasetN
 
 	return numberOfLayers
 
-def defineNeuralNetworkParametersAUANN():
+def defineNeuralNetworkParametersCANN():
 	
 	tf.random.set_seed(5);
 	if(useBinaryWeights):
@@ -184,7 +184,7 @@ def defineNeuralNetworkParametersAUANN():
 
 	
 	
-def neuralNetworkPropagationAUANN(x, networkIndex=1, recordAtrace=False):
+def neuralNetworkPropagationCANN(x, networkIndex=1, recordAtrace=False):
 	
 	global averageTotalInput
 		
@@ -222,27 +222,26 @@ def neuralNetworkPropagationAUANN(x, networkIndex=1, recordAtrace=False):
 			else:
 				ALearn = A
 			#print("ALearn.shape = ", ALearn.shape)
-			
 			Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")] = ALearn
 			
 		AprevLayer = A
 		
 	pred = tf.nn.softmax(Z)
 	
-	#print("neuralNetworkPropagationAUANN pred.shape = ", pred.shape)	
+	#print("neuralNetworkPropagationCANN pred.shape = ", pred.shape)	
 
 	return pred
 	
 
-def neuralNetworkPropagationAUANNtest(x, y, networkIndex=1):
+def neuralNetworkPropagationCANN_test(x, y, networkIndex=1):
 
-	pred = neuralNetworkPropagationAUANN(x, networkIndex)
+	pred = neuralNetworkPropagationCANN(x, networkIndex)
 	loss = ANNtf2_operations.crossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=False)
 	acc = ANNtf2_operations.calculateAccuracy(pred, y)
 	
 	return loss, acc
 	
-def generateYActualfromYAUANN(y, num_output_neurons):
+def generateYActualfromYCANN_expAUANN(y, num_output_neurons):
 	if(dynamicFinalLayerClassTargetAssignment):
 		#print("y = ", y)
 		#print("classTargetExemplarsDynamicOutputNeuronIndexList = ", classTargetExemplarsDynamicOutputNeuronIndexList)
@@ -251,25 +250,25 @@ def generateYActualfromYAUANN(y, num_output_neurons):
 			exemplarsY[e] = classTargetExemplarsDynamicOutputNeuronIndexList[y[e]]
 		#print("exemplarsY = ", exemplarsY)
 	else:
-		#print("generateYActualfromYAUANN error: requires dynamicFinalLayerClassTargetAssignment")
+		#print("generateYActualfromYCANN_expAUANN error: requires dynamicFinalLayerClassTargetAssignment")
 		exemplarsY = y
 	return exemplarsY
 
-def generateNumClassesActualAUANN(datasetNumClasses, num_output_neurons):
+def generateNumClassesActualCANN_expAUANN(datasetNumClasses, num_output_neurons):
 	if(dynamicFinalLayerClassTargetAssignment):
 		return num_output_neurons
 	else:
-		#print("generateNumClassesActualAUANN error: requires dynamicFinalLayerClassTargetAssignment")
+		#print("generateNumClassesActualCANN_expAUANN error: requires dynamicFinalLayerClassTargetAssignment")
 		return datasetNumClasses
 
-def generateTFYActualfromYandExemplarYAUANN(y, exemplarsY):
+def generateTFYActualfromYandExemplarYCANN_expAUANN(y, exemplarsY):
 	if(dynamicFinalLayerClassTargetAssignment):
 		return exemplarsY
 	else:
-		#print("generateTFYActualfromYandExemplarYAUANN error: requires dynamicFinalLayerClassTargetAssignment")
+		#print("generateTFYActualfromYandExemplarYCANN_expAUANN error: requires dynamicFinalLayerClassTargetAssignment")
 		return y
 	
-def neuralNetworkPropagationAUANNtrain(x, y, exemplarsX, exemplarsY, currentClassTarget, networkIndex=1):
+def neuralNetworkPropagationCANN_expAUANNtrain(x, y, exemplarsX, exemplarsY, currentClassTarget, networkIndex=1):
 
 	#connect/associate x to/with exemplarX
 	
@@ -285,31 +284,31 @@ def neuralNetworkPropagationAUANNtrain(x, y, exemplarsX, exemplarsY, currentClas
 	numberOfExemplarX = exemplarsX.shape[0]	#default: 1
 	numberOfDataX = x.shape[0]	#default: 1
 	if(numberOfExemplarX != numberOfDataX):
-		print("neuralNetworkPropagationAUANNtrain error: numberOfExemplarX != numberOfDataX")
+		print("neuralNetworkPropagationCANN_expAUANNtrain error: numberOfExemplarX != numberOfDataX")
 		exit(0)
 	numberOfExemplarY = exemplarsY.shape[0]	#default: 1
 	numberOfDataY = y.shape[0]	#default: 1
 	if(numberOfExemplarY != numberOfDataY):
-		print("neuralNetworkPropagationAUANNtrain error: numberOfExemplarY != numberOfDataY")
+		print("neuralNetworkPropagationCANN_expAUANNtrain error: numberOfExemplarY != numberOfDataY")
 		exit(0)
 	dataOutputNeuronIndex = currentClassTarget 	#y[0]	#all class targets in data/exemplars tensor are identical
 	if(currentClassTarget != y[0]):
-		print("neuralNetworkPropagationAUANNtrain error: (currentClassTarget != y[0])")
+		print("neuralNetworkPropagationCANN_expAUANNtrain error: (currentClassTarget != y[0])")
 		print("currentClassTarget = ", currentClassTarget)
 		print("y[0] = ", y[0])
 		exit(0)
 	if(dynamicFinalLayerClassTargetAssignment):
 		exemplarOutputNeuronIndex = classTargetExemplarsDynamicOutputNeuronIndexList[currentClassTarget]	#exemplarsY[0]	#all class targets in data/exemplars tensor are identical
 		if(classTargetExemplarsDynamicOutputNeuronIndexList[currentClassTarget] != exemplarsY[0]):
-			print("neuralNetworkPropagationAUANNtrain error: (classTargetExemplarsDynamicOutputNeuronIndexList[currentClassTarget] != exemplarsY[0])")
+			print("neuralNetworkPropagationCANN_expAUANNtrain error: (classTargetExemplarsDynamicOutputNeuronIndexList[currentClassTarget] != exemplarsY[0])")
 			exit(0)
 	else:
 		exemplarOutputNeuronIndex = dataOutputNeuronIndex
 		if(y[0] != exemplarsY[0]):
-			print("neuralNetworkPropagationAUANNtrain error: (y[0] != exemplarsY[0])")
+			print("neuralNetworkPropagationCANN_expAUANNtrain error: (y[0] != exemplarsY[0])")
 			exit(0)		
 		
-	predExemplars = neuralNetworkPropagationAUANN(exemplarsX, networkIndex, recordAtrace=True)	#record exemplar activation traces
+	predExemplars = neuralNetworkPropagationCANN_expAUANN(exemplarsX, networkIndex, recordAtrace=True)	#record exemplar activation traces
 	
 	accExemplars = ANNtf2_operations.calculateAccuracy(predExemplars, exemplarsY)
 	print("CHECKTHIS: accExemplars (this should always remain close to 100%) = ", accExemplars)
@@ -378,7 +377,7 @@ def neuralNetworkPropagationAUANNtrain(x, y, exemplarsX, exemplarsY, currentClas
 	for l in range(1, numberOfLayers+1):
 		Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")] = 0	#tf.zeros(n_h[l])
 		
-	pred = neuralNetworkPropagationAUANN(x, networkIndex)
+	pred = neuralNetworkPropagationCANN_expAUANN(x, networkIndex)
 	
 	return pred
 
@@ -410,7 +409,7 @@ def reluCustom(Z, prevLayerSize=None):
  
 
 
-def generateTFtrainDataFromNParraysAUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses):
+def generateTFtrainDataFromNParraysCANN_expAUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses):
 
 	trainDataList = []
 	
@@ -424,7 +423,7 @@ def generateTFtrainDataFromNParraysAUANN(train_x, train_y, shuffleSize, batchSiz
 	return trainDataList
 		
 		
-def generateTFexemplarDataFromNParraysAUANN(train_x, train_y, networkIndex, shuffleSize, batchSize, datasetNumClasses, generateClassTargetExemplars):
+def generateTFexemplarDataFromNParraysCANN_expAUANN(train_x, train_y, networkIndex, shuffleSize, batchSize, datasetNumClasses, generateClassTargetExemplars):
 
 	global classTargetExemplarsXList
 	global classTargetExemplarsYList
@@ -438,7 +437,7 @@ def generateTFexemplarDataFromNParraysAUANN(train_x, train_y, networkIndex, shuf
 	if(generateClassTargetExemplars):
 		classTargetExemplarsDynamicOutputNeuronIndexList = [-1] * datasetNumClasses
 
-		#classTargetExemplarsList global lists are currently required such that generateTFtrainDataFromNParraysAUANN can be executed for multiple epochs (w/wo generateClassTargetExemplars)
+		#classTargetExemplarsList global lists are currently required such that generateTFtrainDataFromNParraysCANN_expAUANN can be executed for multiple epochs (w/wo generateClassTargetExemplars)
 		classTargetExemplarsXList = [None] * datasetNumClasses	
 		classTargetExemplarsYList = [None] * datasetNumClasses
 					
@@ -455,7 +454,7 @@ def generateTFexemplarDataFromNParraysAUANN(train_x, train_y, networkIndex, shuf
 			trainDataAll = trainDataUnbatched.batch(train_xLength)	#train_xLength + 1
 			(x, y) = next(iter(trainDataAll))
 			
-			pred = neuralNetworkPropagationAUANN(x, networkIndex)		
+			pred = neuralNetworkPropagationCANN_expAUANN(x, networkIndex)		
 			
 			if(dynamicFinalLayerClassTargetAssignment):
 				predMaxOutputIndex = tf.argmax(pred, 1).numpy()
@@ -498,10 +497,10 @@ def generateTFexemplarDataFromNParraysAUANN(train_x, train_y, networkIndex, shuf
 			
 		if(classTargetExemplarsXList[classTarget].size == 0):
 			if(dynamicFinalLayerClassTargetAssignment):
-				print("generateTFtrainDataFromNParraysAUANN error: dynamicFinalLayerClassTargetAssignment: exemplar creation currently requires for each data class, at least one successful propagation to output layer in randomly initiated network")
+				print("generateTFtrainDataFromNParraysCANN_expAUANN error: dynamicFinalLayerClassTargetAssignment: exemplar creation currently requires for each data class, at least one successful propagation to output layer in randomly initiated network")
 				print("consider expanding size of network")
 			else:
-				print("generateTFtrainDataFromNParraysAUANN error: !dynamicFinalLayerClassTargetAssignment: exemplar creation currently requires for each data class, at least one successful propagation to class target in randomly initiated network")
+				print("generateTFtrainDataFromNParraysCANN_expAUANN error: !dynamicFinalLayerClassTargetAssignment: exemplar creation currently requires for each data class, at least one successful propagation to class target in randomly initiated network")
 				print("consider enabling dynamicFinalLayerClassTargetAssignment")
 			print("classTarget = ", classTarget)
 			print("classTargetExemplarsXList[classTarget] = ", classTargetExemplarsXList[classTarget])

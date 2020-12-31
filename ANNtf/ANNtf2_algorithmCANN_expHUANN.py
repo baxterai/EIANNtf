@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""ANNtf2_algorithmHUANN.py
+"""ANNtf2_algorithmCANN_expHUANN.py
 
 # Requirements:
 Python 3 and Tensorflow 2.1+ 
@@ -12,7 +12,7 @@ see ANNtf2.py
 
 # Description
 
-Define fully connected hebbian update artificial neural network (HUANN)
+Define fully connected hebbian update artificial neural network (CANN_expHUANN)
 
 - Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
 
@@ -77,7 +77,10 @@ forgetRate = 0.0
 batchSize = 0
 
 
-def defineTrainingParametersHUANN(dataset, trainMultipleFiles):
+def getNoisySampleGenerationNumSamples():
+	return False, 0, 0
+	
+def defineTrainingParametersCANN(dataset, trainMultipleFiles):
 
 	global learningRate
 	global forgetRate
@@ -110,7 +113,7 @@ def defineTrainingParametersHUANN(dataset, trainMultipleFiles):
 	return learningRate, trainingSteps, batchSize, displayStep, numEpochs
 	
 
-def defineNetworkParametersHUANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+def defineNetworkParametersCANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
 
 	global n_h
 	global numberOfLayers
@@ -121,7 +124,7 @@ def defineNetworkParametersHUANN(num_input_neurons, num_output_neurons, datasetN
 	return numberOfLayers
 
 
-def defineNeuralNetworkParametersHUANN():
+def defineNeuralNetworkParametersCANN():
 
 	randomNormal = tf.initializers.RandomNormal()
 	
@@ -133,7 +136,7 @@ def defineNeuralNetworkParametersHUANN():
 			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
 				
 	
-def neuralNetworkPropagationHUANN(x, networkIndex=1):
+def neuralNetworkPropagationCANN(x, networkIndex=1):
 			
 	AprevLayer = x
 	 
@@ -149,7 +152,7 @@ def neuralNetworkPropagationHUANN(x, networkIndex=1):
 	return tf.nn.softmax(Z)
 	
 	
-def neuralNetworkPropagationHUANNtrain(x, y=None, networkIndex=1, trainHebbianForwardprop=False, trainHebbianBackprop=False, trainHebbianLastLayerSupervision=False):
+def neuralNetworkPropagationCANN_expHUANNtrain(x, y=None, networkIndex=1, trainHebbianForwardprop=False, trainHebbianBackprop=False, trainHebbianLastLayerSupervision=False):
 
 	#print("batchSize = ", batchSize)
 	#print("learningRate = ", learningRate)
@@ -176,7 +179,7 @@ def neuralNetworkPropagationHUANNtrain(x, y=None, networkIndex=1, trainHebbianFo
 			A = tf.clip_by_value(A, clip_value_min=-1.0, clip_value_max=1.0)
 
 		if(trainHebbianForwardprop):
-			trainLayerHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackprop=trainHebbianBackprop, trainHebbianLastLayerSupervision=trainHebbianLastLayerSupervision)
+			trainLayerCANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackprop=trainHebbianBackprop, trainHebbianLastLayerSupervision=trainHebbianLastLayerSupervision)
 
 		AprevLayer = A
 	
@@ -188,12 +191,12 @@ def neuralNetworkPropagationHUANNtrain(x, y=None, networkIndex=1, trainHebbianFo
 			AprevLayer = Alayers[l-1]
 			A = Alayers[l]
 			
-			trainLayerHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackprop=trainHebbianBackprop, trainHebbianLastLayerSupervision=trainHebbianLastLayerSupervision)
+			trainLayerCANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackprop=trainHebbianBackprop, trainHebbianLastLayerSupervision=trainHebbianLastLayerSupervision)
 							
 	return tf.nn.softmax(Z)
 
 
-def trainLayerHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackprop=False, trainHebbianLastLayerSupervision=False):
+def trainLayerCANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackprop=False, trainHebbianLastLayerSupervision=False):
 
 		#print("train")
 		isLastLayerSupervision = False

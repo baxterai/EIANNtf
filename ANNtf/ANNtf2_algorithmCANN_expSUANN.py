@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""ANNtf2_algorithmSUANN.py
+"""ANNtf2_algorithmCANN_expSUANN.py
 
 # Requirements:
 Python 3 and Tensorflow 2.1+ 
@@ -12,7 +12,7 @@ see ANNtf2.py
 
 # Description
 
-Define fully connected stochastically updated artificial neural network (SUANN)
+Define fully connected stochastically updated artificial neural network (CANN_expSUANN)
 
 - Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
 
@@ -65,11 +65,6 @@ B = {}
 Wbackup = {}
 Bbackup = {}
 
-NETWORK_PARAM_INDEX_TYPE = 0
-NETWORK_PARAM_INDEX_LAYER = 1
-NETWORK_PARAM_INDEX_H_CURRENT_LAYER = 2
-NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER = 3
-NETWORK_PARAM_INDEX_VARIATION_DIRECTION = 4
 
 
 #Network parameters
@@ -86,7 +81,7 @@ batchSize = 0
 def getNoisySampleGenerationNumSamples():
 	return noisySampleGeneration, noisySampleGenerationNumSamples, noiseStandardDeviation
 	
-def defineTrainingParametersSUANN(dataset, trainMultipleFiles):
+def defineTrainingParametersCANN(dataset, trainMultipleFiles):
 
 	global learningRate
 	global forgetRate
@@ -124,7 +119,7 @@ def defineTrainingParametersSUANN(dataset, trainMultipleFiles):
 	return learningRate, trainingSteps, batchSize, displayStep, numEpochs
 	
 
-def defineNetworkParametersSUANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+def defineNetworkParametersCANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
 
 	global n_h
 	global numberOfLayers
@@ -136,7 +131,7 @@ def defineNetworkParametersSUANN(num_input_neurons, num_output_neurons, datasetN
 	return numberOfLayers
 
 
-def defineNeuralNetworkParametersSUANN():
+def defineNeuralNetworkParametersCANN():
 	
 	tf.random.set_seed(5);
 	if(useBinaryWeights):
@@ -168,7 +163,7 @@ def defineNeuralNetworkParametersSUANN():
 			#exit()
 				
 	
-def neuralNetworkPropagationSUANN(x, networkIndex=1):
+def neuralNetworkPropagationCANN(x, networkIndex=1):
 	
 	global averageTotalInput
 		
@@ -202,22 +197,22 @@ def neuralNetworkPropagationSUANN(x, networkIndex=1):
 	return tf.nn.softmax(Z)
 	
 
-def neuralNetworkPropagationSUANNtest(x, y, networkIndex=1):
+def neuralNetworkPropagationCANN_test(x, y, networkIndex=1):
 
-	pred = neuralNetworkPropagationSUANN(x, networkIndex)
+	pred = neuralNetworkPropagationCANN(x, networkIndex)
 	loss = ANNtf2_operations.crossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=False)
 	acc = ANNtf2_operations.calculateAccuracy(pred, y)
 	
 	return loss, acc
 	
-def neuralNetworkPropagationSUANNtrain(x, y=None, networkIndex=1):
+def neuralNetworkPropagationCANN_expSUANNtrain(x, y=None, networkIndex=1):
 
 	#print("batchSize = ", batchSize)
 	#print("learningRate = ", learningRate)
 	
 	#print("x = ", x)
 	
-	lossStart, accStart = neuralNetworkPropagationSUANNtest(x, y, networkIndex)	#debug only
+	lossStart, accStart = neuralNetworkPropagationCANN_expSUANNtest(x, y, networkIndex)	#debug only
 	print("lossStart = ", lossStart)
 	
 	#ensure that an update is tried at least once for each parameter of the network during each training iteration:
@@ -243,7 +238,7 @@ def neuralNetworkPropagationSUANNtrain(x, y=None, networkIndex=1):
 	
 					networkParameterIndexBase = (parameterTypeWorB, l, hIndexCurrentLayer, hIndexPreviousLayer, variationDirectionInt)
 			
-					lossBase, accBase = neuralNetworkPropagationSUANNtest(x, y, networkIndex)
+					lossBase, accBase = neuralNetworkPropagationCANN_expSUANNtest(x, y, networkIndex)
 					
 					#print("hIndexCurrentLayer = ", hIndexCurrentLayer)
 					#print("hIndexPreviousLayer = ", hIndexPreviousLayer)
@@ -302,7 +297,7 @@ def neuralNetworkPropagationSUANNtrain(x, y=None, networkIndex=1):
 									newVal = currentVal + variationDiff
 								B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
 			
-						loss, acc = neuralNetworkPropagationSUANNtest(x, y, networkIndex)
+						loss, acc = neuralNetworkPropagationCANN_expSUANNtest(x, y, networkIndex)
 						#print("loss = ", loss)
 						
 						if(loss < lossBase):
@@ -319,7 +314,7 @@ def neuralNetworkPropagationSUANNtrain(x, y=None, networkIndex=1):
 							W[generateParameterNameNetwork(networkIndex, l, "W")].assign(Wbackup[generateParameterNameNetwork(networkIndex, l, "W")])
 							B[generateParameterNameNetwork(networkIndex, l, "B")].assign(Bbackup[generateParameterNameNetwork(networkIndex, l, "B")])					
 		
-	pred = neuralNetworkPropagationSUANN(x, networkIndex)
+	pred = neuralNetworkPropagationCANN_expSUANN(x, networkIndex)
 	
 	return pred
 									
