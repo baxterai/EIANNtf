@@ -27,13 +27,26 @@ import math
 from numpy import random
 
 
-biologicalConstraints = True	#batchSize=1, _?
+stochasticUpdateNeurons = True	#default: True
+if(not stochasticUpdateNeurons):
+	stochasticUpdateLayers = True
+	#stochasticUpdateNetwork = False	#not yet coded
+	if(stochasticUpdateLayers):
+		trainLayersUseHebbianHeuristic = True
+		if(trainLayersUseHebbianHeuristic):
+			trainLayersUseHebbianHeuristicMultidirection = True	#try both directions (non/coincident with current activation path)
+		#else
+			#not currently possible since never any negative weight mod applied
+
+	
+biologicalConstraints = False	#batchSize=1, _?
 
 useBatch = True
 noisySampleGeneration = False
 noisySampleGenerationNumSamples = 0
 noiseStandardDeviation = 0
 
+useBinaryWeights = False
 if(biologicalConstraints):
 	useBinaryWeights = True	#increases stochastically updated training speed, but reduces final accuracy
 	if(useBinaryWeights):	
@@ -65,7 +78,11 @@ B = {}
 Wbackup = {}
 Bbackup = {}
 
-
+NETWORK_PARAM_INDEX_TYPE = 0
+NETWORK_PARAM_INDEX_LAYER = 1
+NETWORK_PARAM_INDEX_H_CURRENT_LAYER = 2
+NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER = 3
+NETWORK_PARAM_INDEX_VARIATION_DIRECTION = 4
 
 #Network parameters
 n_h = []
@@ -204,15 +221,105 @@ def neuralNetworkPropagationCANN_test(x, y, networkIndex=1):
 	acc = ANNtf2_operations.calculateAccuracy(pred, y)
 	
 	return loss, acc
-	
+
+
 def neuralNetworkPropagationCANN_expSUANNtrain(x, y=None, networkIndex=1):
+
+	if(stochasticUpdateNeurons):
+		neuralNetworkPropagationCANN_expSUANNtrain_updateNeurons(x, y, networkIndex)
+	elif(stochasticUpdateLayers):
+		neuralNetworkPropagationCANN_expSUANNtrain_updateLayers(x, y, networkIndex)
+	#elif(stochasticUpdateNetwork):
+	#	neuralNetworkPropagationCANN_expSUANNtrain_updateNetwork(x, y, networkIndex)
+		
+
+def neuralNetworkPropagationCANN_expSUANNtrain_updateLayers(x, y=None, networkIndex=1):
 
 	#print("batchSize = ", batchSize)
 	#print("learningRate = ", learningRate)
 	
 	#print("x = ", x)
 	
-	lossStart, accStart = neuralNetworkPropagationCANN_expSUANNtest(x, y, networkIndex)	#debug only
+	lossBase, accBase = neuralNetworkPropagationCANN_test(x, y, networkIndex)	#debug only
+	#print("lossBase = ", lossBase)
+		
+	if(trainLayersUseHebbianHeuristic):
+		AprevLayer = x
+	
+	if(useBinaryWeights):
+		if(useBinaryWeightsReduceMemoryWithBool):
+			dtype=tf.dtypes.bool
+		else:
+			dtype=tf.dtypes.float32	
+	else:
+		dtype=tf.dtypes.float32	
+	
+	for l in range(1, numberOfLayers+1):
+	
+		#print("\nl = " + str(l))
+		
+		WbackupLocal = W[generateParameterNameNetwork(networkIndex, l, "W")]
+		
+		if(trainLayersUseHebbianHeuristic):
+			Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])	
+			A = reluCustom(Z, n_h[l-1])
+			
+			AcoincidenceMatrix = tf.matmul(tf.transpose(AprevLayer), A)
+			
+			AprevLayer = A
+			
+			if(trainLayersUseHebbianHeuristicMultidirection):
+				direction = random.randint(0, 1)
+			else:
+				direction = 0
+			if(direction == 1):	#apply negative
+				AcoincidenceMatrix = tf.negative(AcoincidenceMatrix)
+			WmodRandom = AcoincidenceMatrix
+		else:
+			if(useBinaryWeights):
+				Wint = tf.random.uniform(WbackupLocal.shape, minval=0, maxval=2, dtype=tf.dtypes.int32)		#The lower bound minval is included in the range, while the upper bound maxval is excluded.
+				WmodRandom = tf.Variable(tf.dtypes.cast(Wint, dtype=dtype))
+			else:
+				WmodRandom = tf.random.normal(WbackupLocal.shape, dtype=dtype)
+	
+		if(useBinaryWeights):
+			Wmod = WmodRandom
+			W[generateParameterNameNetwork(networkIndex, l, "W")] = Wmod
+		else:
+			Wmod = WmodRandom*learningRate
+			#print("Wmod = ", Wmod)
+			W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] + Wmod
+				
+		loss, acc = neuralNetworkPropagationCANN_test(x, y, networkIndex)
+		#print("loss = ", loss)
+
+		accuracyImprovementDetected = False
+		if(loss < lossBase):
+			accuracyImprovementDetected = True
+			lossBase = loss
+			#print("\t(loss < lossBase): loss = ", loss)						
+
+		if not accuracyImprovementDetected:
+			#print("!accuracyImprovementDetected")
+			#print("WbackupLocal = ", WbackupLocal)
+			W[generateParameterNameNetwork(networkIndex, l, "W")] = WbackupLocal		
+		#else:
+			#print("accuracyImprovementDetected")
+
+	pred = neuralNetworkPropagationCANN(x, networkIndex)
+	
+	return pred
+					
+					
+					
+def neuralNetworkPropagationCANN_expSUANNtrain_updateNeurons(x, y=None, networkIndex=1):
+
+	#print("batchSize = ", batchSize)
+	#print("learningRate = ", learningRate)
+	
+	#print("x = ", x)
+	
+	lossStart, accStart = neuralNetworkPropagationCANN_test(x, y, networkIndex)	#debug only
 	print("lossStart = ", lossStart)
 	
 	#ensure that an update is tried at least once for each parameter of the network during each training iteration:
@@ -238,7 +345,7 @@ def neuralNetworkPropagationCANN_expSUANNtrain(x, y=None, networkIndex=1):
 	
 					networkParameterIndexBase = (parameterTypeWorB, l, hIndexCurrentLayer, hIndexPreviousLayer, variationDirectionInt)
 			
-					lossBase, accBase = neuralNetworkPropagationCANN_expSUANNtest(x, y, networkIndex)
+					lossBase, accBase = neuralNetworkPropagationCANN_test(x, y, networkIndex)
 					
 					#print("hIndexCurrentLayer = ", hIndexCurrentLayer)
 					#print("hIndexPreviousLayer = ", hIndexPreviousLayer)
@@ -297,7 +404,7 @@ def neuralNetworkPropagationCANN_expSUANNtrain(x, y=None, networkIndex=1):
 									newVal = currentVal + variationDiff
 								B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
 			
-						loss, acc = neuralNetworkPropagationCANN_expSUANNtest(x, y, networkIndex)
+						loss, acc = neuralNetworkPropagationCANN_test(x, y, networkIndex)
 						#print("loss = ", loss)
 						
 						if(loss < lossBase):
@@ -314,7 +421,7 @@ def neuralNetworkPropagationCANN_expSUANNtrain(x, y=None, networkIndex=1):
 							W[generateParameterNameNetwork(networkIndex, l, "W")].assign(Wbackup[generateParameterNameNetwork(networkIndex, l, "W")])
 							B[generateParameterNameNetwork(networkIndex, l, "B")].assign(Bbackup[generateParameterNameNetwork(networkIndex, l, "B")])					
 		
-	pred = neuralNetworkPropagationCANN_expSUANN(x, networkIndex)
+	pred = neuralNetworkPropagationCANN(x, networkIndex)
 	
 	return pred
 									

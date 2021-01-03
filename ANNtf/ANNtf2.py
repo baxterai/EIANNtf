@@ -66,6 +66,9 @@ elif(algorithm == "CANN"):
 	elif(algorithmCANN == "CANN_expCUANN"):
 		import ANNtf2_algorithmCANN_expCUANN as ANNtf2_algorithmCANN
 	elif(algorithmCANN == "CANN_expXUANN"):
+		XUANNnegativeSamplesComplement = False	#default: True
+		XUANNnegativeSamplesAll = False	#default: False #orig implementation
+		XUANNnegativeSamplesRandom = True	#default: False 
 		import ANNtf2_algorithmCANN_expXUANN as ANNtf2_algorithmCANN
 		
 
@@ -119,6 +122,7 @@ elif(algorithm == "CANN"):
 	
 	
 if(dataset == "SmallDataset"):
+	smallDatasetIndex = 0 #default: 0 (New Thyroid)
 	#trainMultipleFiles = False	#required
 	smallDatasetDefinitionsHeader = {'index':0, 'name':1, 'fileName':2, 'classColumnFirst':3}	
 	smallDatasetDefinitions = [
@@ -134,7 +138,6 @@ if(dataset == "SmallDataset"):
 	(9, "Wheat Seeds Dataset", "seeds_datasetFormatted.txt", False),
 	(10, "Boston House Price Dataset", "UNAVAILABLE", False)	#housingFormatted.data BAD
 	]
-	smallDatasetIndex = 0 #default: 0 (New Thyroid)
 	datasetFileName = smallDatasetDefinitions[smallDatasetIndex][smallDatasetDefinitionsHeader['fileName']]
 	datasetClassColumnFirst = smallDatasetDefinitions[smallDatasetIndex][smallDatasetDefinitionsHeader['classColumnFirst']]
 	print("datasetFileName = ", datasetFileName)
@@ -385,12 +388,18 @@ if __name__ == "__main__":
 					generateClassTargetExemplars = False
 					if(e == 0):
 						generateClassTargetExemplars = True
-					trainDataList = ANNtf2_algorithmCANN.generateTFtrainDataFromNParraysCANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses)
+					trainDataList = ANNtf2_algorithmCANN.generateTFtrainDataFromNParraysCANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=True)
 					datasetNumClassTargets = datasetNumClasses
-					samplePositiveDataList = ANNtf2_algorithmCANN.generateTFtrainDataFromNParraysCANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses)
-					sampleNegativeData = generateTFtrainDataFromNParrays(train_x, train_y, shuffleSize, batchSize)	#note current implementation limitation (sample negative contains a selection of experiences from all classes, not just negative classes) - this simplification deemed valid under assumptions: calculations will be averaged over large negative batch and numberClasses >> 2					
-					sampleNegativeDataList = []
-					sampleNegativeDataList.append(sampleNegativeData)	
+					samplePositiveDataList = ANNtf2_algorithmCANN.generateTFtrainDataFromNParraysCANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=True)
+					if(XUANNnegativeSamplesComplement):
+						sampleNegativeDataList = ANNtf2_algorithmCANN.generateTFtrainDataFromNParraysCANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=False)					
+					elif(XUANNnegativeSamplesAll):
+						#implementation limitation (sample negative contains a selection of experiences from all classes, not just negative classes) - this simplification deemed valid under assumptions: calculations will be averaged over large negative batch and numberClasses >> 2
+						sampleNegativeData = generateTFtrainDataFromNParrays(train_x, train_y, shuffleSize, batchSize)
+						sampleNegativeDataList = []
+						sampleNegativeDataList.append(sampleNegativeData)
+					elif(XUANNnegativeSamplesRandom):
+						sampleNegativeDataList = ANNtf2_algorithmCANN.generateTFtrainDataFromNParraysCANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=True)					
 					samplePositiveDataListIterators = []
 					for samplePositiveData in samplePositiveDataList:
 						samplePositiveDataListIterators.append(iter(samplePositiveData))
@@ -417,7 +426,7 @@ if __name__ == "__main__":
 			#print("trainingSteps = ", trainingSteps)
 			#print("batchSize = ", batchSize)
 			
-			for batchIndex in range(int(trainingSteps*shuffleSize*10/batchSize)):		#*5 is to normalise number of final training steps new iteration method in relative to original iteration method
+			for batchIndex in range(int(trainingSteps)):
 				(batchX, batchY) = trainDataListIterators[trainDataIndex].get_next()	#next(trainDataListIterators[trainDataIndex])
 				
 				batchYactual = batchY
@@ -427,7 +436,15 @@ if __name__ == "__main__":
 						batchYactual = ANNtf2_algorithmCANN_expAUANN.generateTFYActualfromYandExemplarYCANN_expAUANN(batchY, exemplarsY)
 					if(algorithmCANN == "CANN_expXUANN"):
 						(samplePositiveX, samplePositiveY) = samplePositiveDataListIterators[trainDataIndex].get_next()
-						(sampleNegativeX, sampleNegativeY) = sampleNegativeDataListIterators[0].get_next()
+						if(XUANNnegativeSamplesRandom):
+							foundTrainDataIndexNegative = False
+							while not foundTrainDataIndexNegative:
+								trainDataIndexNegative = np.random.randint(0, datasetNumClasses)
+								if(trainDataIndexNegative != trainDataIndex):
+									foundTrainDataIndexNegative = True
+							(sampleNegativeX, sampleNegativeY) = sampleNegativeDataListIterators[trainDataIndexNegative].get_next()
+						else:
+							(sampleNegativeX, sampleNegativeY) = sampleNegativeDataListIterators[trainDataIndex].get_next()
 														
 				if(noisySampleGeneration):
 					if(batchSize != 1):	#batchX.shape[0]

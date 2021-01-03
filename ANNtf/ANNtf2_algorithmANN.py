@@ -24,6 +24,8 @@ from ANNtf2_operations import *	#generateParameterNameSeq, generateParameterName
 import ANNtf2_operations
 import ANNtf2_globalDefs
 
+debugFastTrain = True
+
 W = {}
 B = {}
 
@@ -37,21 +39,28 @@ numberOfNetworks = 0
 def defineTrainingParametersANN(dataset, trainMultipleFiles):
 	if(trainMultipleFiles):
 		learningRate = 0.0001
-		if(dataset == "POStagSequence"):
-			trainingSteps = 10000
-		elif(dataset == "SmallDataset"):
-			trainingSteps = 1000
 		batchSize = 100
 		numEpochs = 10
-	else:
-		learningRate = 0.001
 		if(dataset == "POStagSequence"):
 			trainingSteps = 10000
-			numEpochs = 1
 		elif(dataset == "SmallDataset"):
-			trainingSteps = 1000
-			numEpochs = 10
+			if(debugFastTrain):
+				trainingSteps = batchSize
+			else:
+				trainingSteps = 1000
+
+	else:
+		learningRate = 0.001
 		batchSize = 1000
+		numEpochs = 10
+		if(dataset == "POStagSequence"):
+			trainingSteps = 10000
+		elif(dataset == "SmallDataset"):
+			if(debugFastTrain):
+				trainingSteps = batchSize
+			else:
+				trainingSteps = 1000
+		
 	displayStep = 100
 			
 	return learningRate, trainingSteps, batchSize, displayStep, numEpochs

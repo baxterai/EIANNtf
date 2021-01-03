@@ -24,13 +24,16 @@ import ANNtf2_globalDefs
 import math
 
 #if(useBinaryWeights) or if(generateFirstLayerSDR)
-generateLargeNetwork = True
+generateLargeNetwork = True	#default: True
 if(generateLargeNetwork):
-	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 3.0	#2.0 #3.0
+	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 3.0	#default: 3.0	#2.0 
 	generateNetworkNonlinearConvergence = True
 else:
-	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.8
-	generateNetworkNonlinearConvergence = False
+	#maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.5
+	#generateNetworkNonlinearConvergence = True
+	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.8	#default: 0.8
+	generateNetworkNonlinearConvergence = False	#default: False
+
 	
 if(generateNetworkNonlinearConvergence):
 	networkDivergenceType = "nonLinearConverging"
@@ -73,12 +76,13 @@ def printAverage(tensor, tensorName, indentation):
 		indentationString = indentationString + "\t"
 	print(indentationString + tensorName + "Average: %f" % (tensorAverage))
 
-def crossEntropy(y_pred, y_true, datasetNumClasses, costCrossEntropyWithLogits=False):
+def crossEntropy(y_pred, y_true, datasetNumClasses, costCrossEntropyWithLogits=False, oneHotEncoded=False):
 	if(costCrossEntropyWithLogits):
 		cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=tf.squeeze(y_pred), labels=tf.cast(y_true, tf.float32)))
 		return cost
 	else:
-		y_true = tf.one_hot(y_true, depth=datasetNumClasses)
+		if(not oneHotEncoded):
+			y_true = tf.one_hot(y_true, depth=datasetNumClasses)
 		y_pred = tf.clip_by_value(y_pred, 1e-9, 1.)
 		cost = tf.reduce_mean(-tf.reduce_sum(y_true * tf.math.log(y_pred)))
 		return cost
@@ -98,6 +102,13 @@ def filterNParraysByClassTarget(train_x, train_y, classTargetFilterIndex=-1):
 	train_yFiltered = train_y[rowFilter]
 	return train_xFiltered, train_yFiltered
 
+def filterNParraysByClassTargetInverse(train_x, train_y, classTargetFilterIndex=-1):
+	rowFilter = (train_y != classTargetFilterIndex)
+	#print("rowFilter = ", rowFilter)
+	train_xFiltered = train_x[rowFilter]
+	train_yFiltered = train_y[rowFilter]
+	return train_xFiltered, train_yFiltered
+	
 def generateTFtrainDataFromNParrays(train_x, train_y, shuffleSize, batchSize):
 	#shuffleSize = shuffleBufferSize
 	trainDataUnbatched = generateTFtrainDataUnbatchedFromNParrays(train_x, train_y)

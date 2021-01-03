@@ -26,10 +26,13 @@ import ANNtf2_globalDefs
 import math
 from numpy import random
 
-learningRate = 0.001
 
 debugWexplosion = False
-debugFastTrain = True
+debugFastTrain = False
+if(debugFastTrain):
+	learningRate = 0.001
+else:
+	learningRate = 0.0001	#0.00001
 debugVerifyGradientBackpropStopSub = False
 debugVerifyGradientBackpropStopFinalLayer = False
 
@@ -38,7 +41,10 @@ objectiveTargetMinimiseDiffBetweenPositiveSamples = True
 #learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
 useBatch = True
 if(useBatch):
-	batchSize = 100
+	if(debugFastTrain):
+		batchSize = 100
+	else:
+		batchSize = 10
 else:
 	batchSize = 1	
 
@@ -97,20 +103,20 @@ def defineTrainingParametersCANN(dataset, trainMultipleFiles):
 			trainingSteps = 10000
 		elif(dataset == "SmallDataset"):
 			if(debugFastTrain):
-				trainingSteps = batchSize
+				trainingSteps = 1000 #batchSize
 			else:
-				trainingSteps = 1000
+				trainingSteps = 10000 #100000
 		numEpochs = 10
 	else:
 		if(dataset == "POStagSequence"):
 			trainingSteps = 10000
 		elif(dataset == "SmallDataset"):
 			if(debugFastTrain):
-				trainingSteps = batchSize
+				trainingSteps = 1000 #batchSize
 			else:
-				trainingSteps = 1000
+				trainingSteps = 10000 #100000
 		if(useBatch):
-			numEpochs = 10
+			numEpochs = 50	#10
 		else:
 			numEpochs = 100
 	
@@ -164,9 +170,7 @@ def neuralNetworkPropagationCANNfinal(x, networkIndex=1):
 	return neuralNetworkPropagationCANN(x, networkIndex, enableFinalLayerWeightUpdatesOnly=True)
 
 def neuralNetworkPropagationCANN(x, networkIndex=1, enableFinalLayerWeightUpdatesOnly=False):
-	
-	global averageTotalInput
-		
+			
 	AprevLayer = x
 
 	#if(useBinaryWeights):
@@ -248,8 +252,8 @@ def neuralNetworkPropagationCANNsub(x, samplePositiveX, sampleNegativeX, lTrain,
 			#perform activation contrast
 			#print("batchSize = ", batchSize)
 			#print("AprevLayer[traceIndexCurrent].shape = ", AprevLayer[traceIndexCurrent].shape)
-			positiveDiff = tf.subtract(AprevLayer[traceIndexCurrent], AprevLayer[traceIndexPositiveSample])
-			negativeDiff = tf.subtract(AprevLayer[traceIndexCurrent], AprevLayer[traceIndexNegativeSample])
+			positiveDiff = tf.abs(tf.subtract(AprevLayer[traceIndexCurrent], AprevLayer[traceIndexPositiveSample]))
+			negativeDiff = tf.abs(tf.subtract(AprevLayer[traceIndexCurrent], AprevLayer[traceIndexNegativeSample]))
 			#print("negativeDiff.shape = ", negativeDiff.shape)
 			positiveDiffavg = tf.math.reduce_mean(positiveDiff, axis=1)
 			negativeDiffavg = tf.math.reduce_mean(negativeDiff, axis=1)
@@ -257,8 +261,8 @@ def neuralNetworkPropagationCANNsub(x, samplePositiveX, sampleNegativeX, lTrain,
 			ZlastLayer = tf.concat([positiveDiffavg, negativeDiffavg], 0)
 			#print("ZlastLayer.shape = ", ZlastLayer.shape)
 			
-			#pred = tf.nn.softmax(ZlastLayer)
-			pred = tf.nn.sigmoid(ZlastLayer)	#binary classification	
+			pred = tf.nn.softmax(ZlastLayer)
+			#pred = tf.nn.sigmoid(ZlastLayer)	#binary classification	
 			
 			#print("neuralNetworkPropagationCANNsub: pred.shape = ", pred.shape)	
 
@@ -305,7 +309,7 @@ def executeOptimisationSub(x, y, samplePositiveX, samplePositiveY, sampleNegativ
 		pred = neuralNetworkPropagationCANNsub(x, samplePositiveX, sampleNegativeX, lTrain, networkIndex)
 		#print("pred.shape = ", pred.shape)
 		#print("yIntermediaryArtificialTarget.shape = ", yIntermediaryArtificialTarget.shape)
-		loss = crossEntropy(pred, yIntermediaryArtificialTarget, yIntermediaryArtificialTargetNumClasses, costCrossEntropyWithLogits=True)	#single intermediary (per layer) output neuron used for training
+		loss = crossEntropy(pred, yIntermediaryArtificialTarget, yIntermediaryArtificialTargetNumClasses, costCrossEntropyWithLogits=False, oneHotEncoded=True)	#single intermediary (per layer) output neuron used for training
 
 	if(debugVerifyGradientBackpropStopSub):
 		for l in range(1, numberOfLayers+1):
@@ -383,13 +387,17 @@ def reluCustom(Z, prevLayerSize=None):
  
 
 
-def generateTFtrainDataFromNParraysCANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses):
+def generateTFtrainDataFromNParraysCANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples):
 
 	trainDataList = []
 	
 	for classTarget in range(datasetNumClasses):
-			
-		train_xClassFiltered, train_yClassFiltered = filterNParraysByClassTarget(train_x, train_y, classTargetFilterIndex=classTarget)
+		
+		if(generatePositiveSamples):
+			train_xClassFiltered, train_yClassFiltered = filterNParraysByClassTarget(train_x, train_y, classTargetFilterIndex=classTarget)		
+		else:
+			#generateNegativeSamples
+			train_xClassFiltered, train_yClassFiltered = filterNParraysByClassTargetInverse(train_x, train_y, classTargetFilterIndex=classTarget)
 		trainDataUnbatched = generateTFtrainDataUnbatchedFromNParrays(train_xClassFiltered, train_yClassFiltered)
 		trainData = generateTFtrainDataFromTrainDataUnbatched(trainDataUnbatched, shuffleSize, batchSize)
 		trainDataList.append(trainData)
