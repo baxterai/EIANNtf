@@ -41,7 +41,6 @@ else:
 	learningRate = 0.001
 
 
-#learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
 useBatch = True
 if(useBatch):
 	if(debugFastTrain):

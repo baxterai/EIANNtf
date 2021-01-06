@@ -57,7 +57,8 @@ elif(algorithm == "CANN"):
 	#algorithmCANN = "CANN_expAUANN"
 	#algorithmCANN = "CANN_expCUANN"
 	#algorithmCANN = "CANN_expXUANN"
-	algorithmCANN = "CANN_expMUANN"
+	#algorithmCANN = "CANN_expMUANN"
+	algorithmCANN = "CANN_expBUANN"
 	if(algorithmCANN == "CANN_expHUANN"):
 		import ANNtf2_algorithmCANN_expHUANN as ANNtf2_algorithmCANN
 	elif(algorithmCANN == "CANN_expSUANN"):
@@ -73,7 +74,9 @@ elif(algorithm == "CANN"):
 		import ANNtf2_algorithmCANN_expXUANN as ANNtf2_algorithmCANN
 	elif(algorithmCANN == "CANN_expMUANN"):
 		import ANNtf2_algorithmCANN_expMUANN as ANNtf2_algorithmCANN		
-
+	elif(algorithmCANN == "CANN_expBUANN"):
+		import ANNtf2_algorithmCANN_expBUANN as ANNtf2_algorithmCANN
+		
 #learningRate, trainingSteps, batchSize, displayStep, numEpochs = -1
 
 #performance enhancements for development environment only: 
@@ -186,6 +189,9 @@ def executeLearningCANN(x, y, networkIndex=1):
 	elif(algorithmCANN == "CANN_expMUANN"):
 		#learning algorithm embedded in multiple forward propagation and synaptic delta calculations
 		pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expMUANNtrain(x, y, networkIndex)
+	elif(algorithmCANN == "CANN_expBUANN"):
+		#learning algorithm: in reverse order, stocastically establishing Aideal of each layer (by temporarily biasing firing rate of neurons) to better achieve Aideal of higher layer (through multiple local/single layer forward propagations), then (simultaneous/parallel layer processing) stocastically adjusting weights to fine tune towards Aideal of their higher layers
+		pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expBUANNtrain(x, y, networkIndex)
 def executeLearningCANN_expAUANN(x, y, exemplarsX, exemplarsY, currentClassTarget, networkIndex=1):
 	#learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
 	pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expAUANNtrain(x, y, exemplarsX, exemplarsY, currentClassTarget, networkIndex)
@@ -501,6 +507,8 @@ if __name__ == "__main__":
 						elif(algorithmCANN == "CANN_expXUANN"):
 							executeLearningCANN_expXUANN(batchX, batchY, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex)
 						elif(algorithmCANN == "CANN_expMUANN"):
+							executeLearningCANN(batchX, batchY, networkIndex)
+						elif(algorithmCANN == "CANN_expBUANN"):
 							executeLearningCANN(batchX, batchY, networkIndex)
 						if(batchIndex % displayStep == 0):
 							pred = neuralNetworkPropagation(batchX, networkIndex)

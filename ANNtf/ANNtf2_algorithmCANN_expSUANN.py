@@ -412,7 +412,7 @@ def neuralNetworkPropagationCANN_expSUANNtrain_updateNeurons(x, y=None, networkI
 							lossBase = loss
 							#print("\t(loss < lossBase): loss = ", loss)						
 						
-						if accuracyImprovementDetected:
+						if(accuracyImprovementDetected):
 							#print("accuracyImprovementDetected")
 							Wbackup[generateParameterNameNetwork(networkIndex, l, "W")].assign(W[generateParameterNameNetwork(networkIndex, l, "W")])
 							Bbackup[generateParameterNameNetwork(networkIndex, l, "B")].assign(B[generateParameterNameNetwork(networkIndex, l, "B")])								

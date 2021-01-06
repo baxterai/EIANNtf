@@ -36,7 +36,6 @@ if(enableForgetting):
 	enableForgettingRestrictToAPrevAndNotAConnections = True	#True	#this ensures that only connections between active lower layer neurons and unactive higher layer exemplar neurons are suppressed
 	forgetRate = learningRate	#CHECKTHIS
 
-#learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
 useBatch = True
 if(useBatch):
 	batchSize = 10
