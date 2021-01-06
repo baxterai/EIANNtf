@@ -26,6 +26,7 @@ import ANNtf2_globalDefs
 import math
 from numpy import random
 
+debugOnlyTrainFinalLayer = False	#emulate learning performance of single layer perceptron
 
 debugWexplosion = False
 debugFastTrain = False
@@ -35,6 +36,7 @@ else:
 	learningRate = 0.0001	#0.00001
 debugVerifyGradientBackpropStopSub = False
 debugVerifyGradientBackpropStopFinalLayer = False
+
 
 objectiveTargetMinimiseDiffBetweenPositiveSamples = True
 
@@ -284,10 +286,11 @@ def neuralNetworkPropagationCANN_test(x, y, networkIndex=1):
 	
 	
 def neuralNetworkPropagationCANN_expXUANNtrain(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex=1):
-	for l in range(1, numberOfLayers):
-		if(debugVerifyGradientBackpropStopSub):
-			print("l = ", l)
-		executeOptimisationSub(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, l, networkIndex)
+	if not debugOnlyTrainFinalLayer:
+		for l in range(1, numberOfLayers):
+			if(debugVerifyGradientBackpropStopSub):
+				print("l = ", l)
+			executeOptimisationSub(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, l, networkIndex)
 	executeOptimisationFinal(x, y, networkIndex)
 
 def executeOptimisationSub(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, lTrain, networkIndex=1):
@@ -313,7 +316,7 @@ def executeOptimisationSub(x, y, samplePositiveX, samplePositiveY, sampleNegativ
 
 	if(debugVerifyGradientBackpropStopSub):
 		for l in range(1, numberOfLayers+1):
-			print("executeOptimisationFinal before: l = ", l, ", W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
+			print("executeOptimisationSub before: l = ", l, ", W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
 		
 	Wlist = []
 	Blist = []
@@ -329,7 +332,7 @@ def executeOptimisationSub(x, y, samplePositiveX, samplePositiveY, sampleNegativ
 
 	if(debugVerifyGradientBackpropStopSub):
 		for l in range(1, numberOfLayers+1):
-			print("executeOptimisationFinal after: l = ", l, ", W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
+			print("executeOptimisationSub after: l = ", l, ", W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
 
 	
 def executeOptimisationFinal(x, y, networkIndex=1):

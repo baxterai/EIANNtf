@@ -24,7 +24,7 @@ from ANNtf2_operations import *	#generateParameterNameSeq, generateParameterName
 import ANNtf2_operations
 import ANNtf2_globalDefs
 
-debugFastTrain = True
+debugFastTrain = False
 
 W = {}
 B = {}
@@ -47,7 +47,7 @@ def defineTrainingParametersANN(dataset, trainMultipleFiles):
 			if(debugFastTrain):
 				trainingSteps = batchSize
 			else:
-				trainingSteps = 1000
+				trainingSteps = 10000	#1000
 
 	else:
 		learningRate = 0.001
@@ -59,7 +59,7 @@ def defineTrainingParametersANN(dataset, trainMultipleFiles):
 			if(debugFastTrain):
 				trainingSteps = batchSize
 			else:
-				trainingSteps = 1000
+				trainingSteps = 10000	#1000
 		
 	displayStep = 100
 			

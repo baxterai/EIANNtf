@@ -56,7 +56,8 @@ elif(algorithm == "CANN"):
 	#algorithmCANN = "CANN_expSUANN"
 	#algorithmCANN = "CANN_expAUANN"
 	#algorithmCANN = "CANN_expCUANN"
-	algorithmCANN = "CANN_expXUANN"
+	#algorithmCANN = "CANN_expXUANN"
+	algorithmCANN = "CANN_expMUANN"
 	if(algorithmCANN == "CANN_expHUANN"):
 		import ANNtf2_algorithmCANN_expHUANN as ANNtf2_algorithmCANN
 	elif(algorithmCANN == "CANN_expSUANN"):
@@ -70,7 +71,8 @@ elif(algorithm == "CANN"):
 		XUANNnegativeSamplesAll = False	#default: False #orig implementation
 		XUANNnegativeSamplesRandom = True	#default: False 
 		import ANNtf2_algorithmCANN_expXUANN as ANNtf2_algorithmCANN
-		
+	elif(algorithmCANN == "CANN_expMUANN"):
+		import ANNtf2_algorithmCANN_expMUANN as ANNtf2_algorithmCANN		
 
 #learningRate, trainingSteps, batchSize, displayStep, numEpochs = -1
 
@@ -181,6 +183,9 @@ def executeLearningCANN(x, y, networkIndex=1):
 	elif(algorithmCANN == "CANN_expCUANN"):
 		#learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
 		pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expCUANNtrain(x, y, networkIndex)
+	elif(algorithmCANN == "CANN_expMUANN"):
+		#learning algorithm embedded in multiple forward propagation and synaptic delta calculations
+		pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expMUANNtrain(x, y, networkIndex)
 def executeLearningCANN_expAUANN(x, y, exemplarsX, exemplarsY, currentClassTarget, networkIndex=1):
 	#learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
 	pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expAUANNtrain(x, y, exemplarsX, exemplarsY, currentClassTarget, networkIndex)
@@ -495,6 +500,8 @@ if __name__ == "__main__":
 							executeLearningCANN(batchX, batchY, networkIndex)	#currentClassTarget
 						elif(algorithmCANN == "CANN_expXUANN"):
 							executeLearningCANN_expXUANN(batchX, batchY, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex)
+						elif(algorithmCANN == "CANN_expMUANN"):
+							executeLearningCANN(batchX, batchY, networkIndex)
 						if(batchIndex % displayStep == 0):
 							pred = neuralNetworkPropagation(batchX, networkIndex)
 							loss = crossEntropy(pred, batchYactual, datasetNumClasses, costCrossEntropyWithLogits)
