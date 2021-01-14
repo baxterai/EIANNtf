@@ -335,7 +335,7 @@ def neuralNetworkPropagationCANN_expSUANNtrain_updateNeurons(x, y=None, networkI
 		#print("W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
 		#print("B = ", B[generateParameterNameNetwork(networkIndex, l, "B")])
 			
-		for hIndexCurrentLayer in range(0, n_h[l]):
+		for hIndexCurrentLayer in range(0, n_h[l]+1):
 			for hIndexPreviousLayer in range(0, n_h[l-1]+1):
 				if(hIndexPreviousLayer == n_h[l-1]):	#ensure that B parameter updates occur/tested less frequently than W parameter updates
 					parameterTypeWorB = 0

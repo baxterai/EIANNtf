@@ -27,36 +27,58 @@ import math
 from numpy import random
 
 
-learningRateMinFraction = 0.1	#minimum learning rate can be set to always be above 0 (learningRateMinFraction = fraction of learning rate)
+
+debugOnlyTrainFinalLayer = False	#debug weight update method only (not Aideal calculation method)
 
 debugVerboseOutput = False
+debugVerboseOutputTrain = False
 
-useWeightUpdateDirectionHeuristicBasedOnExcitatoryInhibitorySynapseType = True	#enables rapid weight updates, else use stocastic (test both +/-) weight upates
+useWeightUpdateDirectionHeuristicBasedOnExcitatoryInhibitorySynapseType = False	#enables rapid weight updates, else use stocastic (test both +/-) weight upates
 
-useMultiplicationRatherThanAdditionOfDeltaValuesAideal = False
-useMultiplicationRatherThanAdditionOfDeltaValuesW = False
-useMultiplicationRatherThanAdditionOfDeltaValues = True	#this ensures that Aideal/weight updates are normalised across their local layer (to minimise the probability an alternate class data propagation will be interferred with by the update)
+updateWeightsAfterAidealCalculations = False	#method 1
+updateWeightsDuringAidealCalculations = False	#method 2
+updateWeightsBeforeAidealCalculations = True	#method 3
+takeAprevLayerFromTraceRecalculateBeforeWeightUpdates = False
+if(updateWeightsAfterAidealCalculations):
+	takeAprevLayerFromTrace = False
+elif(updateWeightsDuringAidealCalculations):
+	takeAprevLayerFromTrace = True
+	if(takeAprevLayerFromTrace):
+		takeAprevLayerFromTraceRecalculateBeforeWeightUpdates = True 
+elif(updateWeightsBeforeAidealCalculations):
+	takeAprevLayerFromTrace = True
+
+learningRateMinFraction = 0.1	#minimum learning rate can be set to always be above 0 (learningRateMinFraction = fraction of learning rate)
+
+
+
+useMultiplicationRatherThanAdditionOfDeltaValues = False	#this ensures that Aideal/weight updates are normalised across their local layer (to minimise the probability an alternate class data propagation will be interferred with by the update)
 if(useMultiplicationRatherThanAdditionOfDeltaValues):
-	useMultiplicationRatherThanAdditionOfDeltaValuesAideal = True
+	useMultiplicationRatherThanAdditionOfDeltaValuesAideal = False
 	useMultiplicationRatherThanAdditionOfDeltaValuesW = True
+else:
+	useMultiplicationRatherThanAdditionOfDeltaValuesAideal = False
+	useMultiplicationRatherThanAdditionOfDeltaValuesW = False
 	
 useSoftMaxOutputLayerDuringTraining = False	#else use Relu to normalise the training process
 
 
 #BUANN is currently implemented to calculate independent idealA for each batch index (rather than averaged across batch)
 
-applyMinimiumAdeltaContributionThreshold = True 	#only adjust Aideal_k of l based on Aideal of l+1 if it significantly improves Aideal of l+1, where k is neuron index of l
+applyMinimiumAdeltaContributionThreshold = False 	#only adjust Aideal_k of l based on Aideal of l+1 if it significantly improves Aideal of l+1, where k is neuron index of l
 if(applyMinimiumAdeltaContributionThreshold):
 	minimiumAdeltaContributionThreshold = 0.1	#fraction relative to original performance difference
 	#minimiumAdeltaContributionThreshold = 1.0	#this contribution threshold is normalised wrt number of neurons (k) on l+1. default=1.0: if a Aideal_k adjustment on l contributes less than what on average an Aideal_k adjustment must necessarily contribute to achieve Aideal on l+1, then do not adjust Aideal_k (leave same as A_k)
 
-topLayerIdealAstrict = False #top level learning target (idealA) == y, else learning target (idealA) == A + deltaA
+topLayerIdealAstrict = True #top level learning target (idealA) == y, else learning target (idealA) == A + deltaA
 topLayerIdealAproximity = 0.01	#maximum learning rate (effective learning rate will be less than this)
-applySubLayerIdealAmultiplierRequirement = False
-applySubLayerIdealAmultiplierCorrection = False
+applySubLayerIdealAmultiplierRequirement = True
 if(applySubLayerIdealAmultiplierRequirement):
 	subLayerIdealAmultiplierRequirement = 1.5 #idealA of each neuron k on l will only be adjusted if its modification achieves at least xM performance increase for Aideal on l+1
 	applySubLayerIdealAmultiplierCorrection = True	#optional: adjust learning neuron learning based on performance multiplier
+else:
+	applySubLayerIdealAmultiplierCorrection = False
+
 subLayerIdealAlearningRateBase = 0.01	#each neuron k on l will be adjusted only by this amount (modified by its multiplication effect on Aideal of l+1)
 
 debugWexplosion = False
@@ -209,12 +231,13 @@ def neuralNetworkPropagationCANN(x, networkIndex=1, recordAtrace=False):
 def neuralNetworkPropagationCANNlayer(x, lTrain, networkIndex=1, recordAtrace=False):
 			
 	AprevLayer = x
-	#Atrace[generateParameterNameNetwork(networkIndex, 0, "Atrace")] = AprevLayer	#CHECKTHIS
+	Atrace[generateParameterNameNetwork(networkIndex, 0, "Atrace")] = AprevLayer	#CHECKTHIS
 	
 	for l in range(1, lTrain+1):
 	
-		#print("l = " + str(l))
-		#print("W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
+		if(debugVerboseOutput):
+			print("l = " + str(l))
+			print("W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
 		
 		A, Z = neuralNetworkPropagationCANNlayerL(AprevLayer, l, networkIndex)
 
@@ -257,38 +280,70 @@ def neuralNetworkPropagationCANN_test(x, y, networkIndex=1):
 	
 
 def neuralNetworkPropagationCANN_expBUANNtrain(x, y, networkIndex=1):
-
+	
+	#print("numberOfLayers = ", numberOfLayers)
+	
+	if(debugOnlyTrainFinalLayer):
+		minLayerToTrain = numberOfLayers
+	else:
+		minLayerToTrain = 1	#do not calculate Aideal for input layer as this is always set to x
+	
 	#1. initial propagation;
 	y_true = tf.one_hot(y, depth=datasetNumClasses)
-	y_pred, A, Z = neuralNetworkPropagationCANNlayer(x, numberOfLayers, networkIndex, recordAtrace=True)
-
+	pred, A, Z = neuralNetworkPropagationCANNlayer(x, numberOfLayers, networkIndex, recordAtrace=True)
+	if(useSoftMaxOutputLayerDuringTraining):
+		y_pred = pred	#pred is after softmax	
+	else:
+		y_pred = A	#A is after relu
+	
 	#2. calculate Aideal;
-	calculateAidealTopLayer(y_pred, y_true, A, networkIndex)			
-	for l in reversed(range(2, numberOfLayers-1)):	#2: do not calculate Aideal for input layer as this is always set to x
-		if(debugVerboseOutput):
-			print("calculateAideal: l = ", l)
-		calculateAideal(l, networkIndex)	
-	calculateAidealBottomLayer(x, networkIndex)
+	calculateAidealTopLayer(y_pred, y_true, networkIndex)			
+	calculateAidealBottomLayer(x, minLayerToTrain, networkIndex)		
 	
 	#3. calculate W updates;
-	for l in range(1, numberOfLayers+1):	#optimisation note: this can be done in parallel (weights can be updated for each layer simultaneously)
-		updateWeightsBasedOnAideal(l, networkIndex)
+	if(updateWeightsAfterAidealCalculations):
+		for l in reversed(range(minLayerToTrain, numberOfLayers)):
+			if(debugVerboseOutputTrain):
+				print("calculateAideal: l = ", l)
+			calculateAideal(l, networkIndex)	
+		for l in range(minLayerToTrain, numberOfLayers+1):	#optimisation note: this can be done in parallel (weights can be updated for each layer simultaneously)
+			updateWeightsBasedOnAideal(l, x, networkIndex)
+	elif(updateWeightsDuringAidealCalculations):
+		for l in reversed(range(minLayerToTrain, numberOfLayers)):	#2: do not calculate Aideal for input layer as this is always set to x
+			if(debugVerboseOutputTrain):
+				print("calculateAideal: l = ", l)
+			calculateAideal(l, networkIndex)	
+			updateWeightsBasedOnAideal(l+1, x, networkIndex)
+	elif(updateWeightsBeforeAidealCalculations):
+		for l in reversed(range(minLayerToTrain, numberOfLayers+1)):
+			if(debugVerboseOutputTrain):
+				print("calculateAideal: l = ", l)
+			updateWeightsBasedOnAideal(l, x, networkIndex)
+			if(l != 1):	
+				calculateAideal(l-1, networkIndex)
 
-def calculateAidealTopLayer(y_pred, y_true, A, networkIndex=1):
+
+def calculateAidealTopLayer(y_pred, y_true, networkIndex=1):
 
 	#calculate Aideal of final layer based on y	
-	if(useSoftMaxOutputLayerDuringTraining):
-		AdeltaMax = tf.substract(y_true, y_pred)	#y_pred is after softmax	
-	else:
-		AdeltaMax = tf.subtract(y_true, A)	#A is after relu		
-	Adelta = calculateDeltaTF(AdeltaMax, topLayerIdealAproximity, True)
-	
-	Aideal[generateParameterNameNetwork(networkIndex, numberOfLayers, "Aideal")] = tf.add(y_pred, Adelta)
+	AdeltaMax = tf.subtract(y_true, y_pred)	
 
+	if(topLayerIdealAstrict):
+		Adelta = AdeltaMax
+	else:
+		#print("calculateAidealTopLayer warning: ")
+		Adelta = calculateDeltaTF(AdeltaMax, topLayerIdealAproximity, True, applyMinimia=False)
+		
+	Aideal[generateParameterNameNetwork(networkIndex, numberOfLayers, "Aideal")] = tf.add(y_pred, Adelta)
 	
-def calculateAidealBottomLayer(x, networkIndex=1):
+def calculateAidealBottomLayer(x, minLayerToTrain, networkIndex=1):
 	
 	Aideal[generateParameterNameNetwork(networkIndex, 0, "Aideal")] = x	#set Aideal of input layer to x
+
+	if(debugOnlyTrainFinalLayer):
+		for l in range(1, minLayerToTrain):
+			Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")] = Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")]	#set Aideal of input layer to Atrace
+
 
 def calculateAideal(l, networkIndex=1):
 
@@ -298,6 +353,8 @@ def calculateAideal(l, networkIndex=1):
 
 	A = Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")]	#get original A value of lower layer
 	for k in range(n_h[l]):
+		if(debugVerboseOutputTrain):
+			print("\tcalculateAideal: k = ", k)
 		#try both positive and negative adjustments of A_l_k;
 		trialAidealMod(True, A, k, l, networkIndex)
 		trialAidealMod(False, A, k, l, networkIndex)
@@ -316,58 +373,66 @@ def trialAidealMod(direction, A, k, l, networkIndex):
 	AtrialKdelta = calculateDeltaTF(AtrialK, trialAmodValue, useMultiplicationRatherThanAdditionOfDeltaValuesAideal)
 	AtrialK = tf.add(AtrialK, AtrialKdelta)
 	
-	#print("AtrialK.shape = ", AtrialK.shape)
-	#print("A.shape = ", A.shape)
-	#print("AK.shape = ", AK.shape)
-	
 	Atrial = A
 	Atrial = modifyTensorRowColumn(Atrial, False, k, AtrialK, isVector=True)	#Atrial[:,k] = (trialAmodValue)
 
+	#print("AtrialK = ", AtrialK)
+	#print("AtrialKdelta", AtrialKdelta)
+	#print("AtrialKdelta.shape = ", AtrialKdelta.shape)
+	#print("AtrialK.shape = ", AtrialK.shape)
+	#print("A.shape = ", A.shape)
+	#print("AK.shape = ", AK.shape)	
 	#print("A = ", A)
 	#print("k = ", k)
 	#print("Atrial = ", Atrial)
 
 	AtrialAbove, ZtrialAbove = neuralNetworkPropagationCANNlayerL(Atrial, l+1, networkIndex)
-	successfulTrial, performanceMultiplier = testAtrialPerformance(Atrial, AtrialAbove, l, networkIndex)
+	successfulTrial, performanceMultiplier = testAtrialPerformance(AtrialKdelta, AtrialAbove, l, networkIndex)
 	successfulTrialFloat = tf.dtypes.cast(successfulTrial, dtype=tf.float32)
 	
-	AtrialKdelta = tf.ones(AK.shape)
-	AtrialKdelta = tf.multiply(AtrialKdelta, trialAmodValue)	#set every element to trialAmodValue
-	#AtrialKdelta.assign(trialAmodValue)
-	
-	#print("AtrialKdelta.shape = ", AtrialKdelta.shape)
+	#print("AtrialKdelta", AtrialKdelta)
+	#print("performanceMultiplier", performanceMultiplier)
 	
 	if(applySubLayerIdealAmultiplierCorrection):
-		performanceMultiplier = tf.expand_dims(performanceMultiplier, axis=1)
 		AtrialKdelta = tf.multiply(AtrialKdelta, performanceMultiplier)
-		
+				
 		#print("performanceMultiplier.shape = ", performanceMultiplier.shape)
 		#print("AtrialKdelta.shape = ", AtrialKdelta.shape)
+
+	#print("AtrialKdelta", AtrialKdelta)
 	
-	successfulTrialFloat = tf.expand_dims(successfulTrialFloat, axis=1)
+	#print("successfulTrialFloat = ", successfulTrialFloat)
+	
 	AtrialKdeltaSuccessful = tf.multiply(AtrialKdelta, successfulTrialFloat)
+	#AtrialKdeltaSuccessful = tf.squeeze(AtrialKdeltaSuccessful)	#convert to one dimensional tensor
+
+	#print("AtrialKdeltaSuccessful = ", AtrialKdeltaSuccessful)
 	
+	AtrialKSuccessful = tf.add(AtrialK, AtrialKdeltaSuccessful)
+
 	#print("successfulTrialFloat.shape = ", successfulTrialFloat.shape)	
-	#print("AtrialKdeltaSuccessful.shape = ", AtrialKdeltaSuccessful.shape)
+	#print("AtrialKSuccessful.shape = ", AtrialKSuccessful.shape)
 	#print("Aideal.shape = ", Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")].shape)
 	
-	#AtrialKdeltaSuccessful = tf.squeeze(AtrialKdeltaSuccessful)	#convert to one dimensional tensor
+	if(debugVerboseOutputTrain):
+		print("AtrialKSuccessful", AtrialKSuccessful)
 	
 	#A[:,k].assign_add(AtrialKdeltaSuccessful)
 	#Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")][:,k].assign_add(AtrialKdeltaSuccessful)
-	Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")] = modifyTensorRowColumn(Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")], False, k, AtrialKdeltaSuccessful, isVector=True)
+	Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")] = modifyTensorRowColumn(Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")], False, k, AtrialKSuccessful, isVector=True)
 	
 	return A
 
 
-def testAtrialPerformance(Atrial, AtrialAbove, l, networkIndex):
+def testAtrialPerformance(AtrialKdelta, AtrialAbove, l, networkIndex):
 		
-	AtrialDelta = tf.subtract(Atrial, Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")])
-	AtrialDeltaAvg = tf.reduce_mean(AtrialDelta, axis=1)	#average across all k neurons on l
+	successfulTrial, trialPerformanceGain = testAtrialPerformanceAbove(AtrialAbove, l+1, networkIndex)
 	
-	successfulTrial, trialPerformanceGainAbove = testAtrialPerformanceAbove(AtrialAbove, l+1, networkIndex)		
-	performanceMultiplier = tf.divide(trialPerformanceGainAbove, tf.abs(AtrialDeltaAvg))
+	successfulTrial = tf.expand_dims(successfulTrial, axis=1)
+	trialPerformanceGain = tf.expand_dims(trialPerformanceGain, axis=1)
 	
+	performanceMultiplier = tf.divide(trialPerformanceGain, AtrialKdelta)	#TODO: fix this; sometimes divides by zero
+		
 	if(applySubLayerIdealAmultiplierRequirement):
 		performanceMultiplierSuccessful = tf.greater(performanceMultiplier, subLayerIdealAmultiplierRequirement)
 		successfulTrial = tf.logical_and(successfulTrial, performanceMultiplierSuccessful)
@@ -379,14 +444,22 @@ def testAtrialPerformanceAbove(AtrialAbove, l, networkIndex):
 	
 	AidealDeltaOrig = calculateAidealDelta(Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")], l, networkIndex)
 	AidealDeltaTrial = calculateAidealDelta(AtrialAbove, l, networkIndex)
-	AidealDeltaOrigAvg = tf.reduce_mean(AidealDeltaOrig, axis=1)	#average across all k neurons on l
-	AidealDeltaTrialAvg = tf.reduce_mean(AidealDeltaTrial, axis=1)	#average across all k neurons on l
+	AidealDeltaOrigAvg = tf.reduce_mean(AidealDeltaOrig, axis=1)   #average across all k neurons on l
+	AidealDeltaTrialAvg = tf.reduce_mean(AidealDeltaTrial, axis=1) #average across all k neurons on l
 	if(applyMinimiumAdeltaContributionThreshold):
-		AidealDeltaOrigAvg = tf.multiply(tf.sign(AidealDeltaOrigAvg), tf.subtract(tf.abs(AidealDeltaOrigAvg), minimiumAdeltaContributionThreshold))	#tf.maximum(tf.subtract(tf.abs(AidealDeltaOrigAvg), minimiumAdeltaContributionThreshold), 0.0)
+		AidealDeltaOrigAvgThreshold = tf.multiply(tf.sign(AidealDeltaOrigAvg), tf.subtract(tf.abs(AidealDeltaOrigAvg), minimiumAdeltaContributionThreshold))
+		#AidealDeltaOrigAvgThreshold = tf.multiply(tf.sign(AidealDeltaOrigAvg), tf.subtract(tf.abs(AidealDeltaOrigAvg), minimiumAdeltaContributionThreshold)) #tf.maximum(tf.subtract(tf.abs(AidealDeltaOrigAvg), minimiumAdeltaContributionThreshold), 0.0)
+	else:
+		AidealDeltaOrigAvgThreshold = AidealDeltaOrigAvg
+		
+	successfulTrial = tf.math.logical_not(tf.math.logical_xor(tf.less(AidealDeltaTrialAvg, AidealDeltaOrigAvgThreshold), tf.equal(tf.sign(AidealDeltaTrialAvg), 1)))    #tf.multiply(tf.less(AidealDeltaTrialAvg, AidealDeltaOrigAvg), tf.sign(AidealDeltaTrialAvg))
 	
-	successfulTrial = tf.multiply(tf.less(AidealDeltaTrialAvg, AidealDeltaOrigAvg), tf.sign(AidealDeltaTrialAvg))
-			
-	trialPerformanceGain = tf.multiply(tf.subtract(AidealDeltaOrigAvg, AidealDeltaTrialAvg), tf.sign(AidealDeltaTrialAvg))
+	trialPerformanceGain = tf.multiply(tf.subtract(AidealDeltaOrigAvg, AidealDeltaTrialAvg), tf.sign(AidealDeltaTrialAvg))	#orig trialPerformanceGain calculation method 
+
+	#print("AidealDeltaOrigAvg = ", AidealDeltaOrigAvg)
+	#print("AidealDeltaTrialAvg = ", AidealDeltaTrialAvg)
+	#print("successfulTrial = ", successfulTrial)
+	#print("trialPerformanceGain = ", trialPerformanceGain)
 	
 	return successfulTrial, trialPerformanceGain
 	
@@ -403,20 +476,32 @@ def calculateADelta(Abase, A, l):
 
 		
 		
-def updateWeightsBasedOnAideal(l, networkIndex):
-
-	AprevLayer = Aideal[generateParameterNameNetwork(networkIndex, l-1, "Aideal")] 	#or Atrace[generateParameterNameNetwork(networkIndex, l-1, "Atrace")] 
+def updateWeightsBasedOnAideal(l, x, networkIndex):
+	
+	if(takeAprevLayerFromTrace):
+		if(takeAprevLayerFromTraceRecalculateBeforeWeightUpdates):
+			neuralNetworkPropagationCANNlayer(x, l-1, networkIndex, recordAtrace=True)
+		AprevLayer = Atrace[generateParameterNameNetwork(networkIndex, l-1, "Atrace")] 
+	else:
+		AprevLayer = Aideal[generateParameterNameNetwork(networkIndex, l-1, "Aideal")]
+		
 	AtrialBase, ZtrialBase = neuralNetworkPropagationCANNlayerL(AprevLayer, l, networkIndex)
 
 	AidealDeltaOrig = calculateAidealDelta(AtrialBase, l, networkIndex)
 	
+	#print("AtrialBase = ", AtrialBase)
+	#print("Aideal = ", Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")])
+	#print("AidealDeltaOrig = ", AidealDeltaOrig)
+	#exit()
+	
 	if(useWeightUpdateDirectionHeuristicBasedOnExcitatoryInhibitorySynapseType):
 		AidealDeltaOrigVec = tf.reduce_mean(AidealDeltaOrig, axis=0)	#average across all batches
+		#print("AidealDeltaOrigVec = ", AidealDeltaOrigVec)
 		updateWeightsBasedOnAidealHeuristic(l, networkIndex, AidealDeltaOrigVec)
 	else:
 		AidealDeltaOrigAvg = tf.reduce_mean(AidealDeltaOrig)	#average across all batches, across k neurons on l
 		lossBase = AidealDeltaOrigAvg
-		updateWeightsBasedOnAidealStocastic(l, networkIndex, lossBase)
+		updateWeightsBasedOnAidealStocastic(l, AprevLayer, networkIndex, lossBase)
 
 def updateWeightsBasedOnAidealHeuristic(l, networkIndex, AidealDeltaVec):
 
@@ -429,16 +514,19 @@ def updateWeightsBasedOnAidealHeuristic(l, networkIndex, AidealDeltaVec):
 	AidealDeltaTensorSizeWSign = tf.sign(AidealDeltaTensorSizeW)
 	
 	learningRateW = learningRate	#note effective weight learning rate is currently ~topLayerIdealAproximity*subLayerIdealAlearningRateBase*learningRate
-	Wdelta = calculateDeltaTF(AidealDeltaTensorSizeW, learningRateW, useMultiplicationRatherThanAdditionOfDeltaValuesW)
+	if(useMultiplicationRatherThanAdditionOfDeltaValuesW):
+		Wdelta = calculateDeltaTF(AidealDeltaTensorSizeW, learningRateW, useMultiplicationRatherThanAdditionOfDeltaValuesW)
+	else:
+		Wdelta = tf.multiply(AidealDeltaTensorSizeWSign, learningRateW)
 	WlayerNew = tf.add(Wlayer, Wdelta)
 	
 	W[generateParameterNameNetwork(networkIndex, l, "W")] = WlayerNew
 
-def updateWeightsBasedOnAidealStocastic(l, networkIndex, lossBase):
+def updateWeightsBasedOnAidealStocastic(l, AprevLayer, networkIndex, lossBase):
 
 	#stocastic algorithm extracted from neuralNetworkPropagationCANN_expSUANNtrain_updateNeurons()g
 
-	if(not useBinaryWeights):
+	if(useBinaryWeights):
 		variationDirections = 1
 	else:
 		variationDirections = 2
@@ -454,6 +542,8 @@ def updateWeightsBasedOnAidealStocastic(l, networkIndex, lossBase):
 				networkParameterIndexBase = (parameterTypeWorB, l, hIndexCurrentLayer, hIndexPreviousLayer, variationDirectionInt)
 				networkParameterIndex = networkParameterIndexBase
 				
+				#print("l = ", networkParameterIndex[NETWORK_PARAM_INDEX_LAYER])
+				
 				#print("hIndexCurrentLayer = ", hIndexCurrentLayer)
 				#print("hIndexPreviousLayer = ", hIndexPreviousLayer)
 				#print("parameterTypeWorB = ", parameterTypeWorB)
@@ -466,7 +556,7 @@ def updateWeightsBasedOnAidealStocastic(l, networkIndex, lossBase):
 						variationDiff = learningRate
 					else:
 						variationDiff = -learningRate		
-
+				
 				if(networkParameterIndex[NETWORK_PARAM_INDEX_TYPE] == 1):
 					#Wnp = W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")].numpy()
 					#currentVal = Wnp[networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]]
@@ -483,29 +573,34 @@ def updateWeightsBasedOnAidealStocastic(l, networkIndex, lossBase):
 					else:
 						WtrialDelta = calculateDeltaNP(currentVal, variationDiff, useMultiplicationRatherThanAdditionOfDeltaValuesW)
 						newVal = currentVal + WtrialDelta
+						#print("newVal = ", newVal)
+						#print("currentVal = ", currentVal)
+						#print("WtrialDelta = ", WtrialDelta)
+						
 					W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")][networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
 
 					#print("W2 = ", W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")])
-				else:
+				#else:
 					#Bnp = B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")].numpy()
 					#currentVal = Bnp[networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]]
-					currentVal = B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].numpy()
+					#currentVal = B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].numpy()
 
-					if(useBinaryWeights):
-						if(useBinaryWeightsReduceMemoryWithBool):
-							newVal = not currentVal
-						else:
-							newVal = float(not bool(currentVal))
-					else:
-						BtrialDelta = calculateDeltaNP(currentVal, variationDiff, useMultiplicationRatherThanAdditionOfDeltaValuesW)
-						newVal = currentVal + BtrialDelta
-					B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
+					#if(useBinaryWeights):
+					#	if(useBinaryWeightsReduceMemoryWithBool):
+					#		newVal = not currentVal
+					#	else:
+					#		newVal = float(not bool(currentVal))
+					#else:
+					#	BtrialDelta = calculateDeltaNP(currentVal, variationDiff, useMultiplicationRatherThanAdditionOfDeltaValuesW)
+					#	newVal = currentVal + BtrialDelta
+					#B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
 
 				Atrial, Ztrial = neuralNetworkPropagationCANNlayerL(AprevLayer, l, networkIndex)
 
 				AidealDeltaTrial = calculateAidealDelta(Atrial, l, networkIndex)	#ADeltaTrial = calculateADelta(Atrial, AtrialBase, l)
 				AidealDeltaTrialAvg = tf.reduce_mean(AidealDeltaTrial)	#average across all batches, across k neurons on l
-				loss = ADeltaTrialAvg
+				#AidealDeltaTrialAvg = tf.reduce_mean(AidealDeltaTrial, axis=0)	#average across all batches
+				loss = AidealDeltaTrialAvg
 				
 				#print("loss = ", loss)
 
@@ -513,7 +608,9 @@ def updateWeightsBasedOnAidealStocastic(l, networkIndex, lossBase):
 					accuracyImprovementDetected = True
 					lossBase = loss
 					#print("\t(loss < lossBase): loss = ", loss)						
-
+				#else:
+					#print("\t(loss > lossBase)")		
+							
 				if(accuracyImprovementDetected):
 					#print("accuracyImprovementDetected")
 					Wbackup[generateParameterNameNetwork(networkIndex, l, "W")].assign(W[generateParameterNameNetwork(networkIndex, l, "W")])
@@ -549,30 +646,32 @@ def reluCustom(Z, prevLayerSize=None):
 	return A
 
  
-def calculateDeltaTF(deltaMax, learningRate, useMultiplication):
+def calculateDeltaTF(deltaMax, learningRateLocal, useMultiplication, applyMinimia=True):
 	if(useMultiplication):
 		deltaMaxAbs = tf.abs(deltaMax)
-		learningRateMin = learningRate*learningRateMinFraction
-		deltaAbs = tf.multiply(deltaMaxAbs, learningRate)
-		deltaMinAbs = learningRateMin
-		deltaAbs = tf.maximum(deltaAbs, deltaMinAbs)
+		deltaAbs = tf.multiply(deltaMaxAbs, learningRateLocal)
+		if(applyMinimia):
+			learningRateLocalMin = learningRateLocal*learningRateLocalMinFraction
+			deltaMinAbs = learningRateLocalMin
+			deltaAbs = tf.maximum(deltaAbs, deltaMinAbs)
 		deltaAbs = tf.minimum(deltaAbs, deltaMaxAbs)
 		delta = tf.multiply(deltaAbs, tf.sign(deltaMax))
 	else:
-		delta = deltaMax
+		delta = learningRateLocal	#tf.multiply(deltaMax, learningRateLocal)
 	return delta
 
-def calculateDeltaNP(deltaMax, learningRate, useMultiplication):
+def calculateDeltaNP(deltaMax, learningRateLocal, useMultiplication, applyMinimia=True):
 	if(useMultiplication):
 		deltaMaxAbs = np.abs(deltaMax)
-		learningRateMin = learningRate*learningRateMinFraction
-		deltaAbs = np.multiply(deltaMaxAbs, learningRate)
-		deltaMinAbs = learningRateMin
-		deltaAbs = np.maximum(deltaAbs, deltaMinAbs)
+		deltaAbs = np.multiply(deltaMaxAbs, learningRateLocal)
+		if(applyMinimia):
+			learningRateLocalMin = learningRateLocal*learningRateLocalMinFraction
+			deltaMinAbs = learningRateLocalMin
+			deltaAbs = np.maximum(deltaAbs, deltaMinAbs)
 		deltaAbs = np.minimum(deltaAbs, deltaMaxAbs)
 		delta = np.multiply(deltaAbs, np.sign(deltaMax))
 	else:
-		delta = deltaMax
+		delta = learningRateLocal	#np.multiply(deltaMax, learningRateLocal) 
 	return delta
 		
 
