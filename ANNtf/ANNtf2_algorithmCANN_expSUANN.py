@@ -27,6 +27,9 @@ import math
 from numpy import random
 
 
+debugOnlyTrainFinalLayer = True	#for performance comparison tests
+
+
 stochasticUpdateNeurons = True	#default: True
 if(not stochasticUpdateNeurons):
 	stochasticUpdateLayers = True
@@ -318,24 +321,30 @@ def neuralNetworkPropagationCANN_expSUANNtrain_updateNeurons(x, y=None, networkI
 	#print("learningRate = ", learningRate)
 	
 	#print("x = ", x)
-	
+
+	if(debugOnlyTrainFinalLayer):
+		minLayerToTrain = numberOfLayers
+	else:
+		minLayerToTrain = 1
+		
+			
 	lossStart, accStart = neuralNetworkPropagationCANN_test(x, y, networkIndex)	#debug only
 	print("lossStart = ", lossStart)
 	
 	#ensure that an update is tried at least once for each parameter of the network during each training iteration:
 	
-	if(not useBinaryWeights):
+	if(useBinaryWeights):
 		variationDirections = 1
 	else:
 		variationDirections = 2
 	
-	for l in range(1, numberOfLayers+1):
+	for l in range(minLayerToTrain, numberOfLayers+1):
 		
 		#print("l = ", l)
 		#print("W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
 		#print("B = ", B[generateParameterNameNetwork(networkIndex, l, "B")])
 			
-		for hIndexCurrentLayer in range(0, n_h[l]+1):
+		for hIndexCurrentLayer in range(0, n_h[l]):
 			for hIndexPreviousLayer in range(0, n_h[l-1]+1):
 				if(hIndexPreviousLayer == n_h[l-1]):	#ensure that B parameter updates occur/tested less frequently than W parameter updates
 					parameterTypeWorB = 0

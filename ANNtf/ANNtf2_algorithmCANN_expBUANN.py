@@ -28,16 +28,23 @@ from numpy import random
 
 
 
-debugOnlyTrainFinalLayer = False	#debug weight update method only (not Aideal calculation method)
+debugOnlyTrainFinalLayer = True	#debug weight update method only (not Aideal calculation method)
+
+if(debugOnlyTrainFinalLayer):
+	debugOnlyTrainFinalLayerSoftmaxLoss = False	#simulate SUANN performance with debugOnlyTrainFinalLayer
+useSoftMaxOutputLayerDuringTraining = False	#else use Relu to normalise the training process
 
 debugVerboseOutput = False
 debugVerboseOutputTrain = False
 
 useWeightUpdateDirectionHeuristicBasedOnExcitatoryInhibitorySynapseType = False	#enables rapid weight updates, else use stocastic (test both +/-) weight upates
 
-updateWeightsAfterAidealCalculations = False	#method 1
+#activationFunctionType = "relu"
+activationFunctionType = "sigmoid"
+
+updateWeightsAfterAidealCalculations = True	#method 1
 updateWeightsDuringAidealCalculations = False	#method 2
-updateWeightsBeforeAidealCalculations = True	#method 3
+updateWeightsBeforeAidealCalculations = False	#method 3
 takeAprevLayerFromTraceRecalculateBeforeWeightUpdates = False
 if(updateWeightsAfterAidealCalculations):
 	takeAprevLayerFromTrace = False
@@ -60,7 +67,6 @@ else:
 	useMultiplicationRatherThanAdditionOfDeltaValuesAideal = False
 	useMultiplicationRatherThanAdditionOfDeltaValuesW = False
 	
-useSoftMaxOutputLayerDuringTraining = False	#else use Relu to normalise the training process
 
 
 #BUANN is currently implemented to calculate independent idealA for each batch index (rather than averaged across batch)
@@ -255,16 +261,13 @@ def neuralNetworkPropagationCANNlayerL(AprevLayer, l, networkIndex=1):
 		if(useBinaryWeightsReduceMemoryWithBool):
 			Wfloat = tf.dtypes.cast(W[generateParameterNameNetwork(networkIndex, l, "W")], dtype=tf.float32)
 			Bfloat = tf.dtypes.cast(B[generateParameterNameNetwork(networkIndex, l, "B")], dtype=tf.float32)
-			#Z = tf.add(tf.matmul(AprevLayer, Wfloat), Bfloat)
 			Z = tf.add(tf.matmul(AprevLayer, Wfloat), Bfloat)
 		else:
-			#Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
 			Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-		A = reluCustom(Z, n_h[l-1])
+		A = activationFunction(Z, n_h[l-1])
 	else:
-		#Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
 		Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-		A = reluCustom(Z)
+		A = activationFunction(Z)
 	
 	return A, Z
 			
@@ -307,19 +310,21 @@ def neuralNetworkPropagationCANN_expBUANNtrain(x, y, networkIndex=1):
 				print("calculateAideal: l = ", l)
 			calculateAideal(l, networkIndex)	
 		for l in range(minLayerToTrain, numberOfLayers+1):	#optimisation note: this can be done in parallel (weights can be updated for each layer simultaneously)
-			updateWeightsBasedOnAideal(l, x, networkIndex)
+			#print("updateWeightsBasedOnAideal: l = ", l)
+			updateWeightsBasedOnAideal(l, x, y, networkIndex)
 	elif(updateWeightsDuringAidealCalculations):
-		for l in reversed(range(minLayerToTrain, numberOfLayers)):	#2: do not calculate Aideal for input layer as this is always set to x
+		for l in reversed(range(minLayerToTrain, numberOfLayers+1)):	#2: do not calculate Aideal for input layer as this is always set to x
 			if(debugVerboseOutputTrain):
 				print("calculateAideal: l = ", l)
-			calculateAideal(l, networkIndex)	
-			updateWeightsBasedOnAideal(l+1, x, networkIndex)
+			if(l != 1):
+				calculateAideal(l-1, networkIndex)	
+			updateWeightsBasedOnAideal(l, x, y, networkIndex)
 	elif(updateWeightsBeforeAidealCalculations):
 		for l in reversed(range(minLayerToTrain, numberOfLayers+1)):
 			if(debugVerboseOutputTrain):
 				print("calculateAideal: l = ", l)
-			updateWeightsBasedOnAideal(l, x, networkIndex)
-			if(l != 1):	
+			updateWeightsBasedOnAideal(l, x, y, networkIndex)
+			if(l != 1):
 				calculateAideal(l-1, networkIndex)
 
 
@@ -369,56 +374,26 @@ def trialAidealMod(direction, A, k, l, networkIndex):
 	columnsIdx = tf.constant([k])
 	AK = tf.gather(A, columnsIdx, axis=1)	#Atrial[:,k]	
 	AtrialK = AK
-	#AtrialK = tf.squeeze(AtrialK)	#convert to one dimensional tensor
 	AtrialKdelta = calculateDeltaTF(AtrialK, trialAmodValue, useMultiplicationRatherThanAdditionOfDeltaValuesAideal)
 	AtrialK = tf.add(AtrialK, AtrialKdelta)
 	
 	Atrial = A
 	Atrial = modifyTensorRowColumn(Atrial, False, k, AtrialK, isVector=True)	#Atrial[:,k] = (trialAmodValue)
 
-	#print("AtrialK = ", AtrialK)
-	#print("AtrialKdelta", AtrialKdelta)
-	#print("AtrialKdelta.shape = ", AtrialKdelta.shape)
-	#print("AtrialK.shape = ", AtrialK.shape)
-	#print("A.shape = ", A.shape)
-	#print("AK.shape = ", AK.shape)	
-	#print("A = ", A)
-	#print("k = ", k)
-	#print("Atrial = ", Atrial)
-
 	AtrialAbove, ZtrialAbove = neuralNetworkPropagationCANNlayerL(Atrial, l+1, networkIndex)
 	successfulTrial, performanceMultiplier = testAtrialPerformance(AtrialKdelta, AtrialAbove, l, networkIndex)
 	successfulTrialFloat = tf.dtypes.cast(successfulTrial, dtype=tf.float32)
 	
-	#print("AtrialKdelta", AtrialKdelta)
-	#print("performanceMultiplier", performanceMultiplier)
-	
 	if(applySubLayerIdealAmultiplierCorrection):
 		AtrialKdelta = tf.multiply(AtrialKdelta, performanceMultiplier)
-				
-		#print("performanceMultiplier.shape = ", performanceMultiplier.shape)
-		#print("AtrialKdelta.shape = ", AtrialKdelta.shape)
-
-	#print("AtrialKdelta", AtrialKdelta)
-	
-	#print("successfulTrialFloat = ", successfulTrialFloat)
-	
+			
 	AtrialKdeltaSuccessful = tf.multiply(AtrialKdelta, successfulTrialFloat)
-	#AtrialKdeltaSuccessful = tf.squeeze(AtrialKdeltaSuccessful)	#convert to one dimensional tensor
-
-	#print("AtrialKdeltaSuccessful = ", AtrialKdeltaSuccessful)
 	
 	AtrialKSuccessful = tf.add(AtrialK, AtrialKdeltaSuccessful)
-
-	#print("successfulTrialFloat.shape = ", successfulTrialFloat.shape)	
-	#print("AtrialKSuccessful.shape = ", AtrialKSuccessful.shape)
-	#print("Aideal.shape = ", Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")].shape)
 	
 	if(debugVerboseOutputTrain):
 		print("AtrialKSuccessful", AtrialKSuccessful)
 	
-	#A[:,k].assign_add(AtrialKdeltaSuccessful)
-	#Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")][:,k].assign_add(AtrialKdeltaSuccessful)
 	Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")] = modifyTensorRowColumn(Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")], False, k, AtrialKSuccessful, isVector=True)
 	
 	return A
@@ -455,11 +430,6 @@ def testAtrialPerformanceAbove(AtrialAbove, l, networkIndex):
 	successfulTrial = tf.math.logical_not(tf.math.logical_xor(tf.less(AidealDeltaTrialAvg, AidealDeltaOrigAvgThreshold), tf.equal(tf.sign(AidealDeltaTrialAvg), 1)))    #tf.multiply(tf.less(AidealDeltaTrialAvg, AidealDeltaOrigAvg), tf.sign(AidealDeltaTrialAvg))
 	
 	trialPerformanceGain = tf.multiply(tf.subtract(AidealDeltaOrigAvg, AidealDeltaTrialAvg), tf.sign(AidealDeltaTrialAvg))	#orig trialPerformanceGain calculation method 
-
-	#print("AidealDeltaOrigAvg = ", AidealDeltaOrigAvg)
-	#print("AidealDeltaTrialAvg = ", AidealDeltaTrialAvg)
-	#print("successfulTrial = ", successfulTrial)
-	#print("trialPerformanceGain = ", trialPerformanceGain)
 	
 	return successfulTrial, trialPerformanceGain
 	
@@ -476,7 +446,7 @@ def calculateADelta(Abase, A, l):
 
 		
 		
-def updateWeightsBasedOnAideal(l, x, networkIndex):
+def updateWeightsBasedOnAideal(l, x, y, networkIndex):
 	
 	if(takeAprevLayerFromTrace):
 		if(takeAprevLayerFromTraceRecalculateBeforeWeightUpdates):
@@ -489,19 +459,15 @@ def updateWeightsBasedOnAideal(l, x, networkIndex):
 
 	AidealDeltaOrig = calculateAidealDelta(AtrialBase, l, networkIndex)
 	
-	#print("AtrialBase = ", AtrialBase)
-	#print("Aideal = ", Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")])
-	#print("AidealDeltaOrig = ", AidealDeltaOrig)
-	#exit()
-	
 	if(useWeightUpdateDirectionHeuristicBasedOnExcitatoryInhibitorySynapseType):
 		AidealDeltaOrigVec = tf.reduce_mean(AidealDeltaOrig, axis=0)	#average across all batches
 		#print("AidealDeltaOrigVec = ", AidealDeltaOrigVec)
 		updateWeightsBasedOnAidealHeuristic(l, networkIndex, AidealDeltaOrigVec)
 	else:
-		AidealDeltaOrigAvg = tf.reduce_mean(AidealDeltaOrig)	#average across all batches, across k neurons on l
-		lossBase = AidealDeltaOrigAvg
-		updateWeightsBasedOnAidealStocastic(l, AprevLayer, networkIndex, lossBase)
+		lossBase = calculateLossAdelta(AidealDeltaOrig)
+		if(debugOnlyTrainFinalLayerSoftmaxLoss):
+			lossBase, accBase = neuralNetworkPropagationCANN_test(x, y, networkIndex)	#debug only
+		updateWeightsBasedOnAidealStocastic(l, AprevLayer, networkIndex, lossBase, x, y)
 
 def updateWeightsBasedOnAidealHeuristic(l, networkIndex, AidealDeltaVec):
 
@@ -522,7 +488,7 @@ def updateWeightsBasedOnAidealHeuristic(l, networkIndex, AidealDeltaVec):
 	
 	W[generateParameterNameNetwork(networkIndex, l, "W")] = WlayerNew
 
-def updateWeightsBasedOnAidealStocastic(l, AprevLayer, networkIndex, lossBase):
+def updateWeightsBasedOnAidealStocastic(l, AprevLayer, networkIndex, lossBase, x, y):
 
 	#stocastic algorithm extracted from neuralNetworkPropagationCANN_expSUANNtrain_updateNeurons()g
 
@@ -541,14 +507,7 @@ def updateWeightsBasedOnAidealStocastic(l, AprevLayer, networkIndex, lossBase):
 
 				networkParameterIndexBase = (parameterTypeWorB, l, hIndexCurrentLayer, hIndexPreviousLayer, variationDirectionInt)
 				networkParameterIndex = networkParameterIndexBase
-				
-				#print("l = ", networkParameterIndex[NETWORK_PARAM_INDEX_LAYER])
-				
-				#print("hIndexCurrentLayer = ", hIndexCurrentLayer)
-				#print("hIndexPreviousLayer = ", hIndexPreviousLayer)
-				#print("parameterTypeWorB = ", parameterTypeWorB)
-				#print("variationDirectionInt = ", variationDirectionInt)
-
+	
 				accuracyImprovementDetected = False
 					
 				if(not useBinaryWeights):
@@ -558,58 +517,46 @@ def updateWeightsBasedOnAidealStocastic(l, AprevLayer, networkIndex, lossBase):
 						variationDiff = -learningRate		
 				
 				if(networkParameterIndex[NETWORK_PARAM_INDEX_TYPE] == 1):
-					#Wnp = W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")].numpy()
-					#currentVal = Wnp[networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]]
 					currentVal = W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")][networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].numpy()
 
-					#print("currentVal = ", currentVal)
-					#print("W1 = ", W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")])
 					if(useBinaryWeights):
 						if(useBinaryWeightsReduceMemoryWithBool):
 							newVal = not currentVal
 						else:
 							newVal = float(not bool(currentVal))
-							#print("newVal = ", newVal)
 					else:
 						WtrialDelta = calculateDeltaNP(currentVal, variationDiff, useMultiplicationRatherThanAdditionOfDeltaValuesW)
 						newVal = currentVal + WtrialDelta
-						#print("newVal = ", newVal)
-						#print("currentVal = ", currentVal)
-						#print("WtrialDelta = ", WtrialDelta)
 						
 					W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")][networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
+				else:
+					currentVal = B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].numpy()
 
-					#print("W2 = ", W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")])
-				#else:
-					#Bnp = B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")].numpy()
-					#currentVal = Bnp[networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]]
-					#currentVal = B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].numpy()
-
-					#if(useBinaryWeights):
-					#	if(useBinaryWeightsReduceMemoryWithBool):
-					#		newVal = not currentVal
-					#	else:
-					#		newVal = float(not bool(currentVal))
-					#else:
-					#	BtrialDelta = calculateDeltaNP(currentVal, variationDiff, useMultiplicationRatherThanAdditionOfDeltaValuesW)
-					#	newVal = currentVal + BtrialDelta
-					#B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
+					if(useBinaryWeights):
+						if(useBinaryWeightsReduceMemoryWithBool):
+							newVal = not currentVal
+						else:
+							newVal = float(not bool(currentVal))
+					else:
+						BtrialDelta = calculateDeltaNP(currentVal, variationDiff, useMultiplicationRatherThanAdditionOfDeltaValuesW)
+						newVal = currentVal + BtrialDelta
+					B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
 
 				Atrial, Ztrial = neuralNetworkPropagationCANNlayerL(AprevLayer, l, networkIndex)
 
 				AidealDeltaTrial = calculateAidealDelta(Atrial, l, networkIndex)	#ADeltaTrial = calculateADelta(Atrial, AtrialBase, l)
-				AidealDeltaTrialAvg = tf.reduce_mean(AidealDeltaTrial)	#average across all batches, across k neurons on l
-				#AidealDeltaTrialAvg = tf.reduce_mean(AidealDeltaTrial, axis=0)	#average across all batches
-				loss = AidealDeltaTrialAvg
+				loss = calculateLossAdelta(AidealDeltaTrial)	#average across all batches, across k neurons on l
 				
-				#print("loss = ", loss)
-
+				if(debugOnlyTrainFinalLayerSoftmaxLoss):
+					pred = tf.nn.softmax(Ztrial)
+					costCrossEntropyWithLogits = False	#binary classification
+					loss = ANNtf2_operations.crossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=costCrossEntropyWithLogits)
+					#loss, acc = neuralNetworkPropagationCANN_test(x, y, networkIndex)	#method2
+				
 				if(loss < lossBase):
 					accuracyImprovementDetected = True
 					lossBase = loss
-					#print("\t(loss < lossBase): loss = ", loss)						
-				#else:
-					#print("\t(loss > lossBase)")		
+					#print("\t(loss < lossBase): loss = ", loss)				
 							
 				if(accuracyImprovementDetected):
 					#print("accuracyImprovementDetected")
@@ -622,26 +569,19 @@ def updateWeightsBasedOnAidealStocastic(l, AprevLayer, networkIndex, lossBase):
 
 
 
-def reluCustom(Z, prevLayerSize=None):
+def activationFunction(Z, prevLayerSize=None):
 	
 	if(useBinaryWeights):	
 		#offset required because negative weights are not used:
 		Zoffset = tf.ones(Z.shape)
 		Zoffset = tf.multiply(Zoffset, averageTotalInput)
 		Zoffset = tf.multiply(Zoffset, prevLayerSize/2)
-		#print("Zoffset = ", Zoffset)
 		Z = tf.subtract(Z, Zoffset) 
-		A = tf.nn.relu(Z)
-		#AaboveZero = tf.math.greater(A, 0)
-		#AaboveZeroFloat = tf.dtypes.cast(AaboveZero, dtype=tf.dtypes.float32)
-		#ZoffsetRestore = AaboveZeroFloat*Zoffset
-		#print("ZoffsetRestore = ", ZoffsetRestore)
-		#A = tf.add(A, ZoffsetRestore)
-	else:
-		A = tf.nn.relu(Z)
 	
-	#print("Z = ", Z)
-	#print("A = ", A)
+	if(activationFunctionType == "relu"):
+		A = tf.nn.relu(Z)
+	elif(activationFunctionType == "sigmoid"):
+		A = tf.nn.sigmoid(Z)
 	
 	return A
 
@@ -675,15 +615,17 @@ def calculateDeltaNP(deltaMax, learningRateLocal, useMultiplication, applyMinimi
 	return delta
 		
 
+def calculateLossAdelta(AidealDeltaOrig):
+	AidealDeltaOrig = tf.abs(AidealDeltaOrig)
+	AidealDeltaOrigAvg = tf.reduce_mean(AidealDeltaOrig)	#average across all batches, across k neurons on l
+	return AidealDeltaOrigAvg
+		
 def modifyTensorRowColumn(a, isRow, index, updated_value, isVector):
 	
 	if(not isRow):
 		a = tf.transpose(a)
 		if(isVector):
 			updated_value = tf.transpose(updated_value)
-	
-	#print("modifyTensorRowColumn: index = ", index)
-	#print("a = ", a)
 	
 	if(index == 0):
 		if(isVector):
