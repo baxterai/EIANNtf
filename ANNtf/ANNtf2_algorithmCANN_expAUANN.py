@@ -14,7 +14,7 @@ see ANNtf2.py
 
 Define fully connected associative (wrt exemplar) update artificial neural network (CANN_expAUANN)
 
-- Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
+- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 """
 

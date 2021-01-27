@@ -16,7 +16,7 @@ Define Sequentially Activated Neuronal Input (SANI) neural net - repeated module
 
 Neural modules cannot be shared between different areas of input sequence.
 
-- Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
+- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 """
 

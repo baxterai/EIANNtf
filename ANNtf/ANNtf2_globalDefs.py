@@ -14,7 +14,7 @@ see ANNtf2.py
 
 Global definitions
 
-- Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
+- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 """
 

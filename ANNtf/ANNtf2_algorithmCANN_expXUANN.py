@@ -14,7 +14,7 @@ see ANNtf2.py
 
 Define fully connected contrastive (pos/neg sample diff) update artificial neural network (CANN_expXUANN)
 
-- Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
+- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 """
 

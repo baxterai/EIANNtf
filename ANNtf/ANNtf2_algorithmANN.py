@@ -14,7 +14,7 @@ see ANNtf2.py
 
 Define fully connected artificial neural network (ANN)
 
-- Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
+- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 """
 
@@ -23,6 +23,9 @@ import numpy as np
 from ANNtf2_operations import *	#generateParameterNameSeq, generateParameterName, defineNetworkParameters
 import ANNtf2_operations
 import ANNtf2_globalDefs
+
+debugOnlyTrainFinalLayer = False
+debugSingleLayerNetwork = False
 
 debugFastTrain = False
 
@@ -51,8 +54,8 @@ def defineTrainingParametersANN(dataset, trainMultipleFiles):
 
 	else:
 		learningRate = 0.001
-		batchSize = 1000
-		numEpochs = 10
+		batchSize = 1
+		numEpochs = 100 #10
 		if(dataset == "POStagSequence"):
 			trainingSteps = 10000
 		elif(dataset == "SmallDataset"):
@@ -74,7 +77,7 @@ def defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNum
 	global numberOfNetworks
 	
 	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet)
-	#OLD: numberOfLayers = defineNetworkParametersANNlegacy(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet)
+	#numberOfLayers = defineNetworkParametersANNlegacy(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet)
 	
 	return numberOfLayers
 	
@@ -119,8 +122,11 @@ def defineNetworkParametersANNlegacy(num_input_neurons, num_output_neurons, data
 			print("dataset unsupported")
 			exit()
 		n_h_3 = n_y
-		n_h = [n_h_0, n_h_1, n_h_2, n_h_3]
-		numberOfLayers = 3
+		if(debugSingleLayerNetwork):
+			n_h = [n_h_0, n_h_3]	
+		else:
+			n_h = [n_h_0, n_h_1, n_h_2, n_h_3]
+		numberOfLayers = len(n_h)-1
 		
 	return numberOfLayers
 	
@@ -134,7 +140,7 @@ def defineNeuralNetworkParametersANN():
 	for networkIndex in range(1, numberOfNetworks+1):
 			
 		for l in range(1, numberOfLayers+1):
-
+			
 			W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
 			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
 
@@ -145,12 +151,24 @@ def neuralNetworkPropagationANN(x, networkIndex=1):
 	
 	AprevLayer = x
 	for l in range(1, numberOfLayers+1):
-		#print("l = " + str(l))
 		Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-		A = tf.nn.sigmoid(Z)
+		A = activationFunction(Z)
+
+		#print("l = " + str(l))		
+		#print("W = ", W[generateParameterNameNetwork(networkIndex, l, "W")] )
+		
+		if(debugOnlyTrainFinalLayer):
+			if(l < numberOfLayers):
+				A = tf.stop_gradient(A)
+				
 		AprevLayer = A
 	
 	return tf.nn.softmax(Z)
 
 
+def activationFunction(Z):
+	A = tf.nn.relu(Z)
+	#A = tf.nn.sigmoid(Z)
+	return A
+	
 

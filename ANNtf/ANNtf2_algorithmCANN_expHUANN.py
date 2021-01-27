@@ -14,7 +14,7 @@ see ANNtf2.py
 
 Define fully connected hebbian update artificial neural network (CANN_expHUANN)
 
-- Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
+- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 """
 

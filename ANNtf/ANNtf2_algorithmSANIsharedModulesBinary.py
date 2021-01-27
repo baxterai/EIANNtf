@@ -20,7 +20,7 @@ This code mirrors that of GIA Sequence Grammar ANN.
   
 Can parse (by default expects to parse) full sentences; ie features for each word in sentence.
 
-- Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
+- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 """
 

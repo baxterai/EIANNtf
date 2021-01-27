@@ -14,7 +14,7 @@ see ANNtf2.py
 
 Define fully connected stochastically updated artificial neural network (CANN_expSUANN)
 
-- Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
+- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 """
 
@@ -207,10 +207,10 @@ def neuralNetworkPropagationCANN(x, networkIndex=1):
 				Z = tf.add(tf.matmul(AprevLayer, Wfloat), Bfloat)
 			else:
 				Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-			A = reluCustom(Z, n_h[l-1])
+			A = activationFunction(Z, n_h[l-1])
 		else:
 			Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-			A = reluCustom(Z)
+			A = activationFunction(Z)
 			
 		AprevLayer = A
 			
@@ -265,7 +265,7 @@ def neuralNetworkPropagationCANN_expSUANNtrain_updateLayers(x, y=None, networkIn
 		
 		if(trainLayersUseHebbianHeuristic):
 			Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])	
-			A = reluCustom(Z, n_h[l-1])
+			A = activationFunction(Z, n_h[l-1])
 			
 			AcoincidenceMatrix = tf.matmul(tf.transpose(AprevLayer), A)
 			
@@ -459,6 +459,9 @@ def getRandomNetworkParameter(networkIndex, currentSubsetOfParameters):
 
 
 
+def activationFunction(Z, prevLayerSize=None)
+	return reluCustom(Z, prevLayerSize)
+			
 def reluCustom(Z, prevLayerSize=None):
 	
 	if(useBinaryWeights):	

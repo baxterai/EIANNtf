@@ -14,7 +14,7 @@ see ANNtf2.py
 
 SANI operations
 
-- Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
+- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 """
 
@@ -76,16 +76,20 @@ def printAverage(tensor, tensorName, indentation):
 		indentationString = indentationString + "\t"
 	print(indentationString + tensorName + "Average: %f" % (tensorAverage))
 
-def crossEntropy(y_pred, y_true, datasetNumClasses, costCrossEntropyWithLogits=False, oneHotEncoded=False):
+def crossEntropy(y_pred, y_true, datasetNumClasses, costCrossEntropyWithLogits=False, oneHotEncoded=False, reduceMean=True):
 	if(costCrossEntropyWithLogits):
-		cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=tf.squeeze(y_pred), labels=tf.cast(y_true, tf.float32)))
-		return cost
+		cost = tf.nn.sigmoid_cross_entropy_with_logits(logits=tf.squeeze(y_pred), labels=tf.cast(y_true, tf.float32))
+		if(reduceMean):
+			cost = tf.reduce_mean(cost)
 	else:
 		if(not oneHotEncoded):
 			y_true = tf.one_hot(y_true, depth=datasetNumClasses)
 		y_pred = tf.clip_by_value(y_pred, 1e-9, 1.)
-		cost = tf.reduce_mean(-tf.reduce_sum(y_true * tf.math.log(y_pred)))
-		return cost
+		cost = -(y_true * tf.math.log(y_pred))
+		if(reduceMean):
+			cost = tf.reduce_sum(cost)
+	
+	return cost
 
 def calculateAccuracy(y_pred, y_true):
 	correct_prediction = calculateCorrectPrediction(y_pred, y_true) 

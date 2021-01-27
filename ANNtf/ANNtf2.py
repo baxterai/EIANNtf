@@ -14,7 +14,7 @@ python3 ANNtf2.py
 
 Train an artificial neural network (ANN or SANI or CANN)
 
-- Author: Richard Bruce Baxter - Copyright (c) 2020 Baxter AI (baxterai.com)
+- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 """
 
@@ -210,8 +210,13 @@ def executeOptimisation(x, y, networkIndex=1):
 		Wlist = []
 		Blist = []
 		for l in range(1, numberOfLayers+1):
-			Wlist.append(ANNtf2_algorithmANN.W[generateParameterNameNetwork(networkIndex, l, "W")])
-			Blist.append(ANNtf2_algorithmANN.B[generateParameterNameNetwork(networkIndex, l, "B")])
+			if(ANNtf2_algorithmANN.debugOnlyTrainFinalLayer):
+				if(l == numberOfLayers):
+					Wlist.append(ANNtf2_algorithmANN.W[generateParameterNameNetwork(networkIndex, l, "W")])
+					Blist.append(ANNtf2_algorithmANN.B[generateParameterNameNetwork(networkIndex, l, "B")])				
+			else:	
+				Wlist.append(ANNtf2_algorithmANN.W[generateParameterNameNetwork(networkIndex, l, "W")])
+				Blist.append(ANNtf2_algorithmANN.B[generateParameterNameNetwork(networkIndex, l, "B")])
 		trainableVariables = Wlist + Blist
 	elif(algorithm == "SANI"):
 		if(algorithmSANI == "sharedModules"):
