@@ -74,7 +74,7 @@ elif(learningAlgorithm == "backpropApproximation2"):
 	#requires recalculateAtraceUnoptimisedBio==False
 	errorStorageAlgorithm = "useAerror"
 elif(learningAlgorithm == "backpropApproximation3"):
-	errorStorageAlgorithm = "useAerror"
+	errorStorageAlgorithm = "useAideal"
 elif(learningAlgorithm == "backpropApproximation4"):
 	errorStorageAlgorithm = "useAideal"
 	useWeightUpdateDirectionHeuristicBasedOnExcitatoryInhibitorySynapseType = True	#enables rapid weight updates, else use stocastic (test both +/-) weight upates
@@ -107,7 +107,7 @@ updateOrder = "updateWeightsAfterAidealCalculations"	#method 1
 #updateOrder = "updateWeightsDuringAidealCalculations"	#method 2
 #updateOrder = "updateWeightsBeforeAidealCalculations"	#method 3
 
-takeAprevLayerFromTraceDuringWeightUpdates = True	
+#takeAprevLayerFromTraceDuringWeightUpdates = True	#mandatory for computational purposes (normalise across batches)
 	#this parameter value should not be critical to BUANN algorithm (it is currently set based on availability of Aideal of lower layer - ie if it has been precalculated)
 	#difference between Aideal and Atrace of lower layer should be so small takeAprevLayerFromTraceDuringWeightUpdates shouldn't matter
 
@@ -305,10 +305,7 @@ def defineNeuralNetworkParametersCANN():
 					Aerror[generateParameterNameNetwork(networkIndex, l, "Aerror")] = tf.Variable(tf.zeros([batchSize, n_h[l]], dtype=tf.dtypes.float32))
 					
 			if(not recalculateAtraceUnoptimisedBio):
-				if(averageAerrorAcrossBatch):
-					Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")] = tf.Variable(tf.zeros(n_h[l], dtype=tf.dtypes.float32))
-				else:
-					Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")] = tf.Variable(tf.zeros([batchSize, n_h[l]], dtype=tf.dtypes.float32))
+				Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")] = tf.Variable(tf.zeros([batchSize, n_h[l]], dtype=tf.dtypes.float32))
 
 	
 
@@ -321,10 +318,7 @@ def neuralNetworkPropagationCANNlayer(x, lTrain, networkIndex=1, recordAtrace=Fa
 	AprevLayer = x
 	
 	if(recordAtrace):
-		Aaveraged = AprevLayer
-		if(averageAerrorAcrossBatch):
-			Aaveraged = tf.reduce_mean(Aaveraged, axis=0)      #average across all batches
-		Atrace[generateParameterNameNetwork(networkIndex, 0, "Atrace")] = Aaveraged	#CHECKTHIS
+		Atrace[generateParameterNameNetwork(networkIndex, 0, "Atrace")] = AprevLayer
 	
 	for l in range(1, lTrain+1):
 	
@@ -335,10 +329,7 @@ def neuralNetworkPropagationCANNlayer(x, lTrain, networkIndex=1, recordAtrace=Fa
 		A, Z = neuralNetworkPropagationCANNlayerL(AprevLayer, l, networkIndex)
 
 		if(recordAtrace):
-			Aaveraged = A
-			if(averageAerrorAcrossBatch):
-				Aaveraged = tf.reduce_mean(Aaveraged, axis=0)      #average across all batches
-			Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")] = Aaveraged
+			Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")] = A
 		
 		AprevLayer = A
 		
@@ -362,6 +353,27 @@ def neuralNetworkPropagationCANNlayerL(AprevLayer, l, networkIndex=1):
 	
 	return A, Z
 			
+def neuralNetworkPropagationCANNlayerLK(AprevLayer, k, l, networkIndex=1):
+
+	AprevLayerK = AprevLayer[:, k]
+	WlayerK = W[generateParameterNameNetwork(networkIndex, l, "W")][k,:]
+	AprevLayerK = tf.expand_dims(AprevLayerK, axis=1)
+	WlayerK = tf.expand_dims(WlayerK, axis=0)
+		
+	if(useBinaryWeights):
+		if(useBinaryWeightsReduceMemoryWithBool):
+			Wfloat = tf.dtypes.cast(WlayerK, dtype=tf.float32)
+			Bfloat = tf.dtypes.cast(B[generateParameterNameNetwork(networkIndex, l, "B")], dtype=tf.float32)
+			Z = tf.add(tf.matmul(AprevLayerK, Wfloat), Bfloat)
+		else:
+			Z = tf.add(tf.matmul(AprevLayerK, WlayerK), B[generateParameterNameNetwork(networkIndex, l, "B")])
+		A = activationFunction(Z, n_h[l-1])
+	else:
+		Z = tf.add(tf.matmul(AprevLayerK, WlayerK), B[generateParameterNameNetwork(networkIndex, l, "B")])
+		A = activationFunction(Z)
+	
+	return A, Z
+	
 			
 def neuralNetworkPropagationCANN_test(x, y, networkIndex=1):
 
@@ -435,9 +447,6 @@ def calculateAerrorTopLayer(y_pred, y_true, networkIndex=1):
 		AidealDelta = calculateADelta(y_true, y_pred)
 		AidealDeltaSign = tf.sign(AidealDelta)
 		AerrorVec = tf.multiply(AerrorAbs, AidealDeltaSign)	#updateWeightsBasedOnAidealHeuristic requires directional error
-		
-		#print("AerrorVec = ", AerrorVec)
-		#print("AerrorAbs = ", AerrorAbs)
 	else:
 		if(topLayerIdealAstrict):
 			AerrorVec = tf.subtract(y_true, y_pred)	
@@ -451,20 +460,20 @@ def calculateAerrorTopLayer(y_pred, y_true, networkIndex=1):
 		y_pred = tf.reduce_mean(y_pred, axis=0)      #average across all batches 
 		
 	setAerror(AerrorVec, y_pred, numberOfLayers, networkIndex)
-	
-	#print("AerrorVec = ", AerrorVec)
-	#print("y_pred = ", y_pred)
-			
+
 				
 def calculateAerrorBottomLayer(x, minLayerToTrain, networkIndex=1):
 	
 	if(averageAerrorAcrossBatch):
 		xAveraged = tf.reduce_mean(x, axis=0)      #average across all batches
+	else:
+		xAveraged = x
+		
 	setAerrorGivenAideal(xAveraged, xAveraged, 0, networkIndex)	#set Aideal of input layer to x
 	
 	if(debugOnlyTrainFinalLayer):
 		for l in range(1, minLayerToTrain):
-			setAerrorGivenAideal(Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")], Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")], l, networkIndex)	#set Aideal of input layer to Atrace
+			setAerrorGivenAideal(getAtraceComparison(l, networkIndex), getAtraceComparison(l, networkIndex), l, networkIndex)	#set Aideal of input layer to Atrace
 
 
 def calculateAerror(l, networkIndex=1):
@@ -494,22 +503,33 @@ def setAerrorBackpropSemi(A, k, l, networkIndex):
 	AlayerAboveWithError = trialAerrorMod(True, A, k, l, networkIndex)
 	AlayerAboveWithoutError = trialAerrorMod(False, A, k, l, networkIndex)
 	AerrorLayer = calculateErrorAtrial(AlayerAboveWithoutError, AlayerAboveWithError, networkIndex, averageType="none")
+
+	#only set Aerror of neuron k
 	if(averageAerrorAcrossBatch):
-		AerrorLayer = tf.reduce_mean(AidealDelta, axis=0)   #average across all k neurons on l+1
+		AerrorLayer = tf.reduce_mean(AerrorLayer, axis=0)   #average across all k neurons on l+1
 	else:
-		AerrorLayer = tf.reduce_mean(AidealDelta, axis=1)   #average across all k neurons on l+1
-		
-	setAerror(AerrorLayer, Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")], l, networkIndex)
+		AerrorLayer = tf.reduce_mean(AerrorLayer, axis=1)   #average across all k neurons on l+1
+		#AerrorLayer = tf.expand_dims(AerrorLayer, axis=0)
 	
-	#FUTURE: only set Aerror of neuron k (especially required if error signal is transferred externally rather than internally)
+	setAerrorK(AerrorLayer, k, l, networkIndex)
+	
 
 def trialAerrorMod(applyAboveLayerError, A, k, l, networkIndex):
 
-	AtrialAbove, ZtrialAbove = neuralNetworkPropagationCANNlayerL(A, l+1, networkIndex)
-	
+	AtrialAbove, ZtrialAbove = neuralNetworkPropagationCANNlayerLK(A, k, l+1, networkIndex)
+
+	if(averageAerrorAcrossBatch):
+		ZtrialAbove = tf.reduce_mean(ZtrialAbove, axis=0)   #average across all batches
+	else:
+		None
+			
 	if(applyAboveLayerError):
 		AerrorAbove = Aerror[generateParameterNameNetwork(networkIndex, l+1, "Aerror")]
-		AerrorLayer = tf.multiply(ZtrialAbove, AerrorAbove)	
+		
+		#unadjusted: #AerrorLayer = tf.add(ZtrialAbove, AerrorAbove) #AerrorLayer = tf.multiply(ZtrialAbove, AerrorAbove)
+		#perform adjustment to ensure calculateErrorAtrial(AlayerAboveWithoutError, AlayerAboveWithError) will produce precise error value:
+		AerrorAbove = tf.add(tf.sign(AerrorAbove), AerrorAbove)
+		AerrorLayer = tf.multiply(ZtrialAbove, AerrorAbove)
 	else:
 		AerrorLayer = ZtrialAbove
 		
@@ -517,7 +537,7 @@ def trialAerrorMod(applyAboveLayerError, A, k, l, networkIndex):
 
 def setAerrorBackpropStrict(A, l, networkIndex):
 	AerrorVec = calculateAerrorBackpropStrict(A, l, networkIndex)
-	setAerror(AerrorVec, Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")], l, networkIndex)
+	setAerror(AerrorVec, getAtraceComparison(l, networkIndex), l, networkIndex)
 	
 def calculateAerrorBackpropStrict(A, l, networkIndex):
 	AerrorAbove = Aerror[generateParameterNameNetwork(networkIndex, l+1, "Aerror")]
@@ -530,55 +550,10 @@ def calculateAerrorBackpropStrict(A, l, networkIndex):
 	
 	if(averageAerrorAcrossBatch):
 		AerrorVec = tf.squeeze(AerrorVec)
+		A = tf.reduce_mean(A, axis=0)   #average across all batches
 		
 	AerrorVec = tf.multiply(AerrorVec, A) #* A_l	#multiply by the strength of the current layer signal
 	return AerrorVec
-
-def trialAerrorMod(direction, A, k, l, networkIndex):
-
-	if(direction):
-		trialAmodValue = subLayerIdealAlearningRateBase
-	else:
-		trialAmodValue = -subLayerIdealAlearningRateBase
-	
-	columnsIdx = tf.constant([k])
-	AK = tf.gather(A, columnsIdx, axis=1)	#Atrial[:,k]	
-	AtrialK = AK
-	if(learningAlgorithm == "backpropApproximation5"):
-		AtrialKdelta = trialAmodValue
-	elif(learningAlgorithm == "backpropApproximation4"):
-		AtrialKdelta = calculateDeltaTF(AtrialK, trialAmodValue, useMultiplicationRatherThanAdditionOfDeltaValuesAideal)	#this integrates the fact in backpropagation Aerror should be linearly dependent on A  #* A_l	#multiply by the strength of the current layer signal
-	elif(learningAlgorithm == "backpropApproximation3"):
-		AtrialKdelta = trialAmodValue
-	AtrialK = tf.add(AtrialK, AtrialKdelta)
-	
-	Atrial = A
-	Atrial = modifyTensorRowColumn(Atrial, False, k, AtrialK, isVector=True)	#Atrial[:,k] = (trialAmodValue)
-
-	AtrialAbove, ZtrialAbove = neuralNetworkPropagationCANNlayerL(Atrial, l+1, networkIndex)
-	successfulTrial, performanceMultiplier = testAtrialPerformance(AtrialKdelta, AtrialAbove, l, networkIndex)
-	successfulTrialFloat = tf.dtypes.cast(successfulTrial, dtype=tf.float32)
-	
-	if(learningAlgorithm == "backpropApproximation4"):
-		if(applySubLayerIdealAmultiplierCorrection):
-			AtrialKdelta = tf.multiply(AtrialKdelta, performanceMultiplier)	#W_l+1	#multiply by the strength of the signal weight passthrough
-	elif(learningAlgorithm == "backpropApproximation3"):
-		# error_l = (W_l+1 * error_l+1) * A_l
-		AtrialKdelta = tf.multiply(AtrialKdelta, performanceMultiplier)	#W_l+1	#multiply by the strength of the signal weight passthrough
-		AtrialKdelta = tf.multiply(AtrialKdelta, AtrialK) #* A_l	#multiply by the strength of the current layer signal
-
-	AtrialKdeltaSuccessful = tf.multiply(AtrialKdelta, successfulTrialFloat)
-	AtrialKSuccessful = tf.add(AtrialK, AtrialKdeltaSuccessful)
-	
-	if(debugVerboseOutputTrain):
-		print("AtrialKSuccessful", AtrialKSuccessful)
-
-	Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")] = modifyTensorRowColumn(Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")], False, k, AtrialKSuccessful, isVector=True)
-
-	return AlayerAbove
-	
-
-
 
 
 def trialAidealMod(direction, A, k, l, networkIndex):
@@ -603,8 +578,40 @@ def trialAidealMod(direction, A, k, l, networkIndex):
 	Atrial = modifyTensorRowColumn(Atrial, False, k, AtrialK, isVector=True)	#Atrial[:,k] = (trialAmodValue)
 
 	AtrialAbove, ZtrialAbove = neuralNetworkPropagationCANNlayerL(Atrial, l+1, networkIndex)
+	
+	if(learningAlgorithm == "backpropApproximation4"):
+		AtrialKdelta = tf.squeeze(AtrialKdelta)
+			
+	if(averageAerrorAcrossBatch):
+		AtrialAbove = getAcomparison(AtrialAbove)	#average across all batches
+		#AtrialKdelta is already averaged across all batches
+		AtrialK = getAcomparison(AtrialK)	#average across all batches
+		if(learningAlgorithm == "backpropApproximation4"):
+			AtrialKdelta = getAcomparison(AtrialKdelta)
+		
+	#print("AtrialKdelta.shape = ", AtrialKdelta.shape)
+	#print("AtrialAbove.shape = ", AtrialAbove.shape)
+		
 	successfulTrial, performanceMultiplier = testAtrialPerformance(AtrialKdelta, AtrialAbove, l, networkIndex)
+	
+	#required for AtrialK/modifyTensorRowColumn preparation:
+	if(averageAerrorAcrossBatch):
+		successfulTrial = tf.expand_dims(successfulTrial, axis=0)
+		performanceMultiplier = tf.expand_dims(performanceMultiplier, axis=0)
+		if(learningAlgorithm == "backpropApproximation4"):
+			AtrialKdelta = tf.expand_dims(AtrialKdelta, axis=0)
+	else:
+		successfulTrial = tf.expand_dims(successfulTrial, axis=1)
+		performanceMultiplier = tf.expand_dims(performanceMultiplier, axis=1)
+		if(learningAlgorithm == "backpropApproximation4"):
+			AtrialKdelta = tf.expand_dims(AtrialKdelta, axis=1)
+
 	successfulTrialFloat = tf.dtypes.cast(successfulTrial, dtype=tf.float32)
+		
+	#print("successfulTrial.shape = ", successfulTrial.shape)
+	#print("performanceMultiplier.shape = ", performanceMultiplier.shape)
+	#print("AtrialKdelta.shape = ", AtrialKdelta.shape)
+	#print("AtrialK.shape = ", AtrialK.shape)
 	
 	if(learningAlgorithm == "backpropApproximation4"):
 		if(applySubLayerIdealAmultiplierCorrection):
@@ -613,32 +620,36 @@ def trialAidealMod(direction, A, k, l, networkIndex):
 		# error_l = (W_l+1 * error_l+1) * A_l
 		AtrialKdelta = tf.multiply(AtrialKdelta, performanceMultiplier)	#W_l+1	#multiply by the strength of the signal weight passthrough
 		AtrialKdelta = tf.multiply(AtrialKdelta, AtrialK) #* A_l	#multiply by the strength of the current layer signal
-
+			
 	AtrialKdeltaSuccessful = tf.multiply(AtrialKdelta, successfulTrialFloat)
 	AtrialKSuccessful = tf.add(AtrialK, AtrialKdeltaSuccessful)
-	
+
+	#print("AtrialKSuccessful.shape = ", AtrialKSuccessful.shape)
+
 	if(debugVerboseOutputTrain):
 		print("AtrialKSuccessful", AtrialKSuccessful)
+		
+	AidealLayerNew = modifyTensorRowColumn(Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")], False, k, AtrialKSuccessful, isVector=True)
 	
-	Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")] = modifyTensorRowColumn(Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")], False, k, AtrialKSuccessful, isVector=True)
-
+	setAerrorGivenAideal(AidealLayerNew, None, l, networkIndex)
+	
 
 def testAtrialPerformance(AtrialKdelta, AtrialAbove, l, networkIndex):
 		
 	performanceMultiplier = None	#performanceMultiplier: this calculates the ratio of the performance gain relative to the lower layer adjustment
 	
-	successfulTrial, trialPerformanceGain = testAtrialPerformanceAbove(AtrialAbove, l+1, networkIndex)
-	successfulTrial = tf.expand_dims(successfulTrial, axis=1)
+	#print("l = ", l)
+	#print("AtrialAbove.shape = ", AtrialAbove.shape)
 	
+	successfulTrial, trialPerformanceGain = testAtrialPerformanceAbove(AtrialAbove, l+1, networkIndex)
+
 	if(learningAlgorithm == "backpropApproximation4"):
-		trialPerformanceGain = tf.expand_dims(trialPerformanceGain, axis=1)
 		performanceMultiplier = tf.divide(trialPerformanceGain, tf.abs(AtrialKdelta))	#added tf.abs to ensure sign of performanceMultiplier is maintained	#OLD: fix this; sometimes divides by zero	
 			
 		if(applySubLayerIdealAmultiplierRequirement):
 			performanceMultiplierSuccessful = tf.greater(performanceMultiplier, subLayerIdealAmultiplierRequirement)
 			successfulTrial = tf.logical_and(successfulTrial, performanceMultiplierSuccessful)
 	elif(learningAlgorithm == "backpropApproximation3"):
-		trialPerformanceGain = tf.expand_dims(trialPerformanceGain, axis=1)
 		performanceMultiplier = tf.divide(trialPerformanceGain, tf.abs(AtrialKdelta))
 		
 	return successfulTrial, performanceMultiplier
@@ -648,12 +659,16 @@ def testAtrialPerformanceAbove(AtrialAbove, l, networkIndex):
 	
 	#print("l = ", l )
 	#print("1 Aideal.shape = ", Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")].shape)
-	
-	AidealDeltaOrig = calculateAidealDelta(Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")], l, networkIndex)
+
+	AidealDeltaOrig = calculateAidealDelta(getAtraceComparison(l, networkIndex), l, networkIndex)
 	AidealDeltaTrial = calculateAidealDelta(AtrialAbove, l, networkIndex)
 	
-	AidealDeltaOrigAvg = tf.reduce_mean(AidealDeltaOrig, axis=1)   #average across all k neurons on l
-	AidealDeltaTrialAvg = tf.reduce_mean(AidealDeltaTrial, axis=1) #average across all k neurons on l
+	if(averageAerrorAcrossBatch):
+		AidealDeltaOrigAvg = tf.reduce_mean(AidealDeltaOrig, axis=0)   #average across all k neurons on l
+		AidealDeltaTrialAvg = tf.reduce_mean(AidealDeltaTrial, axis=0) #average across all k neurons on l	
+	else:
+		AidealDeltaOrigAvg = tf.reduce_mean(AidealDeltaOrig, axis=1)   #average across all k neurons on l
+		AidealDeltaTrialAvg = tf.reduce_mean(AidealDeltaTrial, axis=1) #average across all k neurons on l
 	AidealDeltaOrigAvgAbs = tf.abs(AidealDeltaOrigAvg)
 	AidealDeltaTrialAvgAbs = tf.abs(AidealDeltaTrialAvg)
 	successfulTrial = tf.less(AidealDeltaTrialAvgAbs, AidealDeltaOrigAvgAbs)
@@ -674,8 +689,11 @@ def testAtrialPerformanceAbove(AtrialAbove, l, networkIndex):
 		#Algorithm limitation - Missing:  * error_l+1	#multiply by the strength of the higher layer error
 	elif(learningAlgorithm == "backpropApproximation3"):
 		trialPerformanceGain = tf.multiply(tf.subtract(AidealDeltaOrig, AidealDeltaTrial), tf.sign(AidealDeltaTrial))	#W_l+1	#multiply by the strength of the signal weight passthrough
-		trialPerformanceGain = tf.multiply(trialPerformanceGain, AidealDeltaOrig)	# * error_l+1	#multiply by the strength of the higher layer error
-		trialPerformanceGain = tf.reduce_mean(trialPerformanceGain, axis=1) #average across all k neurons on l
+		trialPerformanceGain = tf.multiply(trialPerformanceGain, tf.abs(AidealDeltaOrig))	# * error_l+1	#multiply by the strength of the higher layer error	#apply abs correction to AidealDeltaOrig?
+		if(averageAerrorAcrossBatch):
+			trialPerformanceGain = tf.reduce_mean(trialPerformanceGain, axis=0) #average across all k neurons on l
+		else:
+			trialPerformanceGain = tf.reduce_mean(trialPerformanceGain, axis=1) #average across all k neurons on l
 			
 	return successfulTrial, trialPerformanceGain
 
@@ -684,22 +702,17 @@ def testAtrialPerformanceAbove(AtrialAbove, l, networkIndex):
 def updateWeightsBasedOnAerror(l, x, y, networkIndex):
 	
 	
-	if(learningAlgorithm == "backpropApproximation1"):
+	if(learningAlgorithm == "backpropApproximation1" or learningAlgorithm == "backpropApproximation2"):
 		Wlayer = W[generateParameterNameNetwork(networkIndex, l, "W")]
 		Blayer = B[generateParameterNameNetwork(networkIndex, l, "B")]
 		
-		AtraceBelow = Atrace[generateParameterNameNetwork(networkIndex, l-1, "Atrace")]
+		AtraceBelow = getAtraceComparison(l-1, networkIndex)
 		AerrorLayer = Aerror[generateParameterNameNetwork(networkIndex, l, "Aerror")]	
-		
-		#print("AerrorLayer.shape orig = ", AerrorLayer.shape)
-		
+				
 		if(not averageAerrorAcrossBatch):
 			AtraceBelow = tf.reduce_mean(AtraceBelow, axis=0)      #average across all batches 
 			AerrorLayer = tf.reduce_mean(AerrorLayer, axis=0)      #average across all batches 
-			
-		#print("AtraceBelow.shape = ", AtraceBelow.shape)
-		#print("AerrorLayer.shape = ", AerrorLayer.shape)
-		
+
 		AtraceBelow = tf.expand_dims(AtraceBelow, axis=1)	#required for matmul preparation
 		AerrorLayer = tf.expand_dims(AerrorLayer, axis=0)	#required for matmul preparation
 			
@@ -716,14 +729,12 @@ def updateWeightsBasedOnAerror(l, x, y, networkIndex):
 	elif(learningAlgorithm == "backpropApproximation3"):
 		print("updateWeightsBasedOnAerror warning: learningAlgorithm == backpropApproximation3 has not been coded")
 	else:
-		if(takeAprevLayerFromTraceDuringWeightUpdates):
-			if(recalculateAtraceUnoptimisedBio):
-				_ , AprevLayer, _ = neuralNetworkPropagationCANNlayer(x, l-1, networkIndex, recordAtrace=False)
-			else:
-				AprevLayer = Atrace[generateParameterNameNetwork(networkIndex, l-1, "Atrace")] 
+		#if(takeAprevLayerFromTraceDuringWeightUpdates):
+		if(recalculateAtraceUnoptimisedBio):
+			_ , AprevLayer, _ = neuralNetworkPropagationCANNlayer(x, l-1, networkIndex, recordAtrace=False)
 		else:
-			AprevLayer = Aideal[generateParameterNameNetwork(networkIndex, l-1, "Aideal")]
-
+			AprevLayer = Atrace[generateParameterNameNetwork(networkIndex, l-1, "Atrace")] 
+	
 		if(recalculateAtraceUnoptimisedBio):
 			AtrialBase, ZtrialBase = neuralNetworkPropagationCANNlayerL(AprevLayer, l, networkIndex)
 		else:
@@ -732,11 +743,10 @@ def updateWeightsBasedOnAerror(l, x, y, networkIndex):
 		AidealLayer = Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")]
 
 		if(useWeightUpdateDirectionHeuristicBasedOnExcitatoryInhibitorySynapseType):
-			errorVec = calculateErrorAtrialVectorDirectional(AtrialBase, AidealLayer, networkIndex)
-			#print("AidealDeltaOrigVec = ", AidealDeltaOrigVec)
+			errorVec = calculateErrorAtrialVectorDirectional(getAcomparison(AtrialBase), AidealLayer, networkIndex)	#errorVec will be averaged across all batches 
 			updateWeightsBasedOnAidealHeuristic(l, networkIndex, errorVec)
 		else:
-			lossBase = calculateErrorAtrial(AtrialBase, AidealLayer, networkIndex)
+			lossBase = calculateErrorAtrial(AtrialBase, AidealLayer, networkIndex)		#lossBase will be averaged across all batches, across k neurons on l
 			updateWeightsBasedOnAidealStocastic(l, AprevLayer, AidealLayer, networkIndex, lossBase, x)
 
 def updateWeightsBasedOnAidealHeuristic(l, networkIndex, errorVec):
@@ -883,6 +893,7 @@ def calculateDeltaNP(deltaMax, learningRateLocal, useMultiplication, applyMinimi
 		
 def calculateErrorAtrialVectorDirectional(Atrial, AidealLayer, networkIndex, averageType="vector"):
 	
+	#errorVec will be averaged across all batches if not already
 	errorVec = calculateErrorAtrial(Atrial, AidealLayer, networkIndex, averageType)
 
 	return errorVec
@@ -909,7 +920,8 @@ def calculateErrorAtrial(Atrial, AidealLayer, networkIndex, averageType="all"):
 									
 	return error	
 				
-		
+
+#note if updated_value isVector, updated_value should be provided in 2D format
 def modifyTensorRowColumn(a, isRow, index, updated_value, isVector):
 	
 	if(not isRow):
@@ -932,6 +944,10 @@ def modifyTensorRowColumn(a, isRow, index, updated_value, isVector):
 			values = [a[:index], updated_value, a[index+1:]]
 		else:
 			values = [a[:index], [updated_value], a[index+1:]]
+	
+	#print("index = ", index)
+	#print("values = ", values)
+	#print("updated_value = ", updated_value)
 			
 	a = tf.concat(axis=0, values=values)
 			
@@ -947,9 +963,29 @@ def calculateAidealDelta(A, l, networkIndex):
 def calculateADelta(Abase, A):
 	AidealDelta =  tf.subtract(Abase, A)
 	return AidealDelta
-		
+
+def setAerrorK(AerrorK, k, l, networkIndex=1):
+	if(averageAerrorAcrossBatch):
+		isRow = True
+		isVector = False
+	else:
+		isRow = False
+		isVector = False
+	if(errorStorageAlgorithm == "useAideal"):
+		print("setAerrorK requires (errorStorageAlgorithm == useAerror)")
+	elif(errorStorageAlgorithm == "useAerror"):
+		AerrorLayer = Aerror[generateParameterNameNetwork(networkIndex, l, "Aerror")]
+		#print("AerrorLayer.shape = ", AerrorLayer.shape)
+		#print("AerrorK.shape = ", AerrorK.shape)
+		#print("AerrorK = ", AerrorK)
+		AerrorLayer = modifyTensorRowColumn(AerrorLayer, isRow, k, AerrorK, isVector)
+		Aerror[generateParameterNameNetwork(networkIndex, l, "Aerror")] = AerrorLayer
+		#print("AerrorLayer.shape = ", AerrorLayer.shape)
+			
 def setAerror(AerrorLayer, AtraceLayer, l, networkIndex=1):
 	if(errorStorageAlgorithm == "useAideal"):
+		#print("setAerror, AtraceLayer.shape = ", AtraceLayer.shape)
+		#print("setAerror, AerrorLayer.shape = ", AerrorLayer.shape)
 		Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")] = tf.add(AtraceLayer, AerrorLayer)
 	elif(errorStorageAlgorithm == "useAerror"):
 		#print("setAerror, AerrorLayer.shape = ", AerrorLayer.shape)
@@ -957,6 +993,7 @@ def setAerror(AerrorLayer, AtraceLayer, l, networkIndex=1):
 
 def setAerrorGivenAideal(AidealLayer, AtraceLayer, l, networkIndex=1):
 	if(errorStorageAlgorithm == "useAideal"):
+		#print("setAerrorGivenAideal, AidealLayer.shape = ", AidealLayer.shape)
 		Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")] = AidealLayer
 	elif(errorStorageAlgorithm == "useAerror"):
 		#print("setAerrorGivenAideal, AidealLayer.shape = ", AidealLayer.shape)
@@ -964,5 +1001,14 @@ def setAerrorGivenAideal(AidealLayer, AtraceLayer, l, networkIndex=1):
 		Aerror[generateParameterNameNetwork(networkIndex, l, "Aerror")] = tf.subtract(AidealLayer, AtraceLayer)
 
 			
-
+def getAtraceComparison(l, networkIndex=1):		
+	AtraceLayer = Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")]
+	AtraceLayer = getAcomparison(AtraceLayer)
+	return AtraceLayer
+	
+def getAcomparison(A):		
+	if(averageAerrorAcrossBatch):
+		A = tf.reduce_mean(A, axis=0)      #average across all batches
+	return A
+	
 
