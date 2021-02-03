@@ -49,7 +49,7 @@ debugOnlyTrainFinalLayer = False	#debug weight update method only (not Aideal ca
 debugVerboseOutput = False
 debugVerboseOutputTrain = False
 
-averageAerrorAcrossBatch = True	#BUANN was originally implemented to calculate independent idealA for each batch index (rather than averaged across batch)
+averageAerrorAcrossBatch = False	#BUANN was originally implemented to calculate independent idealA for each batch index (rather than averaged across batch)
 
 errorImplementationAlgorithm = "storeErrorAsModulationOfSignalPropagationNeurotransmitterReceptor"	#original	#a) modulates primary propagation neurotransmitter receptor (+/-) to store l error, and for the calculation of l-1 error
 #errorImplementationAlgorithm = "storeErrorAsModulationOfUniqueNeurotransmitterReceptor"	#b) designates a specific neurotransmitter receptor to store l error, and for the calculation of l-1 error
@@ -92,10 +92,10 @@ activationFunctionType = "sigmoid"	#default
 applyFinalLayerLossFunction = False		#if False: normalise the error calculation across all layers, taking y_target as Aideal of top layer
 if(learningAlgorithm == "backpropApproximation1"):
 	activationFunctionTypeFinalLayer = "softmax"
-	applyFinalLayerLossFunction = True
+	applyFinalLayerLossFunction = False
 elif(learningAlgorithm == "backpropApproximation2"):
 	activationFunctionTypeFinalLayer = "softmax"
-	applyFinalLayerLossFunction = True
+	applyFinalLayerLossFunction = False
 else:
 	activationFunctionTypeFinalLayer = "sigmoid"	#default	#doesn't currently converge with final layer loss function calculated based on sigmoid
 	applyFinalLayerLossFunction = True	
@@ -348,6 +348,9 @@ def neuralNetworkPropagationCANNlayerL(AprevLayer, l, networkIndex=1):
 			Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
 		A = activationFunction(Z, n_h[l-1])
 	else:
+		#print("l = ", l)
+		#print("W.shape = ", W[generateParameterNameNetwork(networkIndex, l, "W")].shape)
+		#print("B.shape = ", B[generateParameterNameNetwork(networkIndex, l, "B")].shape)
 		Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
 		A = activationFunction(Z)
 	
@@ -706,18 +709,27 @@ def updateWeightsBasedOnAerror(l, x, y, networkIndex):
 		Wlayer = W[generateParameterNameNetwork(networkIndex, l, "W")]
 		Blayer = B[generateParameterNameNetwork(networkIndex, l, "B")]
 		
-		AtraceBelow = getAtraceComparison(l-1, networkIndex)
+		AtraceBelow = Atrace[generateParameterNameNetwork(networkIndex, l-1, "Atrace")]
 		AerrorLayer = Aerror[generateParameterNameNetwork(networkIndex, l, "Aerror")]	
-				
-		if(not averageAerrorAcrossBatch):
-			AtraceBelow = tf.reduce_mean(AtraceBelow, axis=0)      #average across all batches 
-			AerrorLayer = tf.reduce_mean(AerrorLayer, axis=0)      #average across all batches 
 
-		AtraceBelow = tf.expand_dims(AtraceBelow, axis=1)	#required for matmul preparation
-		AerrorLayer = tf.expand_dims(AerrorLayer, axis=0)	#required for matmul preparation
-			
-		Wdelta = tf.matmul(AtraceBelow, AerrorLayer)	# dC/dW = A_l-1 * error_l
-		Bdelta = AerrorLayer	# dC/dB = error_l
+		#OLD:
+		#AtraceBelow = getAtraceComparison(l-1, networkIndex)	
+		#if(not averageAerrorAcrossBatch):
+		#	AtraceBelow = tf.reduce_mean(AtraceBelow, axis=0)      #average across all batches 
+		#	AerrorLayer = tf.reduce_mean(AerrorLayer, axis=0)      #average across all batches 
+		#AtraceBelow = tf.expand_dims(AtraceBelow, axis=1)	#required for matmul preparation
+		#AerrorLayer = tf.expand_dims(AerrorLayer, axis=0)	#required for matmul preparation
+
+		if(averageAerrorAcrossBatch):
+			AtraceBelow = tf.reduce_mean(AtraceBelow, axis=0)      #average across all batches
+			AtraceBelow = tf.expand_dims(AtraceBelow, axis=0)	#required for matmul preparation
+			AerrorLayer = tf.expand_dims(AerrorLayer, axis=0)
+
+		#print("AtraceBelow.shape = ", AtraceBelow.shape)
+		#print("AerrorLayer.shape = ", AerrorLayer.shape)
+		
+		Wdelta = tf.matmul(tf.transpose(AtraceBelow), AerrorLayer)	# dC/dW = A_l-1 * error_l
+		Bdelta = tf.reduce_mean(AerrorLayer, axis=0) 	# dC/dB = error_l
 		
 		Wlayer = tf.add(Wlayer, tf.multiply(Wdelta, learningRate))
 		Blayer = tf.add(Blayer, tf.multiply(Bdelta, learningRate))
