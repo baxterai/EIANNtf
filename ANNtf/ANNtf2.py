@@ -35,7 +35,10 @@ import ANNtf2_loadDataset
 
 #algorithm = "ANN"
 #algorithm = "SANI"
-algorithm = "CANN"
+#algorithm = "CANN"
+algorithm = "FBANN"
+
+suppressGradientDoNotExistForVariablesWarnings = True
 
 costCrossEntropyWithLogits = False
 if(algorithm == "ANN"):
@@ -58,7 +61,7 @@ elif(algorithm == "CANN"):
 	#algorithmCANN = "CANN_expCUANN"
 	#algorithmCANN = "CANN_expXUANN"
 	#algorithmCANN = "CANN_expMUANN"
-	algorithmCANN = "CANN_expBUANN"
+	algorithmCANN = "CANN_expRUANN"
 	if(algorithmCANN == "CANN_expHUANN"):
 		import ANNtf2_algorithmCANN_expHUANN as ANNtf2_algorithmCANN
 	elif(algorithmCANN == "CANN_expSUANN"):
@@ -74,9 +77,11 @@ elif(algorithm == "CANN"):
 		import ANNtf2_algorithmCANN_expXUANN as ANNtf2_algorithmCANN
 	elif(algorithmCANN == "CANN_expMUANN"):
 		import ANNtf2_algorithmCANN_expMUANN as ANNtf2_algorithmCANN		
-	elif(algorithmCANN == "CANN_expBUANN"):
-		import ANNtf2_algorithmCANN_expBUANN as ANNtf2_algorithmCANN
-		
+	elif(algorithmCANN == "CANN_expRUANN"):
+		import ANNtf2_algorithmCANN_expRUANN as ANNtf2_algorithmCANN
+elif(algorithm == "FBANN"):
+	import ANNtf2_algorithmFBANN as ANNtf2_algorithmFBANN
+				
 #learningRate, trainingSteps, batchSize, displayStep, numEpochs = -1
 
 #performance enhancements for development environment only: 
@@ -124,7 +129,12 @@ elif(algorithm == "CANN"):
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 5	#default: 1
 	trainHebbianBackprop = False	#default: False
-	
+elif(algorithm == "FBANN"):
+	#dataset = "POStagSequence"
+	dataset = "SmallDataset"
+	#trainMultipleNetworks = True	#default: False
+	#numberOfNetworks = 5	#default: 1
+		
 	
 if(dataset == "SmallDataset"):
 	smallDatasetIndex = 0 #default: 0 (New Thyroid)
@@ -169,6 +179,8 @@ def neuralNetworkPropagation(x, networkIndex=1):
 		pred = ANNtf2_algorithmANN.neuralNetworkPropagationANN(x, networkIndex)
 	elif(algorithm == "CANN"):
 		pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN(x, networkIndex)
+	elif(algorithm == "FBANN"):
+		pred = ANNtf2_algorithmFBANN.neuralNetworkPropagationFBANNwrapper(x, networkIndex)
 	return pred
 	
 
@@ -189,9 +201,9 @@ def executeLearningCANN(x, y, networkIndex=1):
 	elif(algorithmCANN == "CANN_expMUANN"):
 		#learning algorithm embedded in multiple forward propagation and synaptic delta calculations
 		pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expMUANNtrain(x, y, networkIndex)
-	elif(algorithmCANN == "CANN_expBUANN"):
+	elif(algorithmCANN == "CANN_expRUANN"):
 		#learning algorithm: in reverse order, stocastically establishing Aideal of each layer (by temporarily biasing firing rate of neurons) to better achieve Aideal of higher layer (through multiple local/single layer forward propagations), then (simultaneous/parallel layer processing) stocastically adjusting weights to fine tune towards Aideal of their higher layers
-		pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expBUANNtrain(x, y, networkIndex)
+		pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expRUANNtrain(x, y, networkIndex)
 def executeLearningCANN_expAUANN(x, y, exemplarsX, exemplarsY, currentClassTarget, networkIndex=1):
 	#learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
 	pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expAUANNtrain(x, y, exemplarsX, exemplarsY, currentClassTarget, networkIndex)
@@ -199,7 +211,7 @@ def executeLearningCANN_expXUANN(x, y, samplePositiveX, samplePositiveY, sampleN
 	#learning algorithm: perform contrast training (diff of interclass experience with current experience, and diff of extraclass experience with current experience) at each layer of network
 	pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expXUANNtrain(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex)
 
-	
+
 			
 def executeOptimisation(x, y, networkIndex=1):
 	with tf.GradientTape() as g:
@@ -258,15 +270,48 @@ def executeOptimisation(x, y, networkIndex=1):
 					#trainableVariables = list(ANNtf2_algorithmSANI.W.values()) + list(ANNtf2_algorithmSANI.B.values())
 				else:
 					print("error: !allowMultipleSubinputsPerSequentialInput && !performSummationOfSequentialInputsWeighted")
+	elif(algorithm == "FBANN"):
+		Wflist = []
+		Wblist = []
+		Blist = []
+		for l1 in range(1, ANNtf2_algorithmFBANN.highestLayer+1):
+			if(ANNtf2_algorithmFBANN.supportSkipLayers):
+				for l2 in range(0, l1):
+					if(l2 < l1):
+						Wflist.append(ANNtf2_algorithmFBANN.Wf[generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, "Wf")])
+				if(ANNtf2_algorithmFBANN.feedbackConnections):
+					if((l1 <= ANNtf2_algorithmFBANN.highestLayerWithIncomingBackwardsConnections) and (l1 >= ANNtf2_algorithmFBANN.lowestLayerWithIncomingBackwardsConnections)):
+						for l2 in range(l1+1, ANNtf2_algorithmFBANN.highestLayer+1):
+							if(l2 > l1):
+								Wblist.append(ANNtf2_algorithmFBANN.Wb[generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, "Wb")])
+			else:
+				Wflist.append(ANNtf2_algorithmFBANN.Wf[generateParameterNameNetwork(networkIndex, l1, "Wf")])
+				if(ANNtf2_algorithmFBANN.feedbackConnections):
+					if((l1 <= ANNtf2_algorithmFBANN.highestLayerWithIncomingBackwardsConnections) and (l1 >= ANNtf2_algorithmFBANN.lowestLayerWithIncomingBackwardsConnections)):
+						Wblist.append(ANNtf2_algorithmFBANN.Wb[generateParameterNameNetwork(networkIndex, l1, "Wb")])
+								
+			Blist.append(ANNtf2_algorithmFBANN.B[generateParameterNameNetwork(networkIndex, l1, "B")])
+			
+		if(ANNtf2_algorithmFBANN.feedbackConnections):
+			trainableVariables = Wflist + Wblist + Blist
+		else:
+			trainableVariables = Wflist + Blist
 	elif(algorithm == "CANN"):
 		print("executeOptimisation error: algorithm CANN not supported, use executeLearningCANN() instead")
 		exit()
 
+		
 	gradients = g.gradient(loss, trainableVariables)
 	
-	optimizer.apply_gradients(zip(gradients, trainableVariables))
+	if(suppressGradientDoNotExistForVariablesWarnings):
+		optimizer.apply_gradients([
+    		(grad, var) 
+    		for (grad, var) in zip(gradients, trainableVariables) 
+    		if grad is not None
+			])
+	else:
+		optimizer.apply_gradients(zip(gradients, trainableVariables))
 
-	
 
 																
 if __name__ == "__main__":
@@ -320,6 +365,10 @@ if __name__ == "__main__":
 		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmCANN.defineTrainingParametersCANN(dataset, trainMultipleFiles)
 		numberOfLayers = ANNtf2_algorithmCANN.defineNetworkParametersCANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
 		ANNtf2_algorithmCANN.defineNeuralNetworkParametersCANN()
+	elif(algorithm == "FBANN"):
+		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmFBANN.defineTrainingParametersFBANN(dataset, trainMultipleFiles)
+		numberOfLayers = ANNtf2_algorithmFBANN.defineNetworkParametersFBANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
+		ANNtf2_algorithmFBANN.defineNeuralNetworkParametersFBANN()
 					
 	#define epochs:
 
@@ -513,12 +562,21 @@ if __name__ == "__main__":
 							executeLearningCANN_expXUANN(batchX, batchY, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex)
 						elif(algorithmCANN == "CANN_expMUANN"):
 							executeLearningCANN(batchX, batchY, networkIndex)
-						elif(algorithmCANN == "CANN_expBUANN"):
+						elif(algorithmCANN == "CANN_expRUANN"):
 							executeLearningCANN(batchX, batchY, networkIndex)
 						if(batchIndex % displayStep == 0):
 							pred = neuralNetworkPropagation(batchX, networkIndex)
 							loss = crossEntropy(pred, batchYactual, datasetNumClasses, costCrossEntropyWithLogits)
 							acc = calculateAccuracy(pred, batchYactual)
+							print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
+							predNetworkAverage = predNetworkAverage + pred
+					elif(algorithm == "FBANN"):
+						executeOptimisation(batchX, batchY, networkIndex)
+						if(batchIndex % displayStep == 0):
+							pred = neuralNetworkPropagation(batchX, networkIndex)
+							#print("pred = ", pred)
+							loss = crossEntropy(pred, batchY, datasetNumClasses, costCrossEntropyWithLogits)
+							acc = calculateAccuracy(pred, batchY)
 							print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
 							predNetworkAverage = predNetworkAverage + pred
 				
@@ -556,7 +614,10 @@ if __name__ == "__main__":
 					pred = neuralNetworkPropagation(test_x, networkIndex)
 					print("Test Accuracy: networkIndex: %i, %f" % (networkIndex, calculateAccuracy(pred, test_y)))
 					predNetworkAverageAll = predNetworkAverageAll + pred
-				
+				elif(algorithm == "FBANN"):
+					pred = neuralNetworkPropagation(test_x, networkIndex)
+					print("Test Accuracy: networkIndex: %i, %f" % (networkIndex, calculateAccuracy(pred, test_y)))
+					predNetworkAverageAll = predNetworkAverageAll + pred				
 
 			if(trainMultipleNetworks):
 					predNetworkAverageAll = predNetworkAverageAll / numberOfNetworks

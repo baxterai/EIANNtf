@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""ANNtf2_algorithmCANN_expBUANN.py
+"""ANNtf2_algorithmCANN_expRUANN.py
 
 # Requirements:
 Python 3 and Tensorflow 2.1+ 
@@ -12,7 +12,8 @@ see ANNtf2.py
 
 # Description
 
-Define fully connected burst/spike update artificial neural network (CANN_expBUANN)
+Define fully connected relaxation update artificial neural network (CANN_expRUANN)
+[relies on sustained burst/spike of ideal A values to perform weight updates]
 
 - Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
@@ -27,7 +28,7 @@ import math
 from numpy import random
 
 #
-# BUANN biological implementation requirements:
+# RUANN biological implementation requirements:
 #
 # backpropagation approximation notes:
 # error_l = (W_l+1 * error_l+1) * A_l
@@ -38,18 +39,18 @@ from numpy import random
 # Aerror_l update is applied based on signal pass through (W), higher level temporary firing rate adjustment, and current firing rate. error_l = (W_l+1 * error_l+1) * A_l
 # W_l update is applied based on firing rate of lower layer and higher level temporary firing rate adjustment. dC/dW = A_l-1 * error_l
 #
-# BUANN approximates backpropagation for constrained/biological assumptions
+# RUANN approximates backpropagation for constrained/biological assumptions
 # Error calculations are achieved by repropagating signal through neuron and measuring either a) temporary modulation in output (Aideal) relative to original (Atrace), or b) output of a specific error storage neurotransmitter receptor
 #
 # Outstanding Biological Requirement: Need to identify a method to pass (single layer) error signal back through neuron from tip of axon to base of dendrite (internal/external signal?)
-#	the original BUANN (learningAlgorithm == "backpropApproximation3/backpropApproximation4") attempts to achieve this by sending a trial +/- signal from the lower layer l neuron k and slowly ramping it up/down (increasing/decreasing its effective error) until the above layer l+1 neurons reach their ideal values/errors  
+#	the original RUANN (learningAlgorithm == "backpropApproximation3/backpropApproximation4") attempts to achieve this by sending a trial +/- signal from the lower layer l neuron k and slowly ramping it up/down (increasing/decreasing its effective error) until the above layer l+1 neurons reach their ideal values/errors  
 #
 
 debugOnlyTrainFinalLayer = False	#debug weight update method only (not Aideal calculation method)	#requires recalculateAtraceUnoptimisedBio==False
 debugVerboseOutput = False
 debugVerboseOutputTrain = False
 
-averageAerrorAcrossBatch = False	#BUANN was originally implemented to calculate independent idealA for each batch index (rather than averaged across batch)
+averageAerrorAcrossBatch = False	#RUANN was originally implemented to calculate independent idealA for each batch index (rather than averaged across batch)
 
 errorImplementationAlgorithm = "storeErrorAsModulationOfSignalPropagationNeurotransmitterReceptor"	#original	#a) modulates primary propagation neurotransmitter receptor (+/-) to store l error, and for the calculation of l-1 error
 #errorImplementationAlgorithm = "storeErrorAsModulationOfUniqueNeurotransmitterReceptor"	#b) designates a specific neurotransmitter receptor to store l error, and for the calculation of l-1 error
@@ -59,7 +60,7 @@ learningAlgorithm = "backpropApproximation1"
 #learningAlgorithm = "backpropApproximation2"
 #learningAlgorithm = "backpropApproximation3"
 #learningAlgorithm = "backpropApproximation4"	#original proposal	#emulates backpropagation using a variety of shortcuts (with optional thresholding), but does not emulate backPropagation completely - error_l (Aideal_l) calculations are missing *error_l+1 (multiply by the strength of the higher layer error)
-#learningAlgorithm = "backpropApproximation5"	#simplifies BUANN algorithm to only consider +/- performance (not numerical/weighted performance)
+#learningAlgorithm = "backpropApproximation5"	#simplifies RUANN algorithm to only consider +/- performance (not numerical/weighted performance)
 	#probably only feasible with useBinaryWeights
 	#note if useBinaryWeights then could more easily biologically predict the effect of adjusting Aideal of lower layer neuron k on performance of upper layer (perhaps without even trialling the adjustment)
 
@@ -108,7 +109,7 @@ updateOrder = "updateWeightsAfterAidealCalculations"	#method 1
 #updateOrder = "updateWeightsBeforeAidealCalculations"	#method 3
 
 #takeAprevLayerFromTraceDuringWeightUpdates = True	#mandatory for computational purposes (normalise across batches)
-	#this parameter value should not be critical to BUANN algorithm (it is currently set based on availability of Aideal of lower layer - ie if it has been precalculated)
+	#this parameter value should not be critical to RUANN algorithm (it is currently set based on availability of Aideal of lower layer - ie if it has been precalculated)
 	#difference between Aideal and Atrace of lower layer should be so small takeAprevLayerFromTraceDuringWeightUpdates shouldn't matter
 
 recalculateAtraceUnoptimisedBio = False
@@ -387,7 +388,7 @@ def neuralNetworkPropagationCANN_test(x, y, networkIndex=1):
 	return loss, acc
 	
 
-def neuralNetworkPropagationCANN_expBUANNtrain(x, y, networkIndex=1):
+def neuralNetworkPropagationCANN_expRUANNtrain(x, y, networkIndex=1):
 	
 	#print("numberOfLayers = ", numberOfLayers)
 	
@@ -442,7 +443,7 @@ def calculateAerrorTopLayer(y_pred, y_true, networkIndex=1):
 		elif(activationFunctionTypeFinalLayer == "sigmoid"):		
 			loss = ANNtf2_operations.crossEntropy(y_pred, y_true, datasetNumClasses=None, costCrossEntropyWithLogits=True, reduceMean=False)	#loss = tf.nn.sigmoid_cross_entropy_with_logits(y_true, y_pred)
 		else:
-			print("activationFunctionTypeFinalLayer not currently supported by BUANN = ", activationFunctionTypeFinalLayer)
+			print("activationFunctionTypeFinalLayer not currently supported by RUANN = ", activationFunctionTypeFinalLayer)
 			exit()
 		AerrorAbs = loss
 	

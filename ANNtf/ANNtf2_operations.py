@@ -52,7 +52,10 @@ else:
 	#networkDivergenceType = "linearDivergingThenConverging"	#not yet coded
 	
 	
-
+def generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, arrayName):
+	parameterName = "n" + str(networkIndex) + "l1" + str(l1) + "l2" + str(l2) + arrayName
+	return parameterName
+	
 def generateParameterNameNetwork(networkIndex, l, arrayName):
 	parameterName = "n" + str(networkIndex) + "l" + str(l) + arrayName
 	return parameterName

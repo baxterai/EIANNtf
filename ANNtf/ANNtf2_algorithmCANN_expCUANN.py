@@ -280,22 +280,15 @@ def neuralNetworkPropagationCANN_expCUANNtrain(x, y, networkIndex=1):	#currentCl
 			AprevLayerLearn = AprevLayer
 
 		#update weights based on hebbian learning rule
-		#strengthen those connections that link the previous layer neuron to the exemplar activation trace for the class target (and weaken those that did not)
-
-		#associate all successfully fired neurons [in AprevLayerLearn] with exemplar higher level neurons [Alearn] previously identified during exemplar activation trace
-		#CHECKTHIS: note this is currently only a unidirectional association (to exemplar activation tree, and not from exemplar activation tree)
+		#strengthen those connections that link the previous layer neuron to the activation trace for the class target (and weaken those that did not)
 
 		AcoincidenceMatrix = tf.matmul(tf.transpose(AprevLayerLearn), A)
 		Wmod = AcoincidenceMatrix/batchSize*learningRate
-		#print("AcoincidenceMatrix = ", AcoincidenceMatrix)
-		#print("Wmod = ", Wmod)
-		#print("W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
 		W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] + Wmod	#apply weight update
 
 		if(enableForgetting):	#this isn't necessarily required for highly sparsely activated network + low shot learning
 			if(enableForgettingRestrictToAPrevAndNotAConnections):
 				AboolNeg = tf.math.equal(Alearn, 0.0)	#Abool = tf.math.greater(Alearn, 0.0), AboolNeg = tf.math.logical_not(Abool)
-				#print("Abool = ",Abool)
 				#AboolNegInt = tf.dtypes.cast(AboolNeg, tf.int32)
 				AboolNegFloat = tf.dtypes.cast(AboolNeg, tf.float32)
 				AcoincidenceMatrixForget = tf.matmul(tf.transpose(AprevLayerLearn), AboolNegFloat)
@@ -307,7 +300,6 @@ def neuralNetworkPropagationCANN_expCUANNtrain(x, y, networkIndex=1):	#currentCl
 				#AcoincidenceMatrixIsZeroInt = tf.dtypes.cast(AcoincidenceMatrixIsZero, tf.int32)
 				AcoincidenceMatrixIsZeroFloat = tf.dtypes.cast(AcoincidenceMatrixIsZero, dtype=tf.float32)
 				Wmod2 = AcoincidenceMatrixIsZeroFloat/batchSize*forgetRate	#tf.square(AcoincidenceMatrixIsZeroFloat) - square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
-				#print("Wmod2 = ", Wmod2)
 				W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2
 
 		if(applyWmaxCap):

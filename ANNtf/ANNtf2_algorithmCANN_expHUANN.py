@@ -21,6 +21,7 @@ Define fully connected hebbian update artificial neural network (CANN_expHUANN)
 import tensorflow as tf
 import numpy as np
 from ANNtf2_operations import *	#generateParameterNameSeq, generateParameterName, defineNetworkParameters
+import ANNtf2_operations
 import ANNtf2_globalDefs
 import math
 
@@ -30,15 +31,24 @@ applyAmaxCap = True	#max A = 1
 enableForgetting = True
 #debugSparseActivatedNetwork = False	#creates much larger network
 
+onlyTrainNeuronsIfLayerActivationIsSparse = True	#only train upper layer [neuron] if layer activation is sparse - ie if only a single hypothesis is detected as true
+if(onlyTrainNeuronsIfLayerActivationIsSparse):
+	onlyTrainNeuronsIfLayerActivationIsSparseRequireUniqueNeuronActivation = True
+	if(not onlyTrainNeuronsIfLayerActivationIsSparseRequireUniqueNeuronActivation):
+		onlyTrainNeuronsIfLayerActivationIsSparseMinSparsity = 0.9	#ie only 10% of neurons can be activation for training to occur
 
-generateFirstLayerSDR = False	#approximates k winners takes all
+if(onlyTrainNeuronsIfLayerActivationIsSparse):		
+	generateFirstLayerSDR = True	#required	#approximates k winners takes all	
+else:
+	generateFirstLayerSDR = False	#optional	#approximates k winners takes all	
+	
 if(generateFirstLayerSDR):
 	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 10.0	#100.0
 else:
 	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.8	#0.8
 
 if(generateFirstLayerSDR):
-	ignoreFirstXlayersTraining = True	#this can be used to significantly increase the network activation sparsity
+	ignoreFirstXlayersTraining = True	#this can be used to significantly increase the network activation sparsity	#required for onlyTrainNeuronsIfLayerActivationIsSparse
 	if(ignoreFirstXlayersTraining):
 		ignoreFirstXlayersTrainingX = 1
 else:
@@ -57,11 +67,14 @@ if(onlyTrainNeuronsIfActivationContributionAboveThreshold):
 	backpropCustomOnlyUpdateWeightsThatContributedTowardsTarget = True	#as not every neuron which fires contributes to the learning in fully connected network
 		#requires trainHebbianBackprop
 
-	
 
-	
 if(enableForgetting):
-	enableForgettingRestrictToAPrevAndNotAConnections = True	#True	#this ensures that only connections between active lower layer neurons and unactive higher layer neurons are suppressed
+	if(onlyTrainNeuronsIfLayerActivationIsSparse):
+		enableForgettingRestrictToAPrevAndNotAConnections = False	#required
+		enableForgettingRestrictToNotAPrevAndAConnections = True	#required
+	else:
+		enableForgettingRestrictToAPrevAndNotAConnections = True	#optional	#True	#this ensures that only connections between active lower layer neurons and unactive higher layer neurons are suppressed
+		enableForgettingRestrictToNotAPrevAndAConnections = False 	#required
 
 W = {}
 B = {}
@@ -102,7 +115,7 @@ def defineTrainingParametersCANN(dataset, trainMultipleFiles):
 			trainingSteps = 10000
 		elif(dataset == "SmallDataset"):
 			trainingSteps = 1000
-		batchSize = 10	#1	#10	#1000	#temporarily reduce batch size for visual debugging (array length) purposes)
+		batchSize = 10		#1	#10	#100	#1000	#temporarily reduce batch size for visual debugging (array length) purposes)
 		if(dataset == "SmallDataset"):
 			numEpochs = 10
 		else:
@@ -230,6 +243,28 @@ def trainLayerCANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHeb
 				AprevLayerAboveThresholdFloat = tf.dtypes.cast(AprevLayerAboveThreshold, dtype=tf.float32)
 				AprevLayerLearn = AprevLayer*AprevLayerAboveThresholdFloat
 			
+			enableLearning = True
+			if(onlyTrainNeuronsIfLayerActivationIsSparse):
+				enableLearning = False
+				#only train upper layer [neuron] if layer activation is sparse - ie if only a single hypothesis is detected as true
+				#print(A.shape)
+				numberHiddenLayerUnits = A.shape[1]
+				AposThresholded = tf.math.greater(A, 0.0)
+				numberHiddenLayerUnitsActive = tf.reduce_sum(tf.cast(AposThresholded, tf.float32), axis=1)
+				#print("numberHiddenLayerUnitsActive = ", numberHiddenLayerUnitsActive)
+				if(onlyTrainNeuronsIfLayerActivationIsSparseRequireUniqueNeuronActivation):
+					batchIndexLearn = tf.math.equal(numberHiddenLayerUnitsActive, 1)
+				else:
+					percentageHiddenLayerUnitsActive = tf.divide(numberHiddenLayerUnitsActive, numberHiddenLayerUnits)
+					batchIndexLearn = tf.math.less(percentageHiddenLayerUnitsActive, 1-onlyTrainNeuronsIfLayerActivationIsSparseMinSparsity)
+				batchIndexLearnFloat = tf.cast(batchIndexLearn, tf.float32)
+				batchIndexLearnFloat = tf.expand_dims(batchIndexLearnFloat, 1)
+				#print("batchIndexLearn = ", batchIndexLearn)
+				#print("Alearn.shape = ", Alearn.shape)
+				#print("batchIndexLearnFloat.shape = ", batchIndexLearnFloat.shape)
+				Alearn = tf.math.multiply(Alearn, batchIndexLearnFloat)	#only learn connections which result in an activated higher layer neuron
+						
+
 			AcoincidenceMatrix = tf.matmul(tf.transpose(AprevLayerLearn), Alearn)
 			#Bmod = 0*learningRate	#biases are not currently used
 			Wmod = AcoincidenceMatrix/batchSize*learningRate
@@ -245,22 +280,32 @@ def trainLayerCANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHeb
 			#print("W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
 
 			if(enableForgetting):
-				if(enableForgettingRestrictToAPrevAndNotAConnections):
-					AboolNeg = tf.math.equal(Alearn, 0.0)	#Abool = tf.math.greater(Alearn, 0.0), AboolNeg = tf.math.logical_not(Abool)
-					#print("Abool = ",Abool)
-					#AboolNegInt = tf.dtypes.cast(AboolNeg, tf.int32)
-					AboolNegFloat = tf.dtypes.cast(AboolNeg, tf.float32)
-					AcoincidenceMatrixForget = tf.matmul(tf.transpose(AprevLayerLearn), AboolNegFloat)
+				if(enableForgettingRestrictToNotAPrevAndAConnections):
+					AprevboolNeg = tf.math.equal(AprevLayerLearn, 0.0)	#Abool = tf.math.greater(Alearn, 0.0), AboolNeg = tf.math.logical_not(Abool)
+					#print("AprevboolNeg = ",AprevboolNeg)
+					#AprevboolNegInt = tf.dtypes.cast(AprevboolNeg, tf.int32)
+					AprevboolNegFloat = tf.dtypes.cast(AprevboolNeg, tf.float32)
+					AcoincidenceMatrixForget = tf.matmul(tf.transpose(AprevboolNegFloat), Alearn)
 					Wmod2 = tf.square(AcoincidenceMatrixForget)/batchSize*forgetRate	#tf.square(AcoincidenceMatrixForget) - square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
 					#print("Wmod2 = ", Wmod2)
-					W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2
+					W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2				
 				else:
-					AcoincidenceMatrixIsZero = tf.math.equal(AcoincidenceMatrix, 0)
-					#AcoincidenceMatrixIsZeroInt = tf.dtypes.cast(AcoincidenceMatrixIsZero, tf.int32)
-					AcoincidenceMatrixIsZeroFloat = tf.dtypes.cast(AcoincidenceMatrixIsZero, dtype=tf.float32)
-					Wmod2 = tf.square(AcoincidenceMatrixIsZeroFloat)/batchSize*forgetRate	#tf.square(AcoincidenceMatrixIsZeroFloat) - square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
-					#print("Wmod2 = ", Wmod2)
-					W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2
+					if(enableForgettingRestrictToAPrevAndNotAConnections):
+						AboolNeg = tf.math.equal(Alearn, 0.0)	#Abool = tf.math.greater(Alearn, 0.0), AboolNeg = tf.math.logical_not(Abool)
+						#print("Abool = ",Abool)
+						#AboolNegInt = tf.dtypes.cast(AboolNeg, tf.int32)
+						AboolNegFloat = tf.dtypes.cast(AboolNeg, tf.float32)
+						AcoincidenceMatrixForget = tf.matmul(tf.transpose(AprevLayerLearn), AboolNegFloat)
+						Wmod2 = tf.square(AcoincidenceMatrixForget)/batchSize*forgetRate	#tf.square(AcoincidenceMatrixForget) - square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
+						#print("Wmod2 = ", Wmod2)
+						W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2
+					else:
+						AcoincidenceMatrixIsZero = tf.math.equal(AcoincidenceMatrix, 0)
+						#AcoincidenceMatrixIsZeroInt = tf.dtypes.cast(AcoincidenceMatrixIsZero, tf.int32)
+						AcoincidenceMatrixIsZeroFloat = tf.dtypes.cast(AcoincidenceMatrixIsZero, dtype=tf.float32)
+						Wmod2 = tf.square(AcoincidenceMatrixIsZeroFloat)/batchSize*forgetRate	#tf.square(AcoincidenceMatrixIsZeroFloat) - square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
+						#print("Wmod2 = ", Wmod2)
+						W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2
 
 			if(applyWmaxCap):
 				#print("W before cap = ", W[generateParameterNameNetwork(networkIndex, l, "W")])

@@ -54,7 +54,7 @@ def defineTrainingParametersANN(dataset, trainMultipleFiles):
 
 	else:
 		learningRate = 0.001
-		batchSize = 1
+		batchSize = 100
 		numEpochs = 100 #10
 		if(dataset == "POStagSequence"):
 			trainingSteps = 10000

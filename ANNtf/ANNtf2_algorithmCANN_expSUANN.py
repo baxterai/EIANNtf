@@ -26,8 +26,9 @@ import ANNtf2_globalDefs
 import math
 from numpy import random
 
-
-debugOnlyTrainFinalLayer = True	#for performance comparison tests
+debugLongTrain = False	#increased number of training epochs (100)
+debugPrintLossVerbose = False	#useful for debugging
+debugOnlyTrainFinalLayer = False	#for performance comparison tests
 
 
 stochasticUpdateNeurons = True	#default: True
@@ -42,14 +43,14 @@ if(not stochasticUpdateNeurons):
 			#not currently possible since never any negative weight mod applied
 
 	
-biologicalConstraints = False	#batchSize=1, _?
+biologicalConstraints = True	#batchSize=1, _?
 
 useBatch = True
 noisySampleGeneration = False
 noisySampleGenerationNumSamples = 0
 noiseStandardDeviation = 0
 
-useBinaryWeights = False
+useBinaryWeights = True
 if(biologicalConstraints):
 	useBinaryWeights = True	#increases stochastically updated training speed, but reduces final accuracy
 	if(useBinaryWeights):	
@@ -129,7 +130,10 @@ def defineTrainingParametersCANN(dataset, trainMultipleFiles):
 			trainingSteps = 1000
 		if(useBatch):
 			batchSize = 100
-			numEpochs = 10
+			if(debugLongTrain):
+				numEpochs = 100
+			else:
+				numEpochs = 10
 		else:
 			batchSize = 1
 			numEpochs = 100
@@ -329,7 +333,8 @@ def neuralNetworkPropagationCANN_expSUANNtrain_updateNeurons(x, y=None, networkI
 		
 			
 	lossStart, accStart = neuralNetworkPropagationCANN_test(x, y, networkIndex)	#debug only
-	print("lossStart = ", lossStart)
+	if(debugPrintLossVerbose):
+		print("lossStart = ", lossStart)
 	
 	#ensure that an update is tried at least once for each parameter of the network during each training iteration:
 	
@@ -459,7 +464,7 @@ def getRandomNetworkParameter(networkIndex, currentSubsetOfParameters):
 
 
 
-def activationFunction(Z, prevLayerSize=None)
+def activationFunction(Z, prevLayerSize=None):
 	return reluCustom(Z, prevLayerSize)
 			
 def reluCustom(Z, prevLayerSize=None):
