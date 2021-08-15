@@ -23,6 +23,9 @@ import numpy as np
 import ANNtf2_globalDefs
 import math
 
+debugSingleLayerNetwork = False
+
+
 #if(useBinaryWeights) or if(generateFirstLayerSDR)
 generateLargeNetwork = True	#default: True
 if(generateLargeNetwork):
@@ -134,6 +137,33 @@ def generateTFtrainDataFromTrainDataUnbatched(trainDataUnbatched, shuffleSize, b
 
 
 def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+	if(debugSingleLayerNetwork):
+		n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = defineNetworkParametersANNsingleLayer(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet)
+	else:
+		n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet)
+	return n_h, numberOfLayers, numberOfNetworks, datasetNumClasses
+
+def defineNetworkParametersANNsingleLayer(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+
+	global n_h
+	global numberOfLayers
+	global numberOfNetworks
+	numberOfNetworks = numberOfNetworksSet
+
+	n_x = num_input_neurons #datasetNumFeatures
+	n_y = num_output_neurons  #datasetNumClasses
+	datasetNumClasses = n_y
+	n_h_0 = n_x
+	n_h_3 = n_y
+	n_h = [n_h_0, n_h_3]	
+	numberOfLayers = len(n_h)-1
+	
+	print("defineNetworkParametersANNsingleLayer, n_h = ", n_h)
+	
+	return 	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses
+	
+	
+def defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
 
 	#Network parameters
 	n_h = []

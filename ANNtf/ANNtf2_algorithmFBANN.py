@@ -107,7 +107,7 @@ def defineNetworkParametersFBANN(num_input_neurons, num_output_neurons, datasetN
 	highestLayer = numberOfLayers
 	highestLayerWithIncomingBackwardsConnections = highestLayer-1
 
-	#print("highestLayer = ", highestLayer)
+	print("highestLayer = ", highestLayer)
 	
 	return numberOfLayers
 
@@ -271,6 +271,7 @@ def neuralNetworkPropagationFBANNfeedBackward(AhighestLayer, additiveZ=True, net
 	if(supportSkipLayers):
 		Atrace[generateParameterNameNetwork(networkIndex, highestLayer+1, "Atrace")] = AprevLayer
 	
+	#print("lowestLayerWithIncomingBackwardsConnections = " , lowestLayerWithIncomingBackwardsConnections)
 	#print("highestLayerWithIncomingBackwardsConnections = " , highestLayerWithIncomingBackwardsConnections)
 	
 	for l1 in reversed(range(lowestLayerWithIncomingBackwardsConnections, highestLayerWithIncomingBackwardsConnections+1)):
@@ -287,7 +288,7 @@ def neuralNetworkPropagationFBANNfeedBackward(AhighestLayer, additiveZ=True, net
 				#print("l2 = ", l2)
 				Zmod = tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wb[generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, "Wb")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
 		else:
-			Zmod = tf.add(tf.matmul(AprevLayer, Wb[generateParameterNameNetwork(networkIndex, l, "Wb")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
+			Zmod = tf.add(tf.matmul(AprevLayer, Wb[generateParameterNameNetwork(networkIndex, l1, "Wb")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
 		
 		Z = tf.add(Z, Zmod)
 		

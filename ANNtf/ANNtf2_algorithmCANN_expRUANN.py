@@ -56,13 +56,15 @@ errorImplementationAlgorithm = "storeErrorAsModulationOfSignalPropagationNeurotr
 #errorImplementationAlgorithm = "storeErrorAsModulationOfUniqueNeurotransmitterReceptor"	#b) designates a specific neurotransmitter receptor to store l error, and for the calculation of l-1 error
 
 #learning algorithm variants in order of emulation similarity to formal backpropagation:
-learningAlgorithm = "backpropApproximation1"
+#learningAlgorithm = "backpropApproximation1"
 #learningAlgorithm = "backpropApproximation2"
 #learningAlgorithm = "backpropApproximation3"
 #learningAlgorithm = "backpropApproximation4"	#original proposal	#emulates backpropagation using a variety of shortcuts (with optional thresholding), but does not emulate backPropagation completely - error_l (Aideal_l) calculations are missing *error_l+1 (multiply by the strength of the higher layer error)
 #learningAlgorithm = "backpropApproximation5"	#simplifies RUANN algorithm to only consider +/- performance (not numerical/weighted performance)
 	#probably only feasible with useBinaryWeights
 	#note if useBinaryWeights then could more easily biologically predict the effect of adjusting Aideal of lower layer neuron k on performance of upper layer (perhaps without even trialling the adjustment)
+learningAlgorithm = "backpropApproximation6"	#calculates current layer neuron k error based on final layer error of propagating signal
+
 
 #errorStorageAlgorithm = "useAerror"	#l+1 error is stored as a linear modulation of post synaptic receptor
 #errorStorageAlgorithm = "useAideal" 	#original	#l+1 error is stored as a hypothetical difference between Atrace and Aideal [ratio]
@@ -84,7 +86,9 @@ elif(learningAlgorithm == "backpropApproximation5"):
 	errorStorageAlgorithm = "useAideal"
 	useWeightUpdateDirectionHeuristicBasedOnExcitatoryInhibitorySynapseType = True
 	useMultiplicationRatherThanAdditionOfDeltaValues = False
-	
+elif(learningAlgorithm == "backpropApproximation6"):
+	errorStorageAlgorithm = "useAerror"
+		
 
 activationFunctionType = "sigmoid"	#default
 #activationFunctionType = "softmax"	#trial only
@@ -107,6 +111,9 @@ errorFunctionTypeDeltaFinalLayer = True		#sigmoid/softmax has already been calcu
 updateOrder = "updateWeightsAfterAidealCalculations"	#method 1
 #updateOrder = "updateWeightsDuringAidealCalculations"	#method 2
 #updateOrder = "updateWeightsBeforeAidealCalculations"	#method 3
+if(learningAlgorithm == "backpropApproximation6"):
+	updateOrder = "updateWeightsDuringAidealCalculations"
+
 
 #takeAprevLayerFromTraceDuringWeightUpdates = True	#mandatory for computational purposes (normalise across batches)
 	#this parameter value should not be critical to RUANN algorithm (it is currently set based on availability of Aideal of lower layer - ie if it has been precalculated)
@@ -150,6 +157,9 @@ if(learningAlgorithm == "backpropApproximation5"):
 else:
 	subLayerIdealAlearningRateBase = 0.01	#each neuron k on l will be adjusted only by this amount (modified by its multiplication effect on Aideal of l+1)
 
+if(learningAlgorithm == "backpropApproximation6"):
+	useMultiplicationRatherThanAdditionOfDeltaValuesAideal = False
+	
 debugWexplosion = False
 debugFastTrain = False
 if(debugFastTrain):
@@ -313,15 +323,19 @@ def defineNeuralNetworkParametersCANN():
 def neuralNetworkPropagationCANN(x, networkIndex=1, recordAtrace=False):
 	pred, A, Z = neuralNetworkPropagationCANNlayer(x, lTrain=numberOfLayers, networkIndex=networkIndex)
 	return pred
-	
-def neuralNetworkPropagationCANNlayer(x, lTrain, networkIndex=1, recordAtrace=False):
+
+def neuralNetworkPropagationCANNlayer(x, lTrainMax, networkIndex=1, recordAtrace=False):
+	AprevLayer = x
+	return neuralNetworkPropagationCANNlayer(AprevLayer, lTrainMax, lTrainMin=1, networkIndex=networkIndex, recordAtrace=recordAtrace)
+		
+def neuralNetworkPropagationCANNlayer(AprevLayer, lTrainMax, lTrainMin=1, networkIndex=1, recordAtrace=False):
 			
 	AprevLayer = x
 	
 	if(recordAtrace):
 		Atrace[generateParameterNameNetwork(networkIndex, 0, "Atrace")] = AprevLayer
 	
-	for l in range(1, lTrain+1):
+	for l in range(lTrainMin, lTrain+1):
 	
 		if(debugVerboseOutput):
 			print("l = " + str(l))
@@ -395,44 +409,56 @@ def neuralNetworkPropagationCANN_expRUANNtrain(x, y, networkIndex=1):
 	if(debugOnlyTrainFinalLayer):
 		minLayerToTrain = numberOfLayers
 	else:
-		minLayerToTrain = 1	#do not calculate Aideal for input layer as this is always set to x
+		if(learningAlgorithm == "backpropApproximation6")
+			minLayerToTrain = 0
+		else:
+			minLayerToTrain = 1	#do not calculate Aideal for input layer as this is always set to x
 	
 	#1. initial propagation;
 	y_true = tf.one_hot(y, depth=datasetNumClasses)
 	pred, A, Z = neuralNetworkPropagationCANNlayer(x, numberOfLayers, networkIndex, recordAtrace=(not recalculateAtraceUnoptimisedBio))
 	
-	if(activationFunctionTypeFinalLayer == "sigmoid"):
-		y_pred = A	#A is after sigmoid
-	elif(activationFunctionTypeFinalLayer == "softmax"):	
-		y_pred = pred	#pred is after softmax
-
 	#2./3. calculate Aideal / W updates;
 	
-	calculateAerrorTopLayer(y_pred, y_true, networkIndex)			
-	calculateAerrorBottomLayer(x, minLayerToTrain, networkIndex)		
+	calculateAndSetAerrorTopLayerWrapper(A, pred, y_true, networkIndex)			
+	calculateAndSetAerrorBottomLayer(x, minLayerToTrain, networkIndex)		
 	
 	if(updateOrder == "updateWeightsAfterAidealCalculations"):
 		for l in reversed(range(minLayerToTrain, numberOfLayers)):
 			if(debugVerboseOutputTrain):
 				print("calculateAerror: l = ", l)
-			calculateAerror(l, networkIndex)	
+			calculateAndSetAerror(l, networkIndex)	
 		for l in range(minLayerToTrain, numberOfLayers+1):	#optimisation note: this can be done in parallel (weights can be updated for each layer simultaneously)
 			#print("updateWeightsBasedOnAerror: l = ", l)
 			updateWeightsBasedOnAerror(l, x, y, networkIndex)
 	elif(updateOrder == "updateWeightsDuringAidealCalculations"):
-		for l in reversed(range(minLayerToTrain, numberOfLayers+1)):	#2: do not calculate Aideal for input layer as this is always set to x
+		for l in reversed(range(minLayerToTrain, numberOfLayers+1)):
 			if(debugVerboseOutputTrain):
 				print("calculateAerror: l = ", l)
-			if(l != 1):
-				calculateAerror(l-1, networkIndex)	
+			if(l != minLayerToTrain):
+				calculateAndSetAerror(l-1, networkIndex, y)	
 			updateWeightsBasedOnAerror(l, x, y, networkIndex)
 	elif(updateOrder == "updateWeightsBeforeAidealCalculations"):
 		for l in reversed(range(minLayerToTrain, numberOfLayers+1)):
 			if(debugVerboseOutputTrain):
 				print("calculateAerror: l = ", l)
 			updateWeightsBasedOnAerror(l, x, y, networkIndex)
-			if(l != 1):
-				calculateAerror(l-1, networkIndex)
+			if(l != minLayerToTrain):
+				calculateAndSetAerror(l-1, networkIndex)
+
+
+def calculateAndSetAerrorTopLayerWrapper(y_pred, y_true, networkIndex=1):
+	AerrorVec, y_pred = calculateAerrorTopLayerWrapper(y_pred, y_true, networkIndex)
+	setAerror(AerrorVec, y_pred, numberOfLayers, networkIndex)
+
+def calculateAerrorTopLayerWrapper(y_pred, y_true, networkIndex=1):
+
+	if(activationFunctionTypeFinalLayer == "sigmoid"):
+		y_pred = A	#A is after sigmoid
+	elif(activationFunctionTypeFinalLayer == "softmax"):	
+		y_pred = pred	#pred is after softmax
+
+	return calculateAerrorTopLayer(y_pred, y_true, networkIndex)			
 
 
 def calculateAerrorTopLayer(y_pred, y_true, networkIndex=1):
@@ -463,10 +489,10 @@ def calculateAerrorTopLayer(y_pred, y_true, networkIndex=1):
 		AerrorVec = tf.reduce_mean(AerrorVec, axis=0)      #average across all batches 
 		y_pred = tf.reduce_mean(y_pred, axis=0)      #average across all batches 
 		
-	setAerror(AerrorVec, y_pred, numberOfLayers, networkIndex)
+	return AerrorVec, y_pred
 
 				
-def calculateAerrorBottomLayer(x, minLayerToTrain, networkIndex=1):
+def calculateAndSetAerrorBottomLayer(x, minLayerToTrain, networkIndex=1):
 	
 	if(averageAerrorAcrossBatch):
 		xAveraged = tf.reduce_mean(x, axis=0)      #average across all batches
@@ -480,7 +506,8 @@ def calculateAerrorBottomLayer(x, minLayerToTrain, networkIndex=1):
 			setAerrorGivenAideal(getAtraceComparison(l, networkIndex), getAtraceComparison(l, networkIndex), l, networkIndex)	#set Aideal of input layer to Atrace
 
 
-def calculateAerror(l, networkIndex=1):
+
+def calculateAndSetAerror(l, networkIndex=1, y=None):
 
 	#stocastically identify Aideal of l (lower) based on Aideal of l+1
 		#this is biologically achieved by temporarily/independently adjusting the firing rate (~bias) of each neuron (index k) on l, and seeing if this better achieves Aideal of l+1
@@ -496,6 +523,8 @@ def calculateAerror(l, networkIndex=1):
 			#try both positive and negative adjustments of A_l_k;
 			if(learningAlgorithm == "backpropApproximation2"):
 				setAerrorBackpropSemi(A, k, l, networkIndex)
+			elif(learningAlgorithm == "backpropApproximation6"):
+				setAerrorBackpropFullNetworkCalculation(A, k, l, y, networkIndex)
 			else:
 				trialAidealMod(True, A, k, l, networkIndex)
 				trialAidealMod(False, A, k, l, networkIndex)
@@ -516,6 +545,42 @@ def setAerrorBackpropSemi(A, k, l, networkIndex):
 		#AerrorLayer = tf.expand_dims(AerrorLayer, axis=0)
 	
 	setAerrorK(AerrorLayer, k, l, networkIndex)
+	
+	
+def setAerrorBackpropFullNetworkCalculation(A, k, l, y, networkIndex):
+
+	AerrorLayerFinalOrig = Aerror[generateParameterNameNetwork(networkIndex, numberOfLayers, "Aerror")]		#use Aerror from final layer
+
+	y_true = tf.one_hot(y, depth=datasetNumClasses)
+	
+	#code from trialAidealMod:
+	direction = True
+	if(direction):
+		trialAmodValue = subLayerIdealAlearningRateBase
+	else:
+		trialAmodValue = -subLayerIdealAlearningRateBase
+	columnsIdx = tf.constant([k])
+	AK = tf.gather(A, columnsIdx, axis=1)	#Atrial[:,k]	
+	AtrialK = AK
+	AtrialKdelta = calculateDeltaTF(AtrialK, trialAmodValue, useMultiplicationRatherThanAdditionOfDeltaValuesAideal)	#this integrates the fact in backpropagation Aerror should be linearly dependent on A  #* A_l	#multiply by the strength of the current layer signal
+	AtrialK = tf.add(AtrialK, AtrialKdelta)
+	Atrial = A
+	Atrial = modifyTensorRowColumn(Atrial, False, k, AtrialK, isVector=True)	#Atrial[:,k] = (trialAmodValue)
+
+	pred, Afinal, Zfinal = neuralNetworkPropagationCANNlayer(Atrial, numberOfLayers, l, networkIndex, recordAtrace=(not recalculateAtraceUnoptimisedBio))
+	AerrorLayerFinalMod, y_pred = calculateAerrorTopLayerWrapper(Afinal, pred, y_true, networkIndex)	
+	
+	AerrorLayer = tf.subtract(AerrorLayerFinalOrig, AerrorLayerFinalMod)
+	
+	#only set Aerror of neuron k
+	if(averageAerrorAcrossBatch):
+		AerrorLayer = tf.reduce_mean(AerrorLayer, axis=0)   #average across all k neurons on l+1
+	else:
+		AerrorLayer = tf.reduce_mean(AerrorLayer, axis=1)   #average across all k neurons on l+1
+		#AerrorLayer = tf.expand_dims(AerrorLayer, axis=0)
+	
+	setAerrorK(AerrorLayer, k, l, networkIndex)
+	
 	
 
 def trialAerrorMod(applyAboveLayerError, A, k, l, networkIndex):
@@ -737,10 +802,10 @@ def updateWeightsBasedOnAerror(l, x, y, networkIndex):
 		
 		W[generateParameterNameNetwork(networkIndex, l, "W")] = Wlayer
 		B[generateParameterNameNetwork(networkIndex, l, "B")] = Blayer
-	elif(learningAlgorithm == "backpropApproximation2"):
-		print("updateWeightsBasedOnAerror warning: learningAlgorithm == backpropApproximation2 has not been coded")
 	elif(learningAlgorithm == "backpropApproximation3"):
 		print("updateWeightsBasedOnAerror warning: learningAlgorithm == backpropApproximation3 has not been coded")
+	elif(learningAlgorithm == "backpropApproximation6"):
+		print("updateWeightsBasedOnAerror warning: learningAlgorithm == backpropApproximation6 has not been coded")
 	else:
 		#if(takeAprevLayerFromTraceDuringWeightUpdates):
 		if(recalculateAtraceUnoptimisedBio):

@@ -51,11 +51,10 @@ def defineTrainingParametersANN(dataset, trainMultipleFiles):
 				trainingSteps = batchSize
 			else:
 				trainingSteps = 10000	#1000
-
 	else:
 		learningRate = 0.001
 		batchSize = 100
-		numEpochs = 100 #10
+		numEpochs = 10	#100 #10
 		if(dataset == "POStagSequence"):
 			trainingSteps = 10000
 		elif(dataset == "SmallDataset"):
@@ -76,8 +75,8 @@ def defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNum
 	global numberOfLayers
 	global numberOfNetworks
 	
-	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet)
 	#numberOfLayers = defineNetworkParametersANNlegacy(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet)
+	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet)
 	
 	return numberOfLayers
 	
@@ -127,7 +126,9 @@ def defineNetworkParametersANNlegacy(num_input_neurons, num_output_neurons, data
 		else:
 			n_h = [n_h_0, n_h_1, n_h_2, n_h_3]
 		numberOfLayers = len(n_h)-1
-		
+	
+	print("defineNetworkParametersANNlegacy, n_h = ", n_h)
+	
 	return numberOfLayers
 	
 
