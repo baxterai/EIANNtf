@@ -35,8 +35,8 @@ import ANNtf2_loadDataset
 
 #algorithm = "ANN"
 #algorithm = "SANI"
-#algorithm = "CANN"
-algorithm = "FBANN"
+algorithm = "CANN"
+#algorithm = "FBANN"
 
 suppressGradientDoNotExistForVariablesWarnings = True
 

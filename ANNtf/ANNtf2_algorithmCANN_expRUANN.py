@@ -56,14 +56,14 @@ errorImplementationAlgorithm = "storeErrorAsModulationOfSignalPropagationNeurotr
 #errorImplementationAlgorithm = "storeErrorAsModulationOfUniqueNeurotransmitterReceptor"	#b) designates a specific neurotransmitter receptor to store l error, and for the calculation of l-1 error
 
 #learning algorithm variants in order of emulation similarity to formal backpropagation:
-#learningAlgorithm = "backpropApproximation1"
+learningAlgorithm = "backpropApproximation1"
 #learningAlgorithm = "backpropApproximation2"
 #learningAlgorithm = "backpropApproximation3"
 #learningAlgorithm = "backpropApproximation4"	#original proposal	#emulates backpropagation using a variety of shortcuts (with optional thresholding), but does not emulate backPropagation completely - error_l (Aideal_l) calculations are missing *error_l+1 (multiply by the strength of the higher layer error)
 #learningAlgorithm = "backpropApproximation5"	#simplifies RUANN algorithm to only consider +/- performance (not numerical/weighted performance)
 	#probably only feasible with useBinaryWeights
 	#note if useBinaryWeights then could more easily biologically predict the effect of adjusting Aideal of lower layer neuron k on performance of upper layer (perhaps without even trialling the adjustment)
-learningAlgorithm = "backpropApproximation6"	#calculates current layer neuron k error based on final layer error of propagating signal
+#learningAlgorithm = "backpropApproximation6"	#calculates current layer neuron k error based on final layer error of propagating signal
 
 
 #errorStorageAlgorithm = "useAerror"	#l+1 error is stored as a linear modulation of post synaptic receptor
@@ -321,7 +321,7 @@ def defineNeuralNetworkParametersCANN():
 	
 
 def neuralNetworkPropagationCANN(x, networkIndex=1, recordAtrace=False):
-	pred, A, Z = neuralNetworkPropagationCANNlayer(x, lTrain=numberOfLayers, networkIndex=networkIndex)
+	pred, A, Z = neuralNetworkPropagationCANNlayer(x, lTrainMax=numberOfLayers, networkIndex=networkIndex)
 	return pred
 
 def neuralNetworkPropagationCANNlayer(x, lTrainMax, networkIndex=1, recordAtrace=False):
@@ -329,13 +329,11 @@ def neuralNetworkPropagationCANNlayer(x, lTrainMax, networkIndex=1, recordAtrace
 	return neuralNetworkPropagationCANNlayer(AprevLayer, lTrainMax, lTrainMin=1, networkIndex=networkIndex, recordAtrace=recordAtrace)
 		
 def neuralNetworkPropagationCANNlayer(AprevLayer, lTrainMax, lTrainMin=1, networkIndex=1, recordAtrace=False):
-			
-	AprevLayer = x
-	
+				
 	if(recordAtrace):
 		Atrace[generateParameterNameNetwork(networkIndex, 0, "Atrace")] = AprevLayer
 	
-	for l in range(lTrainMin, lTrain+1):
+	for l in range(lTrainMin, lTrainMax+1):	#NB lTrainMax=numberOfLayers = len(n_h)-1
 	
 		if(debugVerboseOutput):
 			print("l = " + str(l))
@@ -409,7 +407,7 @@ def neuralNetworkPropagationCANN_expRUANNtrain(x, y, networkIndex=1):
 	if(debugOnlyTrainFinalLayer):
 		minLayerToTrain = numberOfLayers
 	else:
-		if(learningAlgorithm == "backpropApproximation6")
+		if(learningAlgorithm == "backpropApproximation6"):
 			minLayerToTrain = 0
 		else:
 			minLayerToTrain = 1	#do not calculate Aideal for input layer as this is always set to x
@@ -447,11 +445,11 @@ def neuralNetworkPropagationCANN_expRUANNtrain(x, y, networkIndex=1):
 				calculateAndSetAerror(l-1, networkIndex)
 
 
-def calculateAndSetAerrorTopLayerWrapper(y_pred, y_true, networkIndex=1):
-	AerrorVec, y_pred = calculateAerrorTopLayerWrapper(y_pred, y_true, networkIndex)
+def calculateAndSetAerrorTopLayerWrapper(A, pred, y_true, networkIndex=1):
+	AerrorVec, y_pred = calculateAerrorTopLayerWrapper(A, pred, y_true, networkIndex)
 	setAerror(AerrorVec, y_pred, numberOfLayers, networkIndex)
 
-def calculateAerrorTopLayerWrapper(y_pred, y_true, networkIndex=1):
+def calculateAerrorTopLayerWrapper(A, pred, y_true, networkIndex=1):
 
 	if(activationFunctionTypeFinalLayer == "sigmoid"):
 		y_pred = A	#A is after sigmoid
@@ -472,6 +470,7 @@ def calculateAerrorTopLayer(y_pred, y_true, networkIndex=1):
 			print("activationFunctionTypeFinalLayer not currently supported by RUANN = ", activationFunctionTypeFinalLayer)
 			exit()
 		AerrorAbs = loss
+		print("loss = ", loss)
 	
 		#calculate signed error:
 		AidealDelta = calculateADelta(y_true, y_pred)
