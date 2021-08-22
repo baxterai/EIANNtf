@@ -31,9 +31,12 @@ from numpy import random
 # RUANN biological implementation requirements:
 #
 # backpropagation approximation notes:
-# error_l = (W_l+1 * error_l+1) * A_l
+# error_L = (y_L - A_L) [sign reversal]
+# error_l = (W_l+1 * error_l+1) * activationFunctionPrime(z_l) {~A_l}
 # dC/dB = error_l
 # dC/dW = A_l-1 * error_l
+# Bnew = B+dC/dB [sign reversal]
+# Wnew = W+dC/dW [sign reversal]
 #
 # backpropagation error is stored in temporary firing rate modification [increase/decrease] of neurons (ie Atrace->Aideal)
 # Aerror_l update is applied based on signal pass through (W), higher level temporary firing rate adjustment, and current firing rate. error_l = (W_l+1 * error_l+1) * A_l
@@ -215,6 +218,7 @@ NETWORK_PARAM_INDEX_VARIATION_DIRECTION = 4
 
 if(not recalculateAtraceUnoptimisedBio):
 	Atrace = {}
+	Ztrace = {}
 	
 if(errorStorageAlgorithm == "useAideal"):
 	Aideal = {}
@@ -317,6 +321,7 @@ def defineNeuralNetworkParametersCANN():
 					
 			if(not recalculateAtraceUnoptimisedBio):
 				Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")] = tf.Variable(tf.zeros([batchSize, n_h[l]], dtype=tf.dtypes.float32))
+				Ztrace[generateParameterNameNetwork(networkIndex, l, "Ztrace")] = tf.Variable(tf.zeros([batchSize, n_h[l]], dtype=tf.dtypes.float32))
 
 	
 
@@ -343,6 +348,7 @@ def neuralNetworkPropagationCANNlayer(AprevLayer, lTrainMax, lTrainMin=1, networ
 
 		if(recordAtrace):
 			Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")] = A
+			Ztrace[generateParameterNameNetwork(networkIndex, l, "Ztrace")] = Z
 		
 		AprevLayer = A
 		
@@ -608,6 +614,9 @@ def setAerrorBackpropStrict(A, l, networkIndex):
 	setAerror(AerrorVec, getAtraceComparison(l, networkIndex), l, networkIndex)
 	
 def calculateAerrorBackpropStrict(A, l, networkIndex):
+
+	Z = Ztrace[generateParameterNameNetwork(networkIndex, l, "Ztrace")]	#get original Z value of current layer
+
 	AerrorAbove = Aerror[generateParameterNameNetwork(networkIndex, l+1, "Aerror")]
 	WAbove = W[generateParameterNameNetwork(networkIndex, l+1, "W")]
 	
@@ -615,12 +624,16 @@ def calculateAerrorBackpropStrict(A, l, networkIndex):
 		AerrorAbove = tf.expand_dims(AerrorAbove, axis=0)
 
 	AerrorVec = tf.matmul(AerrorAbove, tf.transpose(WAbove))	#(W_l+1 * error_l+1)	#multiply by the strength of the signal weight passthrough	#multiply by the strength of the higher layer error	
+	zPrime = activationFunctionPrime(Z)
+	#print("Z = ", Z)
+	#print("zPrime = ", zPrime)
+	AerrorVec = tf.multiply(AerrorVec, zPrime) 		#* zPrime_l	#multiply by the strength of the current layer zPrime
+	#print("AerrorVec = ", AerrorVec)
 	
 	if(averageAerrorAcrossBatch):
 		AerrorVec = tf.squeeze(AerrorVec)
 		A = tf.reduce_mean(A, axis=0)   #average across all batches
 		
-	AerrorVec = tf.multiply(AerrorVec, A) #* A_l	#multiply by the strength of the current layer signal
 	return AerrorVec
 
 
@@ -1087,5 +1100,13 @@ def getAcomparison(A):
 	if(averageAerrorAcrossBatch):
 		A = tf.reduce_mean(A, axis=0)      #average across all batches
 	return A
-	
+
+def activationFunctionPrime(z):
+	#derivative of the activation function
+	if(activationFunctionType == "relu"):
+		prime = tf.math.greater(z, 0.0)
+		prime = tf.cast(prime, tf.float32)
+	elif(activationFunctionType == "sigmoid"):
+		prime = tf.multiply(tf.nn.sigmoid(z), (tf.subtract(1.0, tf.nn.sigmoid(z))))
+	return prime
 

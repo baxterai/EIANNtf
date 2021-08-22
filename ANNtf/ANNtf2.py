@@ -38,6 +38,14 @@ import ANNtf2_loadDataset
 algorithm = "CANN"
 #algorithm = "FBANN"
 
+y_true = [[0.0, 1.]]
+y_pred = [[0.9, 1.]]
+# Using 'none' reduction type.
+mse = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
+trialLoss = mse(y_true, y_pred).numpy()
+print("trialLoss = ", trialLoss)
+			
+			
 suppressGradientDoNotExistForVariablesWarnings = True
 
 costCrossEntropyWithLogits = False
