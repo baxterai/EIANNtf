@@ -239,3 +239,33 @@ def defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datase
 	
 	return 	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses
 	
+def tileDimension(x, dimensionToTile, numberOfTiles, addDimension):
+
+	#print("x = ", x)
+	#print("dimensionToTile = ", dimensionToTile)
+	#print("numberOfTiles = ", numberOfTiles)	
+	
+	if(addDimension):
+		x = tf.expand_dims(x, dimensionToTile)
+		
+	xNumberOfDimensions = (tf.size(x.shape)).numpy()
+	#print("xNumberOfDimensions = ", xNumberOfDimensions)
+	multiplesDimension = [1] * xNumberOfDimensions
+	multiplesDimension[dimensionToTile] = numberOfTiles
+	
+	multiples = tf.constant(multiplesDimension, tf.int32)
+	xTiled = tf.tile(x, multiples)
+
+	#print("xTiled = ", xTiled)
+	
+	return xTiled
+	
+def convertFloatToBool(xFloat):
+	xInt = tf.dtypes.cast(xFloat, dtype=tf.dtypes.int32)
+	xBool = tf.dtypes.cast(xFloat, dtype=tf.dtypes.bool)
+	return xBool
+	
+def convertSignOutputToBool(xSignOutput):
+	xSignOutput = tf.maximum(xSignOutput, 0)
+	xBool = tf.dtypes.cast(xSignOutput, dtype=tf.dtypes.bool)
+	return xBool

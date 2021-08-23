@@ -145,6 +145,8 @@ def defineNeuralNetworkParametersANN():
 			W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
 			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
 
+			#print("Wlayer = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
+
 	
 def neuralNetworkPropagationANN(x, networkIndex=1):
 			

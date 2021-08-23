@@ -35,8 +35,9 @@ import ANNtf2_loadDataset
 
 #algorithm = "ANN"
 #algorithm = "SANI"
-algorithm = "CANN"
+#algorithm = "CANN"
 #algorithm = "FBANN"
+algorithm = "EIANN"
 
 y_true = [[0.0, 1.]]
 y_pred = [[0.9, 1.]]
@@ -89,7 +90,9 @@ elif(algorithm == "CANN"):
 		import ANNtf2_algorithmCANN_expRUANN as ANNtf2_algorithmCANN
 elif(algorithm == "FBANN"):
 	import ANNtf2_algorithmFBANN as ANNtf2_algorithmFBANN
-				
+elif(algorithm == "EIANN"):
+	import ANNtf2_algorithmEIANN as ANNtf2_algorithmEIANN
+					
 #learningRate, trainingSteps, batchSize, displayStep, numEpochs = -1
 
 #performance enhancements for development environment only: 
@@ -142,7 +145,11 @@ elif(algorithm == "FBANN"):
 	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 5	#default: 1
-		
+elif(algorithm == "EIANN"):
+	#dataset = "POStagSequence"
+	dataset = "SmallDataset"
+	#trainMultipleNetworks = True	#default: False
+	#numberOfNetworks = 3	#default: 1		
 	
 if(dataset == "SmallDataset"):
 	smallDatasetIndex = 0 #default: 0 (New Thyroid)
@@ -189,6 +196,8 @@ def neuralNetworkPropagation(x, networkIndex=1):
 		pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN(x, networkIndex)
 	elif(algorithm == "FBANN"):
 		pred = ANNtf2_algorithmFBANN.neuralNetworkPropagationFBANNwrapper(x, networkIndex)
+	elif(algorithm == "EIANN"):
+		pred = ANNtf2_algorithmEIANN.neuralNetworkPropagationEIANN(x, networkIndex)
 	return pred
 	
 
@@ -222,7 +231,7 @@ def executeLearningCANN_expXUANN(x, y, samplePositiveX, samplePositiveY, sampleN
 
 			
 def executeOptimisation(x, y, networkIndex=1):
-	with tf.GradientTape() as g:
+	with tf.GradientTape() as gt:
 		pred = neuralNetworkPropagation(x, networkIndex)
 		loss = crossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits)
 		
@@ -238,6 +247,8 @@ def executeOptimisation(x, y, networkIndex=1):
 				Wlist.append(ANNtf2_algorithmANN.W[generateParameterNameNetwork(networkIndex, l, "W")])
 				Blist.append(ANNtf2_algorithmANN.B[generateParameterNameNetwork(networkIndex, l, "B")])
 		trainableVariables = Wlist + Blist
+		WlistLength = len(Wlist)
+		BlistLength = len(Blist)
 	elif(algorithm == "SANI"):
 		if(algorithmSANI == "sharedModules"):
 			if(ANNtf2_algorithmSANI.useSparseTensors):
@@ -307,10 +318,60 @@ def executeOptimisation(x, y, networkIndex=1):
 	elif(algorithm == "CANN"):
 		print("executeOptimisation error: algorithm CANN not supported, use executeLearningCANN() instead")
 		exit()
-
+	elif(algorithm == "EIANN"):
+		Wlist = []
+		Blist = []
+		for l in range(1, numberOfLayers+1):
+			if(ANNtf2_algorithmEIANN.debugOnlyTrainFinalLayer):
+				if(l == numberOfLayers):
+					Wlist.append(ANNtf2_algorithmEIANN.W[generateParameterNameNetwork(networkIndex, l, "W")])
+					Blist.append(ANNtf2_algorithmEIANN.B[generateParameterNameNetwork(networkIndex, l, "B")])				
+			else:	
+				Wlist.append(ANNtf2_algorithmEIANN.W[generateParameterNameNetwork(networkIndex, l, "W")])
+				Blist.append(ANNtf2_algorithmEIANN.B[generateParameterNameNetwork(networkIndex, l, "B")])
+		trainableVariables = Wlist + Blist
+		WlistLength = len(Wlist)
+		BlistLength = len(Blist)
 		
-	gradients = g.gradient(loss, trainableVariables)
+	gradients = gt.gradient(loss, trainableVariables)
 	
+	#print("len(gradients) = ", len(gradients))
+	#print("WlistLength = ", WlistLength)
+	#print("BlistLength = ", BlistLength)
+	
+	#if(algorithm == "EIANN"):
+	#	#gradientsWdeltAList = 
+	#	#gradientsBdeltaList = 
+	#	gradientIndex = 0
+	#	for l in range(1, numberOfLayers+1):
+	#		WdeltalistGradientIndex = gradientIndex+l-1
+	#		neuronEIlayerPrevious = ANNtf2_algorithmEIANN.neuronEI[generateParameterNameNetwork(networkIndex, l-1, "neuronEI")]
+	#		Wlayer = ANNtf2_algorithmEIANN.W[generateParameterNameNetwork(networkIndex, l, "W")]
+	#		WdeltaLayer = gradients[WdeltalistGradientIndex]
+	#		WdeltaLayerAdjustment = tf.multiply(WdeltaLayer, learningRate)	#CHECKTHIS (assumes constant learning rate; no learning rate optimisation - see optimizer = tf.optimizers.SGD(learningRate))
+	#		WlayerNew = tf.subtract(Wlayer, WdeltaLayerAdjustment)
+	#		WlayerNewSign = tf.sign(WlayerNew)
+	#		WlayerNewSignBool = tf.dtypes.cast(WlayerNewSign, dtype=tf.dtypes.bool)
+	#		neuronEIlayerPreviousTiled = tileDimension(neuronEIlayerPrevious, 1, ANNtf2_algorithmEIANN.n_h[l], True)
+	#		WlayerNewSignOK = tf.equal(WlayerNewSignBool, neuronEIlayerPreviousTiled)
+	#		WlayerNewSignOK = tf.dtypes.cast(WlayerNewSignOK, dtype=tf.dtypes.float32)
+	#		WdeltaLayerMod = tf.multiply(WdeltaLayer, WlayerNewSignOK)
+	#		gradients[WdeltalistGradientIndex] = WdeltaLayerMod
+	#	gradientIndex = WlistLength
+	#	for l in range(1, numberOfLayers+1):
+	#		BdeltalistGradientIndex = gradientIndex+l-1
+	#		neuronEIlayer = ANNtf2_algorithmEIANN.neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")]
+	#		Blayer = ANNtf2_algorithmEIANN.B[generateParameterNameNetwork(networkIndex, l, "B")]
+	#		BdeltaLayer = gradients[BdeltalistGradientIndex]
+	#		BdeltaLayerAdjustment = tf.multiply(BdeltaLayer, learningRate)	#CHECKTHIS (assumes constant learning rate; no learning rate optimisation - see optimizer = tf.optimizers.SGD(learningRate))
+	#		BlayerNew = tf.subtract(Blayer, BdeltaLayerAdjustment)
+	#		BlayerNewSign = tf.sign(BlayerNew)
+	#		BlayerNewSignBool = tf.dtypes.cast(BlayerNewSign, dtype=tf.dtypes.bool)
+	#		BlayerNewSignOK = tf.equal(BlayerNewSignBool, neuronEIlayer)
+	#		BlayerNewSignOK = tf.dtypes.cast(BlayerNewSignOK, dtype=tf.dtypes.float32)
+	#		BdeltaLayerMod = tf.multiply(BdeltaLayer, BlayerNewSignOK)
+	#		gradients[BdeltalistGradientIndex] = BdeltaLayerMod
+						
 	if(suppressGradientDoNotExistForVariablesWarnings):
 		optimizer.apply_gradients([
     		(grad, var) 
@@ -320,7 +381,75 @@ def executeOptimisation(x, y, networkIndex=1):
 	else:
 		optimizer.apply_gradients(zip(gradients, trainableVariables))
 
+	if(algorithm == "EIANN"):
+		#set all W/B parameters to zero if their updated values violate the E/I neuron type condition
+		for l in range(1, numberOfLayers+1):
 
+			neuronEIlayerPrevious = ANNtf2_algorithmEIANN.neuronEI[generateParameterNameNetwork(networkIndex, l-1, "neuronEI")]
+			neuronEIlayerPreviousTiled = tileDimension(neuronEIlayerPrevious, 1, ANNtf2_algorithmEIANN.n_h[l], True)
+			neuronEI = ANNtf2_algorithmEIANN.neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")]
+
+			Wlayer = ANNtf2_algorithmEIANN.W[generateParameterNameNetwork(networkIndex, l, "W")]
+			WlayerSign = tf.sign(Wlayer)
+			WlayerSignBool = convertSignOutputToBool(WlayerSign)
+			Blayer = ANNtf2_algorithmEIANN.B[generateParameterNameNetwork(networkIndex, l, "B")]
+			BlayerSign = tf.sign(Blayer)
+			BlayerSignBool = convertSignOutputToBool(BlayerSign)
+			
+			WlayerSignCheck = tf.equal(WlayerSignBool, neuronEIlayerPreviousTiled)
+			BlayerSignCheck = tf.equal(BlayerSignBool, neuronEI)
+			
+			#ignore 0.0 values in W/B arrays:
+			WlayerSignCheck = tf.logical_or(WlayerSignCheck, tf.equal(WlayerSign, 0.0))
+			BlayerSignCheck = tf.logical_or(BlayerSignCheck, tf.equal(BlayerSign, 0.0))
+	
+			WlayerCorrected = tf.where(WlayerSignCheck, Wlayer, 0.0)
+			BlayerCorrected = tf.where(BlayerSignCheck, Blayer, 0.0)
+			#print("WlayerCorrected = ", WlayerCorrected)	   
+			#print("BlayerCorrected = ", BlayerCorrected)
+						
+			ANNtf2_algorithmEIANN.W[generateParameterNameNetwork(networkIndex, l, "W")] = WlayerCorrected
+			ANNtf2_algorithmEIANN.B[generateParameterNameNetwork(networkIndex, l, "B")] = BlayerCorrected
+
+		#excitatory/inhibitory weight verification (in accordance with neuron types):	
+		for l in range(1, numberOfLayers+1):
+
+			neuronEIlayerPrevious = ANNtf2_algorithmEIANN.neuronEI[generateParameterNameNetwork(networkIndex, l-1, "neuronEI")]
+			neuronEIlayerPreviousTiled = tileDimension(neuronEIlayerPrevious, 1, ANNtf2_algorithmEIANN.n_h[l], True)
+			neuronEI = ANNtf2_algorithmEIANN.neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")]
+
+			Wlayer = ANNtf2_algorithmEIANN.W[generateParameterNameNetwork(networkIndex, l, "W")]
+			WlayerSign = tf.sign(Wlayer)
+			WlayerSignBool = convertSignOutputToBool(WlayerSign)
+			Blayer = ANNtf2_algorithmEIANN.B[generateParameterNameNetwork(networkIndex, l, "B")]
+			BlayerSign = tf.sign(Blayer)
+			BlayerSignBool = convertSignOutputToBool(BlayerSign)
+			
+			WlayerSignCheck = tf.equal(WlayerSignBool, neuronEIlayerPreviousTiled)
+			BlayerSignCheck = tf.equal(BlayerSignBool, neuronEI)
+			
+			#ignore 0.0 values in W/B arrays:
+			WlayerSignCheck = tf.logical_or(WlayerSignCheck, tf.equal(WlayerSign, 0.0))
+			BlayerSignCheck = tf.logical_or(BlayerSignCheck, tf.equal(BlayerSign, 0.0))
+
+			WlayerSignCheck = tf.math.reduce_all(WlayerSignCheck).numpy()
+			BlayerSignCheck = tf.math.reduce_all(WlayerSignCheck).numpy()
+			
+			#print("WlayerSignCheck = ", WlayerSignCheck)	   
+			#print("BlayerSignCheck = ", BlayerSignCheck)
+			#print("Wlayer = ", Wlayer)	   
+			#print("Blayer = ", Blayer)
+					
+			if(not WlayerSignCheck):
+			   print("!WlayerSignCheck, l = ", l)
+			   print("neuronEIlayerPrevious = ", neuronEIlayerPrevious)
+			   print("Wlayer = ", Wlayer)
+			if(not BlayerSignCheck):
+			   print("!BlayerSignCheck, l = ", l)
+			   print("neuronEI = ", neuronEI)
+			   print("Blayer = ", Blayer)
+			   sdfsdffd
+						
 																
 if __name__ == "__main__":
 
@@ -377,6 +506,10 @@ if __name__ == "__main__":
 		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmFBANN.defineTrainingParametersFBANN(dataset, trainMultipleFiles)
 		numberOfLayers = ANNtf2_algorithmFBANN.defineNetworkParametersFBANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
 		ANNtf2_algorithmFBANN.defineNeuralNetworkParametersFBANN()
+	elif(algorithm == "EIANN"):
+		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmEIANN.defineTrainingParametersEIANN(dataset, trainMultipleFiles)
+		numberOfLayers = ANNtf2_algorithmEIANN.defineNetworkParametersEIANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
+		ANNtf2_algorithmEIANN.defineNeuralNetworkParametersEIANN()
 					
 	#define epochs:
 
@@ -587,7 +720,16 @@ if __name__ == "__main__":
 							acc = calculateAccuracy(pred, batchY)
 							print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
 							predNetworkAverage = predNetworkAverage + pred
-				
+					elif(algorithm == "EIANN"):
+						executeOptimisation(batchX, batchY, networkIndex)
+						if(batchIndex % displayStep == 0):
+							pred = neuralNetworkPropagation(batchX, networkIndex)
+							#print("pred.shape = ", pred.shape)
+							loss = crossEntropy(pred, batchY, datasetNumClasses, costCrossEntropyWithLogits)
+							acc = calculateAccuracy(pred, batchY)
+							print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
+							predNetworkAverage = predNetworkAverage + pred
+							
 				if(algorithm == "CANN"):
 					if(algorithmCANN == "CANN_expAUANN"):
 						#batchYactual = ANNtf2_algorithmCANN_expAUANN.generateTFYActualfromYandExemplarYCANN_expAUANN(batchY, exemplarsY)
@@ -626,7 +768,11 @@ if __name__ == "__main__":
 					pred = neuralNetworkPropagation(test_x, networkIndex)
 					print("Test Accuracy: networkIndex: %i, %f" % (networkIndex, calculateAccuracy(pred, test_y)))
 					predNetworkAverageAll = predNetworkAverageAll + pred				
-
+				elif(algorithm == "EIANN"):
+					pred = neuralNetworkPropagation(test_x, networkIndex)	#test_x batch may be too large to propagate simultaneously and require subdivision
+					print("Test Accuracy: networkIndex: %i, %f" % (networkIndex, calculateAccuracy(pred, test_y)))
+					predNetworkAverageAll = predNetworkAverageAll + pred
+			
 			if(trainMultipleNetworks):
 					predNetworkAverageAll = predNetworkAverageAll / numberOfNetworks
 					#print("predNetworkAverageAll", predNetworkAverageAll)
