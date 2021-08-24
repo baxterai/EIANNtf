@@ -89,7 +89,7 @@ def defineNeuralNetworkParametersEIANN():
 	
 	for networkIndex in range(1, numberOfNetworks+1):
 
-		for l in range(0, numberOfLayers+1):
+		for l in range(0, numberOfLayers+1):	#last layer is ignored
 			if(l == 0):	#not used
 				neuronEIint = tf.ones([n_h[l]], dtype=tf.dtypes.int32)	#first layer is always excitatory
 			else:	

@@ -13,7 +13,6 @@ see ANNtf2.py
 # Description
 
 Define fully connected relaxation update artificial neural network (CANN_expRUANN)
-[relies on sustained burst/spike of ideal A values to perform weight updates]
 
 - Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
@@ -44,6 +43,7 @@ from numpy import random
 #
 # RUANN approximates backpropagation for constrained/biological assumptions
 # Error calculations are achieved by repropagating signal through neuron and measuring either a) temporary modulation in output (Aideal) relative to original (Atrace), or b) output of a specific error storage neurotransmitter receptor
+# can rely on sustained burst/spike of ideal A values to perform weight updates
 #
 # Outstanding Biological Requirement: Need to identify a method to pass (single layer) error signal back through neuron from tip of axon to base of dendrite (internal/external signal?)
 #	the original RUANN (learningAlgorithm == "backpropApproximation3/backpropApproximation4") attempts to achieve this by sending a trial +/- signal from the lower layer l neuron k and slowly ramping it up/down (increasing/decreasing its effective error) until the above layer l+1 neurons reach their ideal values/errors  
@@ -59,15 +59,13 @@ errorImplementationAlgorithm = "storeErrorAsModulationOfSignalPropagationNeurotr
 #errorImplementationAlgorithm = "storeErrorAsModulationOfUniqueNeurotransmitterReceptor"	#b) designates a specific neurotransmitter receptor to store l error, and for the calculation of l-1 error
 
 #learning algorithm variants in order of emulation similarity to formal backpropagation:
-learningAlgorithm = "backpropApproximation1"	#strict backpropagation
-#learningAlgorithm = "backpropApproximation2"	#incomplete
-#learningAlgorithm = "backpropApproximation3"	#incomplete	
-#learningAlgorithm = "backpropApproximation4"	#incomplete	#original proposal	#emulates backpropagation using a variety of shortcuts (with optional thresholding), but does not emulate backPropagation completely - error_l (Aideal_l) calculations are missing *error_l+1 (multiply by the strength of the higher layer error)
-#learningAlgorithm = "backpropApproximation5"	#incomplete	#simplifies RUANN algorithm to only consider +/- performance (not numerical/weighted performance)
-	#probably only feasible with useBinaryWeights
-	#note if useBinaryWeights then could more easily biologically predict the effect of adjusting Aideal of lower layer neuron k on performance of upper layer (perhaps without even trialling the adjustment)
-#learningAlgorithm = "backpropApproximation6"	#incomplete	#calculates current layer neuron k error based on final layer error of propagating signal
-#learningAlgorithm = "backpropApproximation7"	#incomplete	#calculates current layer error/ideal based on above level WdeltaStore
+#learningAlgorithm = "backpropApproximation1"	#strict backpropagation (optional: use A ideal instead of A error, use activationFunctionTypeFinalLayer sigmoid rather than softmax)
+#learningAlgorithm = "backpropApproximation2"	#incomplete	#modifies the A ideal (trials +ve and -ve adjustments; adjusting firing strength), and performs weight updates based on this modified A value
+#learningAlgorithm = "backpropApproximation3"	#incomplete	#modifies the A ideal (trials +ve and -ve adjustments; adjusting firing strength), and performs weight updates based on this modified A value
+#learningAlgorithm = "backpropApproximation4"	#incomplete	#modifies the A ideal (trials +ve and -ve adjustments; adjusting firing strength), and performs weight updates based on this modified A value	#original proposal	#emulates backpropagation using a variety of shortcuts (with optional thresholding), but does not emulate backPropagation completely - error_l (Aideal_l) calculations are missing *error_l+1 (multiply by the strength of the higher layer error)
+#learningAlgorithm = "backpropApproximation5"	#incomplete	#modifies the A ideal (trials +ve and -ve adjustments; adjusting firing strength), and performs weight updates based on this modified A value	#simplifies RUANN algorithm to only consider +/- performance (not numerical/weighted performance) #probably only feasible with useBinaryWeights #note if useBinaryWeights then could more easily biologically predict the effect of adjusting Aideal of lower layer neuron k on performance of upper layer (perhaps without even trialling the adjustment)
+#learningAlgorithm = "backpropApproximation6"	#incomplete	#calculates current layer neuron k A error based on final layer error of propagating signal
+learningAlgorithm = "backpropApproximation7"	#incomplete	#calculates current layer A error/ideal based on above level WdeltaStore
 
 #errorStorageAlgorithm = "useAerror"	#l+1 error is stored as a linear modulation of post synaptic receptor
 #errorStorageAlgorithm = "useAideal" 	#original	#l+1 error is stored as a hypothetical difference between Atrace and Aideal [ratio]
@@ -93,6 +91,7 @@ elif(learningAlgorithm == "backpropApproximation6"):
 	errorStorageAlgorithm = "useAerror"
 elif(learningAlgorithm == "backpropApproximation7"):
 	errorStorageAlgorithm = "useAideal"	#"useAerror"	#optional
+	#averageAerrorAcrossBatch = True		#require inverse matrix multiplication operations (their batchSize dimension must equal 1)
 
 activationFunctionType = "sigmoid"	#default
 #activationFunctionType = "softmax"	#trial only
@@ -175,11 +174,15 @@ else:
 
 
 useBatch = True
+
+if(learningAlgorithm == "backpropApproximation7"):
+	useBatch = False	#require inverse matrix multiplication operations (their batchSize dimension must equal 1)	#or use averageAerrorAcrossBatch instead
+	
 if(useBatch):
 	if(debugFastTrain):
 		batchSize = 1000
 	else:
-		batchSize = 100	#100
+		batchSize = 10	#100
 else:
 	batchSize = 1	
 
@@ -545,6 +548,93 @@ def calculateAndSetAerror(l, networkIndex=1, y=None):
 				trialAidealMod(True, A, k, l, networkIndex)
 				trialAidealMod(False, A, k, l, networkIndex)
 
+def setAerrorBackpropStrict(A, l, networkIndex):
+	AerrorVec = calculateAerrorBackpropStrict(A, l, networkIndex)
+	setAerror(AerrorVec, getAtraceComparison(l, networkIndex), l, networkIndex)
+	
+def calculateAerrorBackpropStrict(A, l, networkIndex):
+
+	Z = Ztrace[generateParameterNameNetwork(networkIndex, l, "Ztrace")]	#get original Z value of current layer
+
+	AerrorAbove =  getAerror(l+1, networkIndex)
+	WAbove = W[generateParameterNameNetwork(networkIndex, l+1, "W")]
+	
+	if(averageAerrorAcrossBatch):
+		AerrorAbove = tf.expand_dims(AerrorAbove, axis=0)
+
+	AerrorVec = tf.matmul(AerrorAbove, tf.transpose(WAbove))	#(W_l+1 * error_l+1)	#multiply by the strength of the signal weight passthrough	#multiply by the strength of the higher layer error	
+	zPrime = activationFunctionPrime(Z)
+	AerrorVec = tf.multiply(AerrorVec, zPrime) 		#. zPrime_l	#multiply by the strength of the current layer zPrime
+	#print("Z = ", Z)
+	#print("zPrime = ", zPrime)
+	#print("AerrorVec = ", AerrorVec)
+	
+	if(averageAerrorAcrossBatch):
+		AerrorVec = tf.squeeze(AerrorVec)
+		A = tf.reduce_mean(A, axis=0)   #average across all batches
+		
+	return AerrorVec
+
+def setAerrorFromOutgoingWeightAdjustments(A, l, networkIndex):
+	AerrorVec = calculateAerrorFromOutgoingWeightAdjustments(A, l, networkIndex)
+	setAerror(AerrorVec, getAtraceComparison(l, networkIndex), l, networkIndex)
+
+def calculateAerrorFromOutgoingWeightAdjustments(A, l, networkIndex):
+
+	# backpropagation approximation notes:
+	# error_L = (y_L - A_L) [sign reversal]
+	# error_l = (W_l+1 * error_l+1) . activationFunctionPrime(z_l) {~A_l}
+	# dC/dB = error_l
+	# dC/dW = A_l-1 * error_l
+	# Bnew = B+dC/dB [sign reversal]
+	# Wnew = W+dC/dW [sign reversal]
+
+	Z = Ztrace[generateParameterNameNetwork(networkIndex, l, "Ztrace")]	#get original Z value of current layer
+
+	WdeltaAbove = WdeltaStore[generateParameterNameNetwork(networkIndex, l+1, "WdeltaStore")]
+	WAbove = W[generateParameterNameNetwork(networkIndex, l+1, "W")]
+	
+	#extract AerrorAbove from weights;
+	
+	#inverse matrix multiplication with batchSize = 1;
+	A = getAcomparison(A)
+	A = tf.squeeze(A)	#required when averageAerrorAcrossBatch=False but batchSize=1
+	WdeltaAboveRow1 = WdeltaAbove[0, :]
+	Arow1 = A[0]
+	AerrorAbove = tf.divide(WdeltaAboveRow1, Arow1)
+	AerrorAbove = tf.expand_dims(AerrorAbove, 0)
+	#print("WdeltaAbove = ", WdeltaAbove)
+	#print("A = ", A)		
+	#print("WdeltaAboveRow1 = ", WdeltaAboveRow1)
+	#print("Arow1 = ", Arow1)
+	#print("AerrorAbove = ", AerrorAbove)
+	
+	#inverse matrix multiplication not possible with batchSize > 1;
+	#Ainverse = tf.math.inverse(A)
+	#AerrorAbove = tf.matmul(Ainverse, WdeltaAbove)		#NO: dC/dW = A_l-1 * error_l, therefore error_l = inverse(A) * dC/dW
+		#if A is a vector then inversion possible
+	#print("Ainverse.shape = ", Ainverse.shape)
+	#print("WdeltaAbove = ", WdeltaAbove)
+	#print("AerrorAbove = ", AerrorAbove)
+
+	#strict backprop for debug only;
+	#AerrorAbove = getAerror(l+1, networkIndex)
+	#if(averageAerrorAcrossBatch):
+	#	AerrorAbove = tf.expand_dims(AerrorAbove, axis=0)
+	#print("AerrorAbove = ", AerrorAbove)
+	
+	AerrorVec = tf.matmul(AerrorAbove, tf.transpose(WAbove))	#(W_l+1 * error_l+1)	#multiply by the strength of the signal weight passthrough	#multiply by the strength of the higher layer error	
+	zPrime = activationFunctionPrime(Z)
+	if(averageAerrorAcrossBatch):
+		zPrime = tf.reduce_mean(zPrime, axis=0)   #average across all  batches
+	AerrorVec = tf.multiply(AerrorVec, zPrime) 		#. zPrime_l	#multiply by the strength of the current layer zPrime
+
+
+	if(averageAerrorAcrossBatch):
+		AerrorVec = tf.squeeze(AerrorVec)
+
+	return AerrorVec
+	
 def setAerrorBackpropSemi(A, k, l, networkIndex):
 
 	#error_l = (W_l+1 * error_l+1) * A_l = (A_l*W_l+1) * Aideal_l+1 - (A_l*W_l+1) * Atrace_l+1 
@@ -561,35 +651,6 @@ def setAerrorBackpropSemi(A, k, l, networkIndex):
 		#AerrorLayer = tf.expand_dims(AerrorLayer, axis=0)
 	
 	setAerrorK(AerrorLayer, k, l, networkIndex)
-	
-	
-def setAerrorFromOutgoingWeightAdjustments(A, l, networkIndex):
-	AerrorVec = calculateAerrorFromOutgoingWeightAdjustments(A, l, networkIndex)
-	setAerror(AerrorVec, getAtraceComparison(l, networkIndex), l, networkIndex)
-
-def calculateAerrorFromOutgoingWeightAdjustments(A, l, networkIndex):
-
-	WdeltaAbove = WdeltaStore[generateParameterNameNetwork(networkIndex, l+1, "WdeltaStore")]
-	WAbove = W[generateParameterNameNetwork(networkIndex, l+1, "W")]
-	Z = Ztrace[generateParameterNameNetwork(networkIndex, l, "Ztrace")]
-	
-	#extract AerrorAbove from weights:	
-	Areciprocal = tf.math.reciprocal(A)
-	#print("Areciprocal.shape = ", Areciprocal.shape)
-	print("WdeltaAbove = ", WdeltaAbove)
-
-	AerrorAbove = tf.matmul(Areciprocal, WdeltaAbove)		#dC/dW = A_l-1 * error_l, therefore error_l = 1/A * dC/dW
-	#print("AerrorAbove.shape = ", AerrorAbove.shape)
-	
-	AerrorVec = tf.matmul(AerrorAbove, tf.transpose(WAbove))	#(W_l+1 * error_l+1)	#multiply by the strength of the signal weight passthrough	#multiply by the strength of the higher layer error	
-	zPrime = activationFunctionPrime(Z)
-	AerrorVec = tf.multiply(AerrorVec, zPrime) 		#. zPrime_l	#multiply by the strength of the current layer zPrime
-	
-	if(averageAerrorAcrossBatch):
-		AerrorVec = tf.squeeze(AerrorVec)
-		A = tf.reduce_mean(A, axis=0)   #average across all batches
-
-	return AerrorVec
 	
 	
 def setAerrorBackpropFullNetworkCalculation(A, k, l, y, networkIndex):
@@ -648,34 +709,6 @@ def trialAerrorMod(applyAboveLayerError, A, k, l, networkIndex):
 		AerrorLayer = ZtrialAbove
 		
 	return AerrorLayer
-
-def setAerrorBackpropStrict(A, l, networkIndex):
-	AerrorVec = calculateAerrorBackpropStrict(A, l, networkIndex)
-	setAerror(AerrorVec, getAtraceComparison(l, networkIndex), l, networkIndex)
-	
-def calculateAerrorBackpropStrict(A, l, networkIndex):
-
-	Z = Ztrace[generateParameterNameNetwork(networkIndex, l, "Ztrace")]	#get original Z value of current layer
-
-	AerrorAbove =  getAerror(l+1, networkIndex)
-	WAbove = W[generateParameterNameNetwork(networkIndex, l+1, "W")]
-	
-	if(averageAerrorAcrossBatch):
-		AerrorAbove = tf.expand_dims(AerrorAbove, axis=0)
-
-	AerrorVec = tf.matmul(AerrorAbove, tf.transpose(WAbove))	#(W_l+1 * error_l+1)	#multiply by the strength of the signal weight passthrough	#multiply by the strength of the higher layer error	
-	zPrime = activationFunctionPrime(Z)
-	#print("Z = ", Z)
-	#print("zPrime = ", zPrime)
-	AerrorVec = tf.multiply(AerrorVec, zPrime) 		#. zPrime_l	#multiply by the strength of the current layer zPrime
-	#print("AerrorVec = ", AerrorVec)
-	
-	if(averageAerrorAcrossBatch):
-		AerrorVec = tf.squeeze(AerrorVec)
-		A = tf.reduce_mean(A, axis=0)   #average across all batches
-		
-	return AerrorVec
-
 
 def trialAidealMod(direction, A, k, l, networkIndex):
 
@@ -1123,6 +1156,7 @@ def setAerror(AerrorLayer, AtraceLayer, l, networkIndex=1):
 	if(errorStorageAlgorithm == "useAideal"):
 		#print("setAerror, AtraceLayer.shape = ", AtraceLayer.shape)
 		#print("setAerror, AerrorLayer.shape = ", AerrorLayer.shape)
+		AtraceLayer = getAcomparison(AtraceLayer)
 		Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")] = tf.add(AtraceLayer, AerrorLayer)
 	elif(errorStorageAlgorithm == "useAerror"):
 		#print("setAerror, AerrorLayer.shape = ", AerrorLayer.shape)
@@ -1135,12 +1169,14 @@ def setAerrorGivenAideal(AidealLayer, AtraceLayer, l, networkIndex=1):
 	elif(errorStorageAlgorithm == "useAerror"):
 		#print("setAerrorGivenAideal, AidealLayer.shape = ", AidealLayer.shape)
 		#print("setAerrorGivenAideal, AtraceLayer.shape = ", AtraceLayer.shape)
+		AtraceLayer = getAcomparison(AtraceLayer)
 		Aerror[generateParameterNameNetwork(networkIndex, l, "Aerror")] = tf.subtract(AidealLayer, AtraceLayer)
 
 def getAerror(l, networkIndex=1):
 	if(errorStorageAlgorithm == "useAideal"):
 		AidealLayer = Aideal[generateParameterNameNetwork(networkIndex, l, "Aideal")]
 		AtraceLayer = Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")]
+		AtraceLayer = getAcomparison(AtraceLayer)
 		AerrorLayer = tf.subtract(AidealLayer, AtraceLayer)
 	elif(errorStorageAlgorithm == "useAerror"):
 		AerrorLayer = Aerror[generateParameterNameNetwork(networkIndex, l, "Aerror")]

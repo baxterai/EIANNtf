@@ -12,7 +12,7 @@ python3 ANNtf2.py
 
 # Description
 
-Train an artificial neural network (ANN or SANI or CANN)
+Train an artificial neural network (ANN/SANI/CANN/FBANN/EIANN)
 
 - Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
@@ -35,9 +35,9 @@ import ANNtf2_loadDataset
 
 #algorithm = "ANN"
 #algorithm = "SANI"
-#algorithm = "CANN"
+algorithm = "CANN"
 #algorithm = "FBANN"
-algorithm = "EIANN"
+#algorithm = "EIANN"
 
 y_true = [[0.0, 1.]]
 y_pred = [[0.9, 1.]]
@@ -409,7 +409,8 @@ def executeOptimisation(x, y, networkIndex=1):
 			#print("BlayerCorrected = ", BlayerCorrected)
 						
 			ANNtf2_algorithmEIANN.W[generateParameterNameNetwork(networkIndex, l, "W")] = WlayerCorrected
-			ANNtf2_algorithmEIANN.B[generateParameterNameNetwork(networkIndex, l, "B")] = BlayerCorrected
+			if(l < numberOfLayers):
+				ANNtf2_algorithmEIANN.B[generateParameterNameNetwork(networkIndex, l, "B")] = BlayerCorrected
 
 		#excitatory/inhibitory weight verification (in accordance with neuron types):	
 		for l in range(1, numberOfLayers+1):
@@ -448,7 +449,6 @@ def executeOptimisation(x, y, networkIndex=1):
 			   print("!BlayerSignCheck, l = ", l)
 			   print("neuronEI = ", neuronEI)
 			   print("Blayer = ", Blayer)
-			   sdfsdffd
 						
 																
 if __name__ == "__main__":
