@@ -54,7 +54,7 @@ else:
 	networkDivergenceType = "linearConverging"
 	#networkDivergenceType = "linearDivergingThenConverging"	#not yet coded
 	
-	
+		
 def generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, arrayName):
 	parameterName = "n" + str(networkIndex) + "l1" + str(l1) + "l2" + str(l2) + arrayName
 	return parameterName
@@ -62,14 +62,25 @@ def generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, arrayName):
 def generateParameterNameNetwork(networkIndex, l, arrayName):
 	parameterName = "n" + str(networkIndex) + "l" + str(l) + arrayName
 	return parameterName
+
+	
+def generateParameterNameSeqSkipLayers(l1, l2, s, arrayName):
+	parameterName = "l1" + str(l1) + "l2" + str(l2) + arrayName + "s" + str(s)
+	return parameterName
 	
 def generateParameterNameSeq(l, s, arrayName):
 	parameterName = "l" + str(l) + arrayName + "s" + str(s)
 	return parameterName
 	
+	
+def generateParameterNameSkipLayers(l1, l2, arrayName):
+	parameterName = "l1" + str(l1) + "l2" + str(l2) + arrayName
+	return parameterName
+	
 def generateParameterName(l, arrayName):
 	parameterName = "l" + str(l) + arrayName
 	return parameterName
+	
 	
 def printShape(tensor, tensorName):
 	print(tensorName + ".shape = ")

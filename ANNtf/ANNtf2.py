@@ -12,7 +12,7 @@ python3 ANNtf2.py
 
 # Description
 
-Train an artificial neural network (ANN/SANI/CANN/FBANN/EIANN)
+Train an artificial neural network (ANN/SANI/LREANN/FBANN/EIANN)
 
 - Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
@@ -32,62 +32,57 @@ from ANNtf2_operations import *
 import ANNtf2_globalDefs
 from numpy import random
 import ANNtf2_loadDataset
+from ANNtf2_algorithmSANIglobalDefs import algorithmSANI
 
-#algorithm = "ANN"
-#algorithm = "SANI"
-algorithm = "CANN"
-#algorithm = "FBANN"
-#algorithm = "EIANN"
+#algorithm = "ANN"	#standard artificial neural network (backprop)
+algorithm = "SANI"	#sequentially activated neuronal input artificial neural network
+#algorithm = "LREANN"	#learning rule experiment artificial neural network
+#algorithm = "FBANN"	#feedback artificial neural network (reverse connectivity)
+#algorithm = "EIANN"	#excitatory/inhibitory artificial neural network
 
-y_true = [[0.0, 1.]]
-y_pred = [[0.9, 1.]]
-# Using 'none' reduction type.
-mse = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
-trialLoss = mse(y_true, y_pred).numpy()
-print("trialLoss = ", trialLoss)
-			
-			
+
 suppressGradientDoNotExistForVariablesWarnings = True
 
 costCrossEntropyWithLogits = False
 if(algorithm == "ANN"):
 	import ANNtf2_algorithmANN
 elif(algorithm == "SANI"):
-	algorithmSANI = "sharedModulesBinary"
-	#algorithmSANI = "sharedModules"
-	#algorithmSANI = "repeatedModules"
-	if(algorithmSANI == "repeatedModules"):
-		import ANNtf2_algorithmSANIrepeatedModules as ANNtf2_algorithmSANI
+	#set algorithmSANI in ANNtf2_algorithmSANIoperations
+	if(algorithmSANI == "sharedModulesHebbian"):
+		import ANNtf2_algorithmSANIsharedModulesHebbian as ANNtf2_algorithmSANI
+		#no cost function used
+	elif(algorithmSANI == "sharedModulesBinary"):
+		import ANNtf2_algorithmSANIsharedModulesBinary as ANNtf2_algorithmSANI
 	elif(algorithmSANI == "sharedModules"):
 		import ANNtf2_algorithmSANIsharedModules as ANNtf2_algorithmSANI
 		costCrossEntropyWithLogits = True
-	elif(algorithmSANI == "sharedModulesBinary"):
-		import ANNtf2_algorithmSANIsharedModulesBinary as ANNtf2_algorithmSANI
-elif(algorithm == "CANN"):
-	#algorithmCANN = "CANN_expHUANN"
-	#algorithmCANN = "CANN_expSUANN"
-	#algorithmCANN = "CANN_expAUANN"
-	#algorithmCANN = "CANN_expCUANN"
-	#algorithmCANN = "CANN_expXUANN"
-	#algorithmCANN = "CANN_expMUANN"
-	algorithmCANN = "CANN_expRUANN"
-	if(algorithmCANN == "CANN_expHUANN"):
-		import ANNtf2_algorithmCANN_expHUANN as ANNtf2_algorithmCANN
-	elif(algorithmCANN == "CANN_expSUANN"):
-		import ANNtf2_algorithmCANN_expSUANN as ANNtf2_algorithmCANN
-	elif(algorithmCANN == "CANN_expAUANN"):
-		import ANNtf2_algorithmCANN_expAUANN as ANNtf2_algorithmCANN
-	elif(algorithmCANN == "CANN_expCUANN"):
-		import ANNtf2_algorithmCANN_expCUANN as ANNtf2_algorithmCANN
-	elif(algorithmCANN == "CANN_expXUANN"):
+	elif(algorithmSANI == "repeatedModules"):
+		import ANNtf2_algorithmSANIrepeatedModules as ANNtf2_algorithmSANI
+elif(algorithm == "LREANN"):
+	#algorithmLREANN = "LREANN_expHUANN"
+	#algorithmLREANN = "LREANN_expSUANN"
+	#algorithmLREANN = "LREANN_expAUANN"
+	#algorithmLREANN = "LREANN_expCUANN"
+	#algorithmLREANN = "LREANN_expXUANN"
+	#algorithmLREANN = "LREANN_expMUANN"
+	algorithmLREANN = "LREANN_expRUANN"
+	if(algorithmLREANN == "LREANN_expHUANN"):
+		import ANNtf2_algorithmLREANN_expHUANN as ANNtf2_algorithmLREANN
+	elif(algorithmLREANN == "LREANN_expSUANN"):
+		import ANNtf2_algorithmLREANN_expSUANN as ANNtf2_algorithmLREANN
+	elif(algorithmLREANN == "LREANN_expAUANN"):
+		import ANNtf2_algorithmLREANN_expAUANN as ANNtf2_algorithmLREANN
+	elif(algorithmLREANN == "LREANN_expCUANN"):
+		import ANNtf2_algorithmLREANN_expCUANN as ANNtf2_algorithmLREANN
+	elif(algorithmLREANN == "LREANN_expXUANN"):
 		XUANNnegativeSamplesComplement = False	#default: True
 		XUANNnegativeSamplesAll = False	#default: False #orig implementation
 		XUANNnegativeSamplesRandom = True	#default: False 
-		import ANNtf2_algorithmCANN_expXUANN as ANNtf2_algorithmCANN
-	elif(algorithmCANN == "CANN_expMUANN"):
-		import ANNtf2_algorithmCANN_expMUANN as ANNtf2_algorithmCANN		
-	elif(algorithmCANN == "CANN_expRUANN"):
-		import ANNtf2_algorithmCANN_expRUANN as ANNtf2_algorithmCANN
+		import ANNtf2_algorithmLREANN_expXUANN as ANNtf2_algorithmLREANN
+	elif(algorithmLREANN == "LREANN_expMUANN"):
+		import ANNtf2_algorithmLREANN_expMUANN as ANNtf2_algorithmLREANN		
+	elif(algorithmLREANN == "LREANN_expRUANN"):
+		import ANNtf2_algorithmLREANN_expRUANN as ANNtf2_algorithmLREANN
 elif(algorithm == "FBANN"):
 	import ANNtf2_algorithmFBANN as ANNtf2_algorithmFBANN
 elif(algorithm == "EIANN"):
@@ -111,30 +106,44 @@ else:
 #if generatePOSunambiguousInput=False and onlyAddPOSunambiguousInputToTrain=False, requires simultaneous propagation of different (ambiguous) POS possibilities
 
 if(algorithm == "SANI"):
-	if(algorithmSANI == "repeatedModules"):
-		dataset = "POStagSequence"
-	elif(algorithmSANI == "sharedModules"):
-		dataset = "POStagSentence"
-		numberOfFeaturesPerWord = -1
-		paddingTagIndex = -1
-		if(ANNtf2_algorithmSANI.allowMultipleContributingSubinputsPerSequentialInput):
+	if(ANNtf2_algorithmSANI.algorithmSANI == "sharedModulesHebbian"):
+		if(ANNtf2_algorithmSANI.SANIsharedModules):
+			dataset = "POStagSentence"
+			numberOfFeaturesPerWord = -1
+			paddingTagIndex = -1
 			generatePOSunambiguousInput = False
-			onlyAddPOSunambiguousInputToTrain = False
+			onlyAddPOSunambiguousInputToTrain = False	#True
 		else:
+			print("!ANNtf2_algorithmSANI.SANIsharedModules")
+			dataset = "POStagSequence"
+	elif(ANNtf2_algorithmSANI.algorithmSANI == "sharedModulesBinary"):
+		if(ANNtf2_algorithmSANI.SANIsharedModules):	#only implementation
+			print("sharedModulesBinary")
+			dataset = "POStagSentence"
+			numberOfFeaturesPerWord = -1
+			paddingTagIndex = -1	
 			generatePOSunambiguousInput = False
-			onlyAddPOSunambiguousInputToTrain = True
-	elif(algorithmSANI == "sharedModulesBinary"):
-		dataset = "POStagSentence"
-		numberOfFeaturesPerWord = -1
-		paddingTagIndex = -1	
-		generatePOSunambiguousInput = False
-		onlyAddPOSunambiguousInputToTrain = False	#True
+			onlyAddPOSunambiguousInputToTrain = False	#True
+	elif(ANNtf2_algorithmSANI.algorithmSANI == "sharedModules"):
+		if(ANNtf2_algorithmSANI.SANIsharedModules):	#only implementation
+			dataset = "POStagSentence"
+			numberOfFeaturesPerWord = -1
+			paddingTagIndex = -1
+			if(ANNtf2_algorithmSANI.allowMultipleContributingSubinputsPerSequentialInput):
+				generatePOSunambiguousInput = False
+				onlyAddPOSunambiguousInputToTrain = False
+			else:
+				generatePOSunambiguousInput = False
+				onlyAddPOSunambiguousInputToTrain = True
+	elif(ANNtf2_algorithmSANI.algorithmSANI == "repeatedModules"):
+		if(not ANNtf2_algorithmSANI.SANIsharedModules):	#only implementation
+			dataset = "POStagSequence"
 elif(algorithm == "ANN"):
 	#dataset = "POStagSequence"
 	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 3	#default: 1
-elif(algorithm == "CANN"):
+elif(algorithm == "LREANN"):
 	#dataset = "POStagSequence"
 	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
@@ -168,17 +177,19 @@ if(dataset == "SmallDataset"):
 	(9, "Wheat Seeds Dataset", "seeds_datasetFormatted.txt", False),
 	(10, "Boston House Price Dataset", "UNAVAILABLE", False)	#housingFormatted.data BAD
 	]
-	datasetFileName = smallDatasetDefinitions[smallDatasetIndex][smallDatasetDefinitionsHeader['fileName']]
+	dataset2FileName = smallDatasetDefinitions[smallDatasetIndex][smallDatasetDefinitionsHeader['fileName']]
 	datasetClassColumnFirst = smallDatasetDefinitions[smallDatasetIndex][smallDatasetDefinitionsHeader['classColumnFirst']]
-	print("datasetFileName = ", datasetFileName)
+	print("dataset2FileName = ", dataset2FileName)
 	print("datasetClassColumnFirst = ", datasetClassColumnFirst)
 			
 if(debugUseSmallPOStagSequenceDataset):
-	datasetFileNameXstart = "XdatasetPartSmall"
-	datasetFileNameYstart = "YdatasetPartSmall"
+	dataset1FileNameXstart = "Xdataset1PartSmall"
+	dataset1FileNameYstart = "Ydataset1PartSmall"
+	dataset3FileNameXstart = "Xdataset3PartSmall"
 else:
-	datasetFileNameXstart = "XdatasetPart"
-	datasetFileNameYstart = "YdatasetPart"
+	dataset1FileNameXstart = "Xdataset1Part"
+	dataset1FileNameYstart = "Ydataset1Part"
+	dataset3FileNameXstart = "Xdataset3Part"
 datasetFileNameXend = ".dat"
 datasetFileNameYend = ".dat"
 datasetFileNameStart = "datasetPart"
@@ -192,8 +203,8 @@ def neuralNetworkPropagation(x, networkIndex=1):
 		pred = ANNtf2_algorithmSANI.neuralNetworkPropagationSANI(x)
 	elif(algorithm == "ANN"):
 		pred = ANNtf2_algorithmANN.neuralNetworkPropagationANN(x, networkIndex)
-	elif(algorithm == "CANN"):
-		pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN(x, networkIndex)
+	elif(algorithm == "LREANN"):
+		pred = ANNtf2_algorithmLREANN.neuralNetworkPropagationLREANN(x, networkIndex)
 	elif(algorithm == "FBANN"):
 		pred = ANNtf2_algorithmFBANN.neuralNetworkPropagationFBANNwrapper(x, networkIndex)
 	elif(algorithm == "EIANN"):
@@ -201,32 +212,32 @@ def neuralNetworkPropagation(x, networkIndex=1):
 	return pred
 	
 
-#algorithm CANN:
-def executeLearningCANN(x, y, networkIndex=1):
-	if(algorithmCANN == "CANN_expHUANN"):
+#algorithm LREANN:
+def executeLearningLREANN(x, y, networkIndex=1):
+	if(algorithmLREANN == "LREANN_expHUANN"):
 		#learning algorithm embedded in forward propagation
 		if(trainHebbianBackprop):
-			pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expHUANNtrain(x, y, networkIndex, trainHebbianBackprop=True, trainHebbianLastLayerSupervision=True)
+			pred = ANNtf2_algorithmLREANN.neuralNetworkPropagationLREANN_expHUANNtrain(x, y, networkIndex, trainHebbianBackprop=True, trainHebbianLastLayerSupervision=True)
 		else:
-			pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expHUANNtrain(x, y, networkIndex, trainHebbianForwardprop=True, trainHebbianLastLayerSupervision=True)
-	elif(algorithmCANN == "CANN_expSUANN"):
+			pred = ANNtf2_algorithmLREANN.neuralNetworkPropagationLREANN_expHUANNtrain(x, y, networkIndex, trainHebbianForwardprop=True, trainHebbianLastLayerSupervision=True)
+	elif(algorithmLREANN == "LREANN_expSUANN"):
 		#learning algorithm embedded in multiple iterations of forward propagation
-		pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expSUANNtrain(x, y, networkIndex)
-	elif(algorithmCANN == "CANN_expCUANN"):
+		pred = ANNtf2_algorithmLREANN.neuralNetworkPropagationLREANN_expSUANNtrain(x, y, networkIndex)
+	elif(algorithmLREANN == "LREANN_expCUANN"):
 		#learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
-		pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expCUANNtrain(x, y, networkIndex)
-	elif(algorithmCANN == "CANN_expMUANN"):
+		pred = ANNtf2_algorithmLREANN.neuralNetworkPropagationLREANN_expCUANNtrain(x, y, networkIndex)
+	elif(algorithmLREANN == "LREANN_expMUANN"):
 		#learning algorithm embedded in multiple forward propagation and synaptic delta calculations
-		pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expMUANNtrain(x, y, networkIndex)
-	elif(algorithmCANN == "CANN_expRUANN"):
+		pred = ANNtf2_algorithmLREANN.neuralNetworkPropagationLREANN_expMUANNtrain(x, y, networkIndex)
+	elif(algorithmLREANN == "LREANN_expRUANN"):
 		#learning algorithm: in reverse order, stocastically establishing Aideal of each layer (by temporarily biasing firing rate of neurons) to better achieve Aideal of higher layer (through multiple local/single layer forward propagations), then (simultaneous/parallel layer processing) stocastically adjusting weights to fine tune towards Aideal of their higher layers
-		pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expRUANNtrain(x, y, networkIndex)
-def executeLearningCANN_expAUANN(x, y, exemplarsX, exemplarsY, currentClassTarget, networkIndex=1):
+		pred = ANNtf2_algorithmLREANN.neuralNetworkPropagationLREANN_expRUANNtrain(x, y, networkIndex)
+def executeLearningLREANN_expAUANN(x, y, exemplarsX, exemplarsY, currentClassTarget, networkIndex=1):
 	#learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
-	pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expAUANNtrain(x, y, exemplarsX, exemplarsY, currentClassTarget, networkIndex)
-def executeLearningCANN_expXUANN(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex):
+	pred = ANNtf2_algorithmLREANN.neuralNetworkPropagationLREANN_expAUANNtrain(x, y, exemplarsX, exemplarsY, currentClassTarget, networkIndex)
+def executeLearningLREANN_expXUANN(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex):
 	#learning algorithm: perform contrast training (diff of interclass experience with current experience, and diff of extraclass experience with current experience) at each layer of network
-	pred = ANNtf2_algorithmCANN.neuralNetworkPropagationCANN_expXUANNtrain(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex)
+	pred = ANNtf2_algorithmLREANN.neuralNetworkPropagationLREANN_expXUANNtrain(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex)
 
 
 			
@@ -250,45 +261,8 @@ def executeOptimisation(x, y, networkIndex=1):
 		WlistLength = len(Wlist)
 		BlistLength = len(Blist)
 	elif(algorithm == "SANI"):
-		if(algorithmSANI == "sharedModules"):
-			if(ANNtf2_algorithmSANI.useSparseTensors):
-				if(ANNtf2_algorithmSANI.performSummationOfSubInputsWeighted):
-					if(ANNtf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
-						trainableVariables = list(ANNtf2_algorithmSANI.W.values()) + list(ANNtf2_algorithmSANI.Wseq.values())	#+ list(ANNtf2_algorithmSANI.B.values()) 
-					else:
-						trainableVariables = list(ANNtf2_algorithmSANI.Wseq.values())
-				else:
-					if(ANNtf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
-						trainableVariables = list(ANNtf2_algorithmSANI.W.values()) #+ list(ANNtf2_algorithmSANI.B.values())
-					else:
-						trainableVariables = list()	
-			else:
-				if(ANNtf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
-					trainableVariables = list(ANNtf2_algorithmSANI.W.values()) + list(ANNtf2_algorithmSANI.Wseq.values()) + list(ANNtf2_algorithmSANI.Bseq.values())	#+ list(ANNtf2_algorithmSANI.B.values()) 
-				else:
-					trainableVariables = list(ANNtf2_algorithmSANI.Wseq.values()) + list(ANNtf2_algorithmSANI.Bseq.values())
-					#trainableVariables = list(ANNtf2_algorithmSANI.Wseq.values())		
-		elif(algorithmSANI == "repeatedModules"):
-			if(ANNtf2_algorithmSANI.allowMultipleSubinputsPerSequentialInput):
-				if(ANNtf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
-					if(ANNtf2_algorithmSANI.performSummationOfSubInputsWeighted):
-						trainableVariables = list(ANNtf2_algorithmSANI.W.values()) + list(ANNtf2_algorithmSANI.Wseq.values())
-						#trainableVariables = list(ANNtf2_algorithmSANI.W.values()) + list(ANNtf2_algorithmSANI.B.values()) + list(ANNtf2_algorithmSANI.Wseq.values()) + list(ANNtf2_algorithmSANI.Bseq.values())
-					else:
-						trainableVariables = list(ANNtf2_algorithmSANI.W.values())
-						#trainableVariables = list(ANNtf2_algorithmSANI.W.values()) + list(ANNtf2_algorithmSANI.B.values())
-				else:
-					if(ANNtf2_algorithmSANI.performSummationOfSubInputsWeighted):
-						trainableVariables = list(ANNtf2_algorithmSANI.Wseq.values())
-						#trainableVariables = list(ANNtf2_algorithmSANI.Wseq.values()) + list(ANNtf2_algorithmSANI.Bseq.values())
-					else:
-						print("error: allowMultipleSubinputsPerSequentialInput && !performSummationOfSequentialInputsWeighted && !performSummationOfSubInputsWeighted")
-			else:
-				if(ANNtf2_algorithmSANI.performSummationOfSequentialInputsWeighted):
-					trainableVariables = list(ANNtf2_algorithmSANI.W.values())
-					#trainableVariables = list(ANNtf2_algorithmSANI.W.values()) + list(ANNtf2_algorithmSANI.B.values())
-				else:
-					print("error: !allowMultipleSubinputsPerSequentialInput && !performSummationOfSequentialInputsWeighted")
+		print("executeOptimisation error: algorithm SANI not supported, use neuralNetworkPropagation() instead")
+		exit()
 	elif(algorithm == "FBANN"):
 		Wflist = []
 		Wblist = []
@@ -315,8 +289,8 @@ def executeOptimisation(x, y, networkIndex=1):
 			trainableVariables = Wflist + Wblist + Blist
 		else:
 			trainableVariables = Wflist + Blist
-	elif(algorithm == "CANN"):
-		print("executeOptimisation error: algorithm CANN not supported, use executeLearningCANN() instead")
+	elif(algorithm == "LREANN"):
+		print("executeOptimisation error: algorithm LREANN not supported, use executeLearningLREANN() instead")
 		exit()
 	elif(algorithm == "EIANN"):
 		Wlist = []
@@ -334,43 +308,6 @@ def executeOptimisation(x, y, networkIndex=1):
 		BlistLength = len(Blist)
 		
 	gradients = gt.gradient(loss, trainableVariables)
-	
-	#print("len(gradients) = ", len(gradients))
-	#print("WlistLength = ", WlistLength)
-	#print("BlistLength = ", BlistLength)
-	
-	#if(algorithm == "EIANN"):
-	#	#gradientsWdeltAList = 
-	#	#gradientsBdeltaList = 
-	#	gradientIndex = 0
-	#	for l in range(1, numberOfLayers+1):
-	#		WdeltalistGradientIndex = gradientIndex+l-1
-	#		neuronEIlayerPrevious = ANNtf2_algorithmEIANN.neuronEI[generateParameterNameNetwork(networkIndex, l-1, "neuronEI")]
-	#		Wlayer = ANNtf2_algorithmEIANN.W[generateParameterNameNetwork(networkIndex, l, "W")]
-	#		WdeltaLayer = gradients[WdeltalistGradientIndex]
-	#		WdeltaLayerAdjustment = tf.multiply(WdeltaLayer, learningRate)	#CHECKTHIS (assumes constant learning rate; no learning rate optimisation - see optimizer = tf.optimizers.SGD(learningRate))
-	#		WlayerNew = tf.subtract(Wlayer, WdeltaLayerAdjustment)
-	#		WlayerNewSign = tf.sign(WlayerNew)
-	#		WlayerNewSignBool = tf.dtypes.cast(WlayerNewSign, dtype=tf.dtypes.bool)
-	#		neuronEIlayerPreviousTiled = tileDimension(neuronEIlayerPrevious, 1, ANNtf2_algorithmEIANN.n_h[l], True)
-	#		WlayerNewSignOK = tf.equal(WlayerNewSignBool, neuronEIlayerPreviousTiled)
-	#		WlayerNewSignOK = tf.dtypes.cast(WlayerNewSignOK, dtype=tf.dtypes.float32)
-	#		WdeltaLayerMod = tf.multiply(WdeltaLayer, WlayerNewSignOK)
-	#		gradients[WdeltalistGradientIndex] = WdeltaLayerMod
-	#	gradientIndex = WlistLength
-	#	for l in range(1, numberOfLayers+1):
-	#		BdeltalistGradientIndex = gradientIndex+l-1
-	#		neuronEIlayer = ANNtf2_algorithmEIANN.neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")]
-	#		Blayer = ANNtf2_algorithmEIANN.B[generateParameterNameNetwork(networkIndex, l, "B")]
-	#		BdeltaLayer = gradients[BdeltalistGradientIndex]
-	#		BdeltaLayerAdjustment = tf.multiply(BdeltaLayer, learningRate)	#CHECKTHIS (assumes constant learning rate; no learning rate optimisation - see optimizer = tf.optimizers.SGD(learningRate))
-	#		BlayerNew = tf.subtract(Blayer, BdeltaLayerAdjustment)
-	#		BlayerNewSign = tf.sign(BlayerNew)
-	#		BlayerNewSignBool = tf.dtypes.cast(BlayerNewSign, dtype=tf.dtypes.bool)
-	#		BlayerNewSignOK = tf.equal(BlayerNewSignBool, neuronEIlayer)
-	#		BlayerNewSignOK = tf.dtypes.cast(BlayerNewSignOK, dtype=tf.dtypes.float32)
-	#		BdeltaLayerMod = tf.multiply(BdeltaLayer, BlayerNewSignOK)
-	#		gradients[BdeltalistGradientIndex] = BdeltaLayerMod
 						
 	if(suppressGradientDoNotExistForVariablesWarnings):
 		optimizer.apply_gradients([
@@ -464,19 +401,21 @@ if __name__ == "__main__":
 	fileIndexTemp = 0
 	fileIndexStr = str(fileIndexTemp).zfill(4)
 	if(dataset == "POStagSequence"):
-		datasetType1FileNameX = datasetFileNameXstart + fileIndexStr + datasetFileNameXend
-		datasetType1FileNameY = datasetFileNameYstart + fileIndexStr + datasetFileNameYend
+		datasetType1FileNameX = dataset1FileNameXstart + fileIndexStr + datasetFileNameXend
+		datasetType1FileNameY = dataset1FileNameYstart + fileIndexStr + datasetFileNameYend
+	elif(dataset == "POStagSentence"):
+		datasetType3FileNameX = dataset3FileNameXstart + fileIndexStr + datasetFileNameXend		
 	elif(dataset == "SmallDataset"):
 		if(trainMultipleFiles):
-			datasetType2FileName = datasetFileNameStart + fileIndexStr + datasetFileNameEnd
+			datasetType2FileName = dataset2FileNameStart + fileIndexStr + datasetFileNameEnd
 		else:
-			datasetType2FileName = datasetFileName
+			datasetType2FileName = dataset2FileName
 
 	numberOfLayers = 0
 	if(dataset == "POStagSequence"):
-		datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
+		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
 	elif(dataset == "POStagSentence"):
-		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType3(datasetType1FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain, useSmallSentenceLengths)
+		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType3(datasetType3FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain, useSmallSentenceLengths)
 	elif(dataset == "SmallDataset"):
 		datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType2(datasetType2FileName, datasetClassColumnFirst)
 
@@ -484,24 +423,23 @@ if __name__ == "__main__":
 	#Model constants
 	num_input_neurons = datasetNumFeatures  #train_x.shape[1]
 	num_output_neurons = datasetNumClasses
-	if(algorithm == "CANN"):
-		if(algorithmCANN == "CANN_expAUANN"):
-			num_output_neurons = ANNtf2_algorithmCANN_expAUANN.calculateOutputNeuronsCANN_expAUANN(datasetNumClasses)
+	if(algorithm == "LREANN"):
+		if(algorithmLREANN == "LREANN_expAUANN"):
+			num_output_neurons = ANNtf2_algorithmLREANN.calculateOutputNeuronsLREANN_expAUANN(datasetNumClasses)
 
 	if(algorithm == "ANN"):
 		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmANN.defineTrainingParametersANN(dataset, trainMultipleFiles)
 		numberOfLayers = ANNtf2_algorithmANN.defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
 		ANNtf2_algorithmANN.defineNeuralNetworkParametersANN()
 	elif(algorithm == "SANI"):
-		if(dataset == "POStagSentence"):
-			ANNtf2_algorithmSANI.defineTrainingParametersSANIsharedModules(numberOfFeaturesPerWord, paddingTagIndex)
-		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmSANI.defineTrainingParametersSANI(dataset, trainMultipleFiles)
-		ANNtf2_algorithmSANI.defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, useSmallSentenceLengths)
+		ANNtf2_algorithmSANI.defineTrainingParametersSANIsharedModules(numberOfFeaturesPerWord, paddingTagIndex)
+		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmSANI.defineTrainingParametersSANIwrapper(dataset, trainMultipleFiles)
+		ANNtf2_algorithmSANI.defineNetworkParametersSANIwrapper(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, useSmallSentenceLengths, numberOfFeaturesPerWord)
 		ANNtf2_algorithmSANI.defineNeuralNetworkParametersSANI()
-	elif(algorithm == "CANN"):
-		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmCANN.defineTrainingParametersCANN(dataset, trainMultipleFiles)
-		numberOfLayers = ANNtf2_algorithmCANN.defineNetworkParametersCANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
-		ANNtf2_algorithmCANN.defineNeuralNetworkParametersCANN()
+	elif(algorithm == "LREANN"):
+		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmLREANN.defineTrainingParametersLREANN(dataset, trainMultipleFiles)
+		numberOfLayers = ANNtf2_algorithmLREANN.defineNetworkParametersLREANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
+		ANNtf2_algorithmLREANN.defineNeuralNetworkParametersLREANN()
 	elif(algorithm == "FBANN"):
 		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmFBANN.defineTrainingParametersFBANN(dataset, trainMultipleFiles)
 		numberOfLayers = ANNtf2_algorithmFBANN.defineNetworkParametersFBANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
@@ -512,7 +450,7 @@ if __name__ == "__main__":
 		ANNtf2_algorithmEIANN.defineNeuralNetworkParametersEIANN()
 					
 	#define epochs:
-
+	
 	if(trainMultipleFiles):
 		fileIndexFirst = 0
 		if(useSmallSentenceLengths):
@@ -521,8 +459,8 @@ if __name__ == "__main__":
 			fileIndexLast = 1202
 
 	noisySampleGeneration = False
-	if(algorithm == "CANN"):
-		noisySampleGeneration, noisySampleGenerationNumSamples, noiseStandardDeviation = ANNtf2_algorithmCANN.getNoisySampleGenerationNumSamples()
+	if(algorithm == "LREANN"):
+		noisySampleGeneration, noisySampleGenerationNumSamples, noiseStandardDeviation = ANNtf2_algorithmLREANN.getNoisySampleGenerationNumSamples()
 		if(noisySampleGeneration):
 			batchXmultiples = tf.constant([noisySampleGenerationNumSamples, 1], tf.int32)
 			batchYmultiples = tf.constant([noisySampleGenerationNumSamples], tf.int32)
@@ -552,60 +490,62 @@ if __name__ == "__main__":
 
 			fileIndexStr = str(fileIndex).zfill(4)
 			if(dataset == "POStagSequence"):
-				datasetType1FileNameX = datasetFileNameXstart + fileIndexStr + datasetFileNameXend
-				datasetType1FileNameY = datasetFileNameYstart + fileIndexStr + datasetFileNameYend
+				datasetType1FileNameX = dataset1FileNameXstart + fileIndexStr + datasetFileNameXend
+				datasetType1FileNameY = dataset1FileNameYstart + fileIndexStr + datasetFileNameYend
+			elif(dataset == "POStagSentence"):
+				datasetType3FileNameX = dataset3FileNameXstart + fileIndexStr + datasetFileNameXend	
 			elif(dataset == "SmallDataset"):
 				if(trainMultipleFiles):
-					datasetType2FileName = datasetFileNameStart + fileIndexStr + datasetFileNameEnd
+					datasetType2FileName = dataset2FileNameStart + fileIndexStr + datasetFileNameEnd
 				else:
-					datasetType2FileName = datasetFileName
+					datasetType2FileName = dataset2FileName
 
 			if(dataset == "POStagSequence"):
-				datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = ANNtf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
+				numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = ANNtf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
 			if(dataset == "POStagSentence"):
-				numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = ANNtf2_loadDataset.loadDatasetType3(datasetType1FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain, useSmallSentenceLengths)
+				numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = ANNtf2_loadDataset.loadDatasetType3(datasetType3FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain, useSmallSentenceLengths)
 			elif(dataset == "SmallDataset"):
 				datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = ANNtf2_loadDataset.loadDatasetType2(datasetType2FileName, datasetClassColumnFirst)
 
 			shuffleSize = datasetNumExamples	#heuristic: 10*batchSize
 			
-			#new iteration method (only required for algorithm == "CANN_expAUANN/CANN_expCUANN"):	
+			#new iteration method (only required for algorithm == "LREANN_expAUANN/LREANN_expCUANN"):	
 			datasetNumClassesActual = datasetNumClasses
 			trainDataIndex = 0
-			if(algorithm == "CANN"):
-				if(algorithmCANN == "CANN_expAUANN"):
+			if(algorithm == "LREANN"):
+				if(algorithmLREANN == "LREANN_expAUANN"):
 					currentClassTarget = 0
 					generateClassTargetExemplars = False
 					if(e == 0):
 						generateClassTargetExemplars = True
-					networkIndex = 1 #note ANNtf2_algorithmCANN_expAUANN doesn't currently support multiple networks
-					trainDataList = ANNtf2_algorithmCANN.generateTFtrainDataFromNParraysCANN_expAUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses)
-					exemplarDataList = ANNtf2_algorithmCANN.generateTFexemplarDataFromNParraysCANN_expAUANN(train_x, train_y, networkIndex, shuffleSize, batchSize, datasetNumClasses, generateClassTargetExemplars)
-					test_y = ANNtf2_algorithmCANN.generateYActualfromYCANN_expAUANN(test_y, num_output_neurons)
+					networkIndex = 1 #note ANNtf2_algorithmLREANN_expAUANN doesn't currently support multiple networks
+					trainDataList = ANNtf2_algorithmLREANN.generateTFtrainDataFromNParraysLREANN_expAUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses)
+					exemplarDataList = ANNtf2_algorithmLREANN.generateTFexemplarDataFromNParraysLREANN_expAUANN(train_x, train_y, networkIndex, shuffleSize, batchSize, datasetNumClasses, generateClassTargetExemplars)
+					test_y = ANNtf2_algorithmLREANN.generateYActualfromYLREANN_expAUANN(test_y, num_output_neurons)
 					datasetNumClassTargets = datasetNumClasses
-					datasetNumClasses = ANNtf2_algorithmCANN.generateNumClassesActualCANN_expAUANN(datasetNumClasses, num_output_neurons)
+					datasetNumClasses = ANNtf2_algorithmLREANN.generateNumClassesActualLREANN_expAUANN(datasetNumClasses, num_output_neurons)
 					exemplarDataListIterators = []
 					for exemplarData in exemplarDataList:
 						exemplarDataListIterators.append(iter(exemplarData))
-				elif(algorithmCANN == "CANN_expCUANN"):
-					trainDataList = ANNtf2_algorithmCANN.generateTFtrainDataFromNParraysCANN_expCUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses)
-				elif(algorithmCANN == "CANN_expXUANN"):
+				elif(algorithmLREANN == "LREANN_expCUANN"):
+					trainDataList = ANNtf2_algorithmLREANN.generateTFtrainDataFromNParraysLREANN_expCUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses)
+				elif(algorithmLREANN == "LREANN_expXUANN"):
 					currentClassTarget = 0
 					generateClassTargetExemplars = False
 					if(e == 0):
 						generateClassTargetExemplars = True
-					trainDataList = ANNtf2_algorithmCANN.generateTFtrainDataFromNParraysCANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=True)
+					trainDataList = ANNtf2_algorithmLREANN.generateTFtrainDataFromNParraysLREANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=True)
 					datasetNumClassTargets = datasetNumClasses
-					samplePositiveDataList = ANNtf2_algorithmCANN.generateTFtrainDataFromNParraysCANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=True)
+					samplePositiveDataList = ANNtf2_algorithmLREANN.generateTFtrainDataFromNParraysLREANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=True)
 					if(XUANNnegativeSamplesComplement):
-						sampleNegativeDataList = ANNtf2_algorithmCANN.generateTFtrainDataFromNParraysCANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=False)					
+						sampleNegativeDataList = ANNtf2_algorithmLREANN.generateTFtrainDataFromNParraysLREANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=False)					
 					elif(XUANNnegativeSamplesAll):
 						#implementation limitation (sample negative contains a selection of experiences from all classes, not just negative classes) - this simplification deemed valid under assumptions: calculations will be averaged over large negative batch and numberClasses >> 2
 						sampleNegativeData = generateTFtrainDataFromNParrays(train_x, train_y, shuffleSize, batchSize)
 						sampleNegativeDataList = []
 						sampleNegativeDataList.append(sampleNegativeData)
 					elif(XUANNnegativeSamplesRandom):
-						sampleNegativeDataList = ANNtf2_algorithmCANN.generateTFtrainDataFromNParraysCANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=True)					
+						sampleNegativeDataList = ANNtf2_algorithmLREANN.generateTFtrainDataFromNParraysLREANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=True)					
 					samplePositiveDataListIterators = []
 					for samplePositiveData in samplePositiveDataList:
 						samplePositiveDataListIterators.append(iter(samplePositiveData))
@@ -636,11 +576,11 @@ if __name__ == "__main__":
 				(batchX, batchY) = trainDataListIterators[trainDataIndex].get_next()	#next(trainDataListIterators[trainDataIndex])
 				
 				batchYactual = batchY
-				if(algorithm == "CANN"):
-					if(algorithmCANN == "CANN_expAUANN"):
+				if(algorithm == "LREANN"):
+					if(algorithmLREANN == "LREANN_expAUANN"):
 						(exemplarsX, exemplarsY) = exemplarDataListIterators[trainDataIndex].get_next()
-						batchYactual = ANNtf2_algorithmCANN_expAUANN.generateTFYActualfromYandExemplarYCANN_expAUANN(batchY, exemplarsY)
-					if(algorithmCANN == "CANN_expXUANN"):
+						batchYactual = ANNtf2_algorithmLREANN.generateTFYActualfromYandExemplarYLREANN_expAUANN(batchY, exemplarsY)
+					if(algorithmLREANN == "LREANN_expXUANN"):
 						(samplePositiveX, samplePositiveY) = samplePositiveDataListIterators[trainDataIndex].get_next()
 						if(XUANNnegativeSamplesRandom):
 							foundTrainDataIndexNegative = False
@@ -686,25 +626,25 @@ if __name__ == "__main__":
 							pred = neuralNetworkPropagation(batchX)
 						if(batchIndex % displayStep == 0):
 							pred = neuralNetworkPropagation(batchX)
-							acc = tf.reduce_mean(tf.dtypes.cast(pred, tf.float32))
-							print("batchIndex: %i, accuracy: %f" % (batchIndex, acc))
-					elif(algorithm == "CANN"):
-						if(algorithmCANN == "CANN_expHUANN"):
+							#acc = tf.reduce_mean(tf.dtypes.cast(pred, tf.float32))
+							#print("batchIndex: %i, accuracy: %f" % (batchIndex, acc))
+					elif(algorithm == "LREANN"):
+						if(algorithmLREANN == "LREANN_expHUANN"):
 							batchYoneHot = tf.one_hot(batchY, depth=datasetNumClasses)
-							executeLearningCANN(batchX, batchYoneHot, networkIndex)
-						elif(algorithmCANN == "CANN_expSUANN"):
-							executeLearningCANN(batchX, batchY, networkIndex)
-						elif(algorithmCANN == "CANN_expAUANN"):
+							executeLearningLREANN(batchX, batchYoneHot, networkIndex)
+						elif(algorithmLREANN == "LREANN_expSUANN"):
+							executeLearningLREANN(batchX, batchY, networkIndex)
+						elif(algorithmLREANN == "LREANN_expAUANN"):
 							#learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
-							executeLearningCANN_expAUANN(batchX, batchY, exemplarsX, exemplarsY, currentClassTarget, networkIndex)
-						elif(algorithmCANN == "CANN_expCUANN"):
-							executeLearningCANN(batchX, batchY, networkIndex)	#currentClassTarget
-						elif(algorithmCANN == "CANN_expXUANN"):
-							executeLearningCANN_expXUANN(batchX, batchY, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex)
-						elif(algorithmCANN == "CANN_expMUANN"):
-							executeLearningCANN(batchX, batchY, networkIndex)
-						elif(algorithmCANN == "CANN_expRUANN"):
-							executeLearningCANN(batchX, batchY, networkIndex)
+							executeLearningLREANN_expAUANN(batchX, batchY, exemplarsX, exemplarsY, currentClassTarget, networkIndex)
+						elif(algorithmLREANN == "LREANN_expCUANN"):
+							executeLearningLREANN(batchX, batchY, networkIndex)	#currentClassTarget
+						elif(algorithmLREANN == "LREANN_expXUANN"):
+							executeLearningLREANN_expXUANN(batchX, batchY, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex)
+						elif(algorithmLREANN == "LREANN_expMUANN"):
+							executeLearningLREANN(batchX, batchY, networkIndex)
+						elif(algorithmLREANN == "LREANN_expRUANN"):
+							executeLearningLREANN(batchX, batchY, networkIndex)
 						if(batchIndex % displayStep == 0):
 							pred = neuralNetworkPropagation(batchX, networkIndex)
 							loss = crossEntropy(pred, batchYactual, datasetNumClasses, costCrossEntropyWithLogits)
@@ -730,14 +670,14 @@ if __name__ == "__main__":
 							print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
 							predNetworkAverage = predNetworkAverage + pred
 							
-				if(algorithm == "CANN"):
-					if(algorithmCANN == "CANN_expAUANN"):
-						#batchYactual = ANNtf2_algorithmCANN_expAUANN.generateTFYActualfromYandExemplarYCANN_expAUANN(batchY, exemplarsY)
+				if(algorithm == "LREANN"):
+					if(algorithmLREANN == "LREANN_expAUANN"):
+						#batchYactual = ANNtf2_algorithmLREANN.generateTFYActualfromYandExemplarYLREANN_expAUANN(batchY, exemplarsY)
 						currentClassTarget = currentClassTarget+1
 						if(currentClassTarget == datasetNumClassTargets):
 							currentClassTarget = 0
 						trainDataIndex = currentClassTarget
-					elif(algorithmCANN == "CANN_expXUANN"):
+					elif(algorithmLREANN == "LREANN_expXUANN"):
 						currentClassTarget = currentClassTarget+1
 						if(currentClassTarget == datasetNumClassTargets):
 							currentClassTarget = 0
@@ -760,7 +700,7 @@ if __name__ == "__main__":
 				elif(algorithm == "SANI"):
 					#learning algorithm not yet implemented:
 					pythonDummy = 1
-				elif(algorithm == "CANN"):
+				elif(algorithm == "LREANN"):
 					pred = neuralNetworkPropagation(test_x, networkIndex)
 					print("Test Accuracy: networkIndex: %i, %f" % (networkIndex, calculateAccuracy(pred, test_y)))
 					predNetworkAverageAll = predNetworkAverageAll + pred

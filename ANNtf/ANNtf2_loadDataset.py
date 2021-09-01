@@ -345,7 +345,8 @@ def loadDatasetType1(datasetFileNameX, datasetFileNameY):
 	#https://www.tensorflow.org/api_docs/python/tf/keras/datasets/mnist/load_data?version=stable
 	#https://medium.com/@HojjatA/could-not-find-valid-device-for-node-while-eagerly-executing-8f2ff588d1e
 
-	return datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y
+	paddingTagIndexNA = paddingTagIndex
+	return numberOfFeaturesPerWord, paddingTagIndexNA, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y
 
 	
 def loadDatasetType2(datasetFileName, classColumnFirst=True):
