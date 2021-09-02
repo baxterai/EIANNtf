@@ -118,35 +118,6 @@ if(algorithmSANI == "sharedModulesHebbian"):
 	if(algorithmSANI == "sharedModulesHebbian"):
 		if(useHebbianLearningRuleApply):
 			WseqDelta = {}	#prospective weights update
-elif(algorithmSANI == "sharedModulesBinary"):
-	Vseq = {}
-	Zseq = {}
-	Aseq = {}
-	TMaxSeq = {}
-	TMinSeq = {}
-	ZseqTadjusted = {}
-	Z = {}
-	A = {}
-	T = {}
-	TMax = {}
-	TMin = {}
-	sequentialActivationFound = {}
-	AseqInputVerified = {}
-elif(algorithmSANI == "sharedModules"):
-	Vseq = {}
-	Zseq = {}
-	Aseq = {}
-	TMaxSeq = {}
-	TMinSeq = {}
-	ZseqTadjusted = {}
-	Z = {}
-	A = {}
-	TMax = {}
-	TMin = {}
-	sequentialActivationFound = {}
-	AseqInputVerified = {}
-elif(algorithmSANI == "repeatedModules"):
-	pass
 
 #end common ANNtf2_algorithmSANI.py code
 
@@ -222,6 +193,8 @@ def neuralNetworkPropagationSANI(x):
 		#for w in range(0, 1):
 		for w in range(maxNumberOfWordsInSentenceBatch-numberOfWordsInConvolutionalWindowSeen+1):
 
+			print("w =", w)
+			
 			for l in range(1, numberOfLayers+1):
 				sequentialActivationFound[generateParameterName(l, "sequentialActivationFound")] = tf.Variable(tf.dtypes.cast(tf.zeros([batchSize, n_h[l]]), tf.bool), dtype=tf.bool)	#CHECKTHIS: is this required?
 			
@@ -255,7 +228,7 @@ def neuralNetworkPropagationSANIfeed(AfirstLayer):
 
 	for l in range(1, numberOfLayers+1):
 		
-		print("\tl = " + str(l))
+		print("\tl =", l)
 
 		if(supportFeedback):
 			l2Max = numberOfLayers
@@ -276,22 +249,25 @@ def neuralNetworkPropagationSANIfeed(AfirstLayer):
 			
 		for s in range(numberOfSequentialInputs):
 			
-			print("\t\ts = " + str(s))
+			print("\t\ts =", s)
 			
 			#calculate ZseqHypothetical for sequential input
 			if(supportFullConnectivity):
 				ZseqHypothetical = tf.zeros([batchSize, n_h[l]])	#same dimensions as Zseq
+				
 				for l2 in range(0, l2Max+1):
-					print("\t\t\tl2 = " + str(l2))
-
-					AseqInput = A[generateParameterName(l2, "A")]
-
-					WseqCurrent = Wseq[generateParameterNameSeqSkipLayers(l, l2, s, "Wseq")]
-					#print("AseqInput = ", AseqInput.shape)
-					#print("WseqCurrent = ", WseqCurrent.shape)
+					print("\t\t\tl2 =", l2)
 					
+					AseqInput = A[generateParameterName(l2, "A")]
+					WseqCurrent = Wseq[generateParameterNameSeqSkipLayers(l, l2, s, "Wseq")]
 					ZseqHypotheticalAddition = tf.matmul(AseqInput, Wseq[generateParameterNameSeqSkipLayers(l, l2, s, "Wseq")])
+					#if(l == 1):
+					#	print("AseqInput = ", AseqInput)
+					#	print("WseqCurrent = ", WseqCurrent)					
+					#	print("ZseqHypotheticalAddition = ", ZseqHypotheticalAddition)
+					
 					ZseqHypothetical = tf.add(ZseqHypothetical, ZseqHypotheticalAddition)
+					
 				ZseqHypothetical = tf.add(ZseqHypothetical, Bseq[generateParameterNameSeq(l, s, "Bseq")])
 					
 				#check output threshold
@@ -312,6 +288,10 @@ def neuralNetworkPropagationSANIfeed(AfirstLayer):
 						
 			#apply validation matrix
 			ZseqCurrent = tf.multiply(ZseqHypothetical, VseqFloat)
+			
+			if(l == 1):
+				print("ZseqPassThresold = ", ZseqPassThresold)
+				
 			if(performSummationOfSubInputsNonlinear):	#CHECKTHIS: should be made redundant by choice of sequentialInputCombinationModeSummation
 				AseqCurrent = tf.nn.sigmoid(ZseqCurrent)	#or relu
 			else:
@@ -429,7 +409,7 @@ def neuralNetworkPropagationSANIfeed(AfirstLayer):
 					WseqDeltaApplicable = tf.multiply(ATiledActive, WseqDelta[generateParameterNameSeqSkipLayers(l, l2, s2, "WseqDelta")])
 					
 					WseqUpdated = tf.add(Wseq[generateParameterNameSeqSkipLayers(l, l2, s2, "Wseq")], WseqDeltaApplicable)
-					tf.clip_by_value(WseqUpdated, minimumConnectionWeight, maximumConnectionWeight)
+					WseqUpdated = tf.clip_by_value(WseqUpdated, minimumConnectionWeight, maximumConnectionWeight)
 					Wseq[generateParameterNameSeqSkipLayers(l, l2, s2, "Wseq")] = WseqUpdated 
 
 	ZlastLayer = Z[generateParameterName(numberOfLayers, "Z")]

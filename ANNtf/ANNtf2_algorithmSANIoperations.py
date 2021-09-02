@@ -85,17 +85,17 @@ def defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNu
 		n_h_0 = n_x
 		if(dataset == "POStagSentence"):
 			if(supportFeedback):
-				n_h_1 = int(datasetNumFeatures*1)
-				n_h_2 = int(datasetNumFeatures*2)
-				n_h_3 = int(datasetNumFeatures*4)
-				n_h_4 = int(datasetNumFeatures*8)
+				n_h_1 = int(inputLength*1)
+				n_h_2 = int(inputLength*2)
+				n_h_3 = int(inputLength*4)
+				n_h_4 = int(inputLength*8)
 				n_h_5 = n_y
 				n_h = [n_h_0, n_h_1, n_h_2, n_h_3, n_h_4, n_h_5]
 			else:
-				n_h_1 = int(datasetNumFeatures*1)	#*x for skip layers	#FUTURE: upgrade to support multiple permutations
-				n_h_2 = int(datasetNumFeatures*2)
-				n_h_3 = int(datasetNumFeatures*3)
-				n_h_4 = int(datasetNumFeatures*4)
+				n_h_1 = int(inputLength*1)	#*x for skip layers	#FUTURE: upgrade to support multiple permutations
+				n_h_2 = int(inputLength*2)
+				n_h_3 = int(inputLength*3)
+				n_h_4 = int(inputLength*4)
 				n_h_5 = n_y
 				n_h = [n_h_0, n_h_1, n_h_2, n_h_3, n_h_4, n_h_5]
 		else:
@@ -239,13 +239,17 @@ def defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNu
 		elif(dataset == "SmallDataset"):
 			n_h_1 = 4
 			n_h_2 = 4
-			n_h_3 = n_y
+			n_h_3 = n_y1
 			n_h = [n_h_0, n_h_1, n_h_2, n_h_3]
 		else:
 			print("dataset unsupported")
 			exit()
-		
+	
 	numberOfLayers = len(n_h)-1
+	
+	for l1 in range(0, numberOfLayers+1):
+		print("h_h[", l1, "] = ", n_h[l1]) 
+		
 	
 	return n_h, numberOfLayers
 
@@ -268,12 +272,9 @@ def defineNeuralNetworkParametersSANI(n_h, numberOfLayers, Cseq, CseqLayer, n_h_
 					#print("\tn_h[l1] = " + str(n_h[l1]))
 					for s in range(numberOfSequentialInputs):
 						#print("\t\ts = " + str(s))
-
 						if(useHebbianLearningRule):
 							sparsityLevel = getSparsityLevel(l1,l2,n_h)
-							WseqNP = np.random.normal(loc=0.0, scale=sparsityLevel, size=(n_h[l2], n_h[l1]))
-							if(useHebbianLearningRulePositiveWeights):
-								WseqNP = WseqNP.clip(min=0)
+							WseqNP = np.random.exponential(scale=sparsityLevel, size=(n_h[l2], n_h[l1]))
 						else:
 							WseqNP = np.random.rand(n_h[l2], n_h[l1])	#uniform distribution
 						Wseq[generateParameterNameSeqSkipLayers(l1, l2, s, "Wseq")] = tf.Variable(WseqNP, dtype=tf.float32)
@@ -422,8 +423,11 @@ def getSparsityLevel(l, l2, n_h):
 
 	if(useHebbianLearningRule):
 		if(useHebbianLearningRulePositiveWeights):
-			averageLayerActivationLevel = 1.0/(n_h[l]*n_h[l2]*numberOfSequentialInputs) * neuronActivationFiringThreshold
-			sparsityLevel = averageLayerActivationLevel
+			calibrationValue = 1.0 #exponential scale calibration factor - requires calibration
+			averageNumberNeuronsActivePerLayer = 1.0
+			sparsityLevel = averageNumberNeuronsActivePerLayer*calibrationValue	#assume ~1 input active per layer
+			#averageLayerActivationLevel = 1.0/(n_h[l]*n_h[l2]*numberOfSequentialInputs) * neuronActivationFiringThreshold
+			#sparsityLevel = averageLayerActivationLevel
 		else:
 			sparsityLevel = 1.0
 	else:

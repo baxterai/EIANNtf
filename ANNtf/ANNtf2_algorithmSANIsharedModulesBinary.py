@@ -102,17 +102,7 @@ def defineNeuralNetworkParametersSANI():
 			
 
 #temporary variables for neuralNetworkPropagationSANI:
-if(algorithmSANI == "sharedModulesHebbian"):
-	Vseq = {}
-	Zseq = {}
-	Aseq = {}
-	Z = {}
-	A = {}
-	sequentialActivationFound = {}	#CHECKTHIS: is this required?
-	if(algorithmSANI == "sharedModulesHebbian"):
-		if(useHebbianLearningRuleApply):
-			WseqDelta = {}	#prospective weights update
-elif(algorithmSANI == "sharedModulesBinary"):
+if(algorithmSANI == "sharedModulesBinary"):
 	Vseq = {}
 	Zseq = {}
 	Aseq = {}
@@ -126,21 +116,6 @@ elif(algorithmSANI == "sharedModulesBinary"):
 	TMin = {}
 	sequentialActivationFound = {}
 	AseqInputVerified = {}
-elif(algorithmSANI == "sharedModules"):
-	Vseq = {}
-	Zseq = {}
-	Aseq = {}
-	TMaxSeq = {}
-	TMinSeq = {}
-	ZseqTadjusted = {}
-	Z = {}
-	A = {}
-	TMax = {}
-	TMin = {}
-	sequentialActivationFound = {}
-	AseqInputVerified = {}
-elif(algorithmSANI == "repeatedModules"):
-	pass
 
 #end common ANNtf2_algorithmSANI.py code
 
