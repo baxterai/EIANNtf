@@ -98,6 +98,10 @@ def defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNu
 				n_h_4 = int(inputLength*4)
 				n_h_5 = n_y
 				n_h = [n_h_0, n_h_1, n_h_2, n_h_3, n_h_4, n_h_5]
+
+			if(createSmallNetworkForDebug):
+				n_h_1 = int(inputLength)	#*x for skip layers	#FUTURE: upgrade to support multiple permutations
+				n_h = [n_h_0, n_h_1]				
 		else:
 			print("sequential input data is required")
 			exit()	

@@ -261,12 +261,13 @@ def neuralNetworkPropagationSANIfeed(AfirstLayer):
 					AseqInput = A[generateParameterName(l2, "A")]
 					WseqCurrent = Wseq[generateParameterNameSeqSkipLayers(l, l2, s, "Wseq")]
 					ZseqHypotheticalAddition = tf.matmul(AseqInput, Wseq[generateParameterNameSeqSkipLayers(l, l2, s, "Wseq")])
-					#if(l == 1):
-					#	print("AseqInput = ", AseqInput)
-					#	print("WseqCurrent = ", WseqCurrent)					
-					#	print("ZseqHypotheticalAddition = ", ZseqHypotheticalAddition)
+					
+					#print("AseqInput = ", AseqInput)
+					print("WseqCurrent = ", WseqCurrent)					
+					#print("ZseqHypotheticalAddition = ", ZseqHypotheticalAddition)
 					
 					ZseqHypothetical = tf.add(ZseqHypothetical, ZseqHypotheticalAddition)
+					#print("ZseqHypotheticalAddition = ", ZseqHypotheticalAddition)
 					
 				ZseqHypothetical = tf.add(ZseqHypothetical, Bseq[generateParameterNameSeq(l, s, "Bseq")])
 					
@@ -283,14 +284,10 @@ def neuralNetworkPropagationSANIfeed(AfirstLayer):
 				#note ANNtf2_algorithmSANIsharedModulesHebbian does not use time/word index contiguity checks
 				VseqExisting = VseqPrevTest	#if previous sequentiality check fails, then all future sequentiality checks must fail	
 			
-			#VseqInt = tf.dtypes.cast(VseqExisting, tf.int32)
 			VseqFloat = tf.dtypes.cast(VseqExisting, tf.float32)
 						
 			#apply validation matrix
 			ZseqCurrent = tf.multiply(ZseqHypothetical, VseqFloat)
-			
-			if(l == 1):
-				print("ZseqPassThresold = ", ZseqPassThresold)
 				
 			if(performSummationOfSubInputsNonlinear):	#CHECKTHIS: should be made redundant by choice of sequentialInputCombinationModeSummation
 				AseqCurrent = tf.nn.sigmoid(ZseqCurrent)	#or relu
@@ -303,6 +300,11 @@ def neuralNetworkPropagationSANIfeed(AfirstLayer):
 				
 			#update Vseq/Zseq/Aseq
 			VseqUpdated = tf.math.logical_and(ZseqPassThresold, VseqExisting)
+			
+			#print("VseqExisting = ", VseqExisting)	
+			#print("ZseqPassThresold = ", ZseqPassThresold)
+			print("VseqUpdated = ", VseqUpdated)
+
 			Vseq[generateParameterNameSeq(l, s, "Vseq")] = VseqUpdated
 			Zseq[generateParameterNameSeq(l, s, "Zseq")] = ZseqCurrent
 			Aseq[generateParameterNameSeq(l, s, "Aseq")] = AseqCurrent
@@ -310,6 +312,8 @@ def neuralNetworkPropagationSANIfeed(AfirstLayer):
 			
 			if(useHebbianLearningRuleApply):
 				for l2 in range(0, l2Max+1):
+					#constrain learning (weight updates) to where VseqUpdated is True:
+					
 					AseqInput = A[generateParameterName(l2, "A")]
 					AseqInputSqueezed = tf.squeeze(AseqInput, axis=0)	#batchSize must equal 1
 					AseqInputSqueezed = tf.expand_dims(AseqInputSqueezed, axis=1)
@@ -321,13 +325,16 @@ def neuralNetworkPropagationSANIfeed(AfirstLayer):
 					VseqUpdatedFloatSqueeze = tf.expand_dims(VseqUpdatedFloatSqueeze, axis=0)
 					multiples = tf.constant([n_h[l2],1], tf.int32)
 					VseqUpdatedFloatTiled = tf.tile(VseqUpdatedFloatSqueeze, multiples)
-
-					WseqActive = tf.multiply(AseqInputTiled, VseqUpdatedFloatTiled)	
-					WseqActiveBool = tf.math.greater(WseqActive, 0.0)
-					WseqActiveSign = tf.dtypes.cast(WseqActiveBool, tf.float32)	
-					WseqActiveSign = tf.subtract(tf.multiply(WseqActiveSign, 2.0), 1.0)
-					WseqDeltaCurrent = tf.multiply(WseqActiveSign, hebbianLearningRate)
+					
+					AseqMod = tf.subtract(tf.multiply(AseqInputSqueezed, 2.0), 1.0)
+					WseqDeltaSign = tf.multiply(AseqMod, VseqUpdatedFloatTiled)	
+					WseqDeltaCurrent = tf.multiply(WseqDeltaSign, hebbianLearningRate)
 					WseqDelta[generateParameterNameSeqSkipLayers(l, l2, s, "WseqDelta")] = WseqDeltaCurrent 
+					
+					#print("AseqInputTiled = ", AseqInputTiled)
+					#print("VseqUpdatedFloatTiled = ", VseqUpdatedFloatTiled)
+					print("WseqDeltaSign = ", WseqDeltaSign)
+
 								
 			if(performSummationOfSequentialInputs):
 				if(performSummationOfSequentialInputsWeighted):
@@ -399,6 +406,8 @@ def neuralNetworkPropagationSANIfeed(AfirstLayer):
 			for s2 in range(numberOfSequentialInputs):
 				for l2 in range(0, l2Max+1):
 
+					#only apply weight updates to neurons that fired (all sequential inputs passed):
+					
 					Asqueezed = tf.squeeze(A[generateParameterName(l, "A")], axis=0)	#batchSize must equal 1
 					Asqueezed = tf.expand_dims(Asqueezed, axis=0)
 					multiples = tf.constant([n_h[l2],1], tf.int32)

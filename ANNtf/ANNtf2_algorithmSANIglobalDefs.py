@@ -28,8 +28,7 @@ algorithmSANI = "sharedModulesHebbian"
 #algorithmSANI = "sharedModules"
 #algorithmSANI = "repeatedModules"
 
-if(algorithmSANI == "sharedModulesBinary"):
-	createSmallNetworkForDebug = False
+createSmallNetworkForDebug = False
 
 useSequentialInputs = True
 if(useSequentialInputs):
