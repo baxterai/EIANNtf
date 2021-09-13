@@ -35,8 +35,8 @@ import ANNtf2_loadDataset
 from ANNtf2_algorithmSANIglobalDefs import algorithmSANI
 
 #algorithm = "ANN"	#standard artificial neural network (backprop)
-algorithm = "SANI"	#sequentially activated neuronal input artificial neural network
-#algorithm = "LREANN"	#learning rule experiment artificial neural network
+#algorithm = "SANI"	#sequentially activated neuronal input artificial neural network
+algorithm = "LREANN"	#learning rule experiment artificial neural network
 #algorithm = "FBANN"	#feedback artificial neural network (reverse connectivity)
 #algorithm = "EIANN"	#excitatory/inhibitory artificial neural network
 
@@ -59,13 +59,13 @@ elif(algorithm == "SANI"):
 	elif(algorithmSANI == "repeatedModules"):
 		import ANNtf2_algorithmSANIrepeatedModules as ANNtf2_algorithmSANI
 elif(algorithm == "LREANN"):
-	#algorithmLREANN = "LREANN_expHUANN"
+	algorithmLREANN = "LREANN_expHUANN"
 	#algorithmLREANN = "LREANN_expSUANN"
 	#algorithmLREANN = "LREANN_expAUANN"
 	#algorithmLREANN = "LREANN_expCUANN"
 	#algorithmLREANN = "LREANN_expXUANN"
 	#algorithmLREANN = "LREANN_expMUANN"
-	algorithmLREANN = "LREANN_expRUANN"
+	#algorithmLREANN = "LREANN_expRUANN"
 	if(algorithmLREANN == "LREANN_expHUANN"):
 		import ANNtf2_algorithmLREANN_expHUANN as ANNtf2_algorithmLREANN
 	elif(algorithmLREANN == "LREANN_expSUANN"):

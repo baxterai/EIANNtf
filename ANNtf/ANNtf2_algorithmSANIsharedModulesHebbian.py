@@ -214,6 +214,8 @@ def neuralNetworkPropagationSANI(x):
 			AfirstLayerShifted = tf.dtypes.cast(AfirstLayerShifted, tf.float32)	#added 01 Sept 2021 #convert input from int to float
 			A[generateParameterName(0, "A")] = AfirstLayerShifted
 			neuralNetworkPropagationSANIfeed(AfirstLayerShifted)
+			
+			#exit()
 	else:
 		AfirstLayer = x
 		
@@ -262,7 +264,7 @@ def neuralNetworkPropagationSANIfeed(AfirstLayer):
 					WseqCurrent = Wseq[generateParameterNameSeqSkipLayers(l, l2, s, "Wseq")]
 					ZseqHypotheticalAddition = tf.matmul(AseqInput, Wseq[generateParameterNameSeqSkipLayers(l, l2, s, "Wseq")])
 					
-					#print("AseqInput = ", AseqInput)
+					print("AseqInput = ", AseqInput)
 					print("WseqCurrent = ", WseqCurrent)					
 					#print("ZseqHypotheticalAddition = ", ZseqHypotheticalAddition)
 					
@@ -333,7 +335,7 @@ def neuralNetworkPropagationSANIfeed(AfirstLayer):
 					
 					#print("AseqInputTiled = ", AseqInputTiled)
 					#print("VseqUpdatedFloatTiled = ", VseqUpdatedFloatTiled)
-					print("WseqDeltaSign = ", WseqDeltaSign)
+					#print("WseqDeltaSign = ", WseqDeltaSign)
 
 								
 			if(performSummationOfSequentialInputs):

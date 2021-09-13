@@ -25,17 +25,28 @@ import ANNtf2_operations
 import ANNtf2_globalDefs
 import math
 
+immutableConnections = True	#a fraction of connection weights (e.g. 1) is immutable, the others are used in its prediction
+sparseConnections = True	#a fraction of connections are active, the others are disabled
+if(immutableConnections):
+	immutableConnectionsFraction = 0.1	#0.1	#only ~1 connection will be immutable
+	#FUTURE: guarantee that at least one incoming connection per neuron is immutable
+if(sparseConnections):
+	activeConnectionsFraction = 0.5	#0.1	#only x connections will be active (connected)	#connectivity sparsity
+		
 debugHebbianForwardPropOnlyTrainFinalSupervisedLayer = False
 applyWmaxCap = True	#max W = 1
 applyAmaxCap = True	#max A = 1
 enableForgetting = True
 #debugSparseActivatedNetwork = False	#creates much larger network
 
-onlyTrainNeuronsIfLayerActivationIsSparse = True	#only train upper layer [neuron] if layer activation is sparse - ie if only a single hypothesis is detected as true
-if(onlyTrainNeuronsIfLayerActivationIsSparse):
-	onlyTrainNeuronsIfLayerActivationIsSparseRequireUniqueNeuronActivation = True
-	if(not onlyTrainNeuronsIfLayerActivationIsSparseRequireUniqueNeuronActivation):
-		onlyTrainNeuronsIfLayerActivationIsSparseMinSparsity = 0.9	#ie only 10% of neurons can be activation for training to occur
+if(immutableConnections):
+	onlyTrainNeuronsIfLayerActivationIsSparse = False
+else:
+	onlyTrainNeuronsIfLayerActivationIsSparse = True	#only train upper layer [neuron] if layer activation is sparse - ie if only a single hypothesis is detected as true
+	if(onlyTrainNeuronsIfLayerActivationIsSparse):
+		onlyTrainNeuronsIfLayerActivationIsSparseRequireUniqueNeuronActivation = True
+		if(not onlyTrainNeuronsIfLayerActivationIsSparseRequireUniqueNeuronActivation):
+			onlyTrainNeuronsIfLayerActivationIsSparseMinSparsity = 0.9	#ie only 10% of neurons can be activation for training to occur
 
 if(onlyTrainNeuronsIfLayerActivationIsSparse):		
 	generateFirstLayerSDR = True	#required	#approximates k winners takes all	
@@ -69,16 +80,23 @@ if(onlyTrainNeuronsIfActivationContributionAboveThreshold):
 
 
 if(enableForgetting):
-	if(onlyTrainNeuronsIfLayerActivationIsSparse):
-		enableForgettingRestrictToAPrevAndNotAConnections = False	#required
-		enableForgettingRestrictToNotAPrevAndAConnections = True	#required
+	if(immutableConnections):
+		enableForgettingRestrictToAPrevAndNotAConnections = False
+		enableForgettingRestrictToNotAPrevAndAConnections = False
 	else:
-		enableForgettingRestrictToAPrevAndNotAConnections = True	#optional	#True	#this ensures that only connections between active lower layer neurons and unactive higher layer neurons are suppressed
-		enableForgettingRestrictToNotAPrevAndAConnections = False 	#required
+		if(onlyTrainNeuronsIfLayerActivationIsSparse):
+			enableForgettingRestrictToAPrevAndNotAConnections = False	#required
+			enableForgettingRestrictToNotAPrevAndAConnections = True	#required
+		else:
+			enableForgettingRestrictToAPrevAndNotAConnections = True	#optional	#True	#this ensures that only connections between active lower layer neurons and unactive higher layer neurons are suppressed
+			enableForgettingRestrictToNotAPrevAndAConnections = False 	#required
 
 W = {}
 B = {}
-
+if(sparseConnections):
+	Wactive = {}	#tf.dtypes.bool
+if(immutableConnections):
+	Wmutable = {}	#tf.dtypes.bool
 
 #Network parameters
 n_h = []
@@ -117,7 +135,7 @@ def defineTrainingParametersLREANN(dataset, trainMultipleFiles):
 			trainingSteps = 1000
 		batchSize = 10		#1	#10	#100	#1000	#temporarily reduce batch size for visual debugging (array length) purposes)
 		if(dataset == "SmallDataset"):
-			numEpochs = 10
+			numEpochs = 100
 		else:
 			numEpochs = 1
 	
@@ -147,7 +165,20 @@ def defineNeuralNetworkParametersLREANN():
 
 			W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
 			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
-				
+			
+			if(sparseConnections):
+				WactiveFloat = tf.random.uniform([n_h[l-1], n_h[l]], dtype=tf.dtypes.float32)
+				WactiveBool = tf.less(WactiveFloat, activeConnectionsFraction)
+				Wactive[generateParameterNameNetwork(networkIndex, l, "Wactive")] = WactiveBool
+				WactiveFloat = tf.dtypes.cast(WactiveBool, tf.float32)  
+				W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.multiply(W[generateParameterNameNetwork(networkIndex, l, "W")], WactiveFloat)
+				#print("WactiveBool = ", WactiveBool)
+				#print(W[generateParameterNameNetwork(networkIndex, l, "W")])
+			if(immutableConnections):
+				WmutableFloat = tf.random.uniform([n_h[l-1], n_h[l]], dtype=tf.dtypes.float32)
+				WmutableBool = tf.greater(WmutableFloat, immutableConnectionsFraction)
+				Wmutable[generateParameterNameNetwork(networkIndex, l, "Wmutable")]	= WmutableBool
+				#print("WmutableBool = ", WmutableBool)
 	
 def neuralNetworkPropagationLREANN(x, networkIndex=1):
 			
@@ -268,6 +299,16 @@ def trainLayerLREANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainH
 			AcoincidenceMatrix = tf.matmul(tf.transpose(AprevLayerLearn), Alearn)
 			#Bmod = 0*learningRate	#biases are not currently used
 			Wmod = AcoincidenceMatrix/batchSize*learningRate
+			
+			if(immutableConnections):
+				WmutableFloat = tf.dtypes.cast(Wmutable[generateParameterNameNetwork(networkIndex, l, "Wmutable")], tf.float32)  
+				Wmod = tf.multiply(Wmod, WmutableFloat)
+			if(sparseConnections):
+				WactiveFloat = tf.dtypes.cast(Wactive[generateParameterNameNetwork(networkIndex, l, "Wactive")], tf.float32)  
+				Wmod = tf.multiply(Wmod, WactiveFloat)
+	
+			#print("Wmod = ", Wmod)
+				
 			#B[generateParameterNameNetwork(networkIndex, l, "B")] = B[generateParameterNameNetwork(networkIndex, l, "B")] + Bmod
 			W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] + Wmod
 
@@ -288,7 +329,6 @@ def trainLayerLREANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainH
 					AcoincidenceMatrixForget = tf.matmul(tf.transpose(AprevboolNegFloat), Alearn)
 					Wmod2 = tf.square(AcoincidenceMatrixForget)/batchSize*forgetRate	#tf.square(AcoincidenceMatrixForget) - square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
 					#print("Wmod2 = ", Wmod2)
-					W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2				
 				else:
 					if(enableForgettingRestrictToAPrevAndNotAConnections):
 						AboolNeg = tf.math.equal(Alearn, 0.0)	#Abool = tf.math.greater(Alearn, 0.0), AboolNeg = tf.math.logical_not(Abool)
@@ -298,15 +338,25 @@ def trainLayerLREANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainH
 						AcoincidenceMatrixForget = tf.matmul(tf.transpose(AprevLayerLearn), AboolNegFloat)
 						Wmod2 = tf.square(AcoincidenceMatrixForget)/batchSize*forgetRate	#tf.square(AcoincidenceMatrixForget) - square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
 						#print("Wmod2 = ", Wmod2)
-						W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2
 					else:
 						AcoincidenceMatrixIsZero = tf.math.equal(AcoincidenceMatrix, 0)
 						#AcoincidenceMatrixIsZeroInt = tf.dtypes.cast(AcoincidenceMatrixIsZero, tf.int32)
 						AcoincidenceMatrixIsZeroFloat = tf.dtypes.cast(AcoincidenceMatrixIsZero, dtype=tf.float32)
 						Wmod2 = tf.square(AcoincidenceMatrixIsZeroFloat)/batchSize*forgetRate	#tf.square(AcoincidenceMatrixIsZeroFloat) - square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
 						#print("Wmod2 = ", Wmod2)
-						W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2
-
+				
+				if(immutableConnections):
+					#WmutableFloat = tf.dtypes.cast(Wmutable[generateParameterNameNetwork(networkIndex, l, "Wmutable")], tf.float32)  
+					Wmod2 = tf.multiply(Wmod2, WmutableFloat)
+				if(sparseConnections):
+					#WactiveFloat = tf.dtypes.cast(Wactive[generateParameterNameNetwork(networkIndex, l, "Wactive")], tf.float32)  
+					Wmod2 = tf.multiply(Wmod2, WactiveFloat)
+				
+				#print("Wmod2 = ", Wmod2)
+								
+				W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2
+				
+				
 			if(applyWmaxCap):
 				#print("W before cap = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
 				W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.clip_by_value(W[generateParameterNameNetwork(networkIndex, l, "W")], clip_value_min=-1.0, clip_value_max=1.0)

@@ -27,18 +27,25 @@ debugSingleLayerNetwork = False
 
 
 #if(useBinaryWeights) or if(generateFirstLayerSDR)
+
 generateLargeNetwork = True	#default: True
 if(generateLargeNetwork):
-	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 3.0	#default: 3.0	#2.0 
-	generateNetworkNonlinearConvergence = True
+	generateNetworkStatic = True
+	if(generateNetworkStatic):
+		maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 5.0
+	else:
+		maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 3.0	#default: 3.0	#2.0 
+		generateNetworkNonlinearConvergence = True
 else:
 	#maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.5
 	#generateNetworkNonlinearConvergence = True
 	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.8	#default: 0.8
 	generateNetworkNonlinearConvergence = False	#default: False
 
-	
-if(generateNetworkNonlinearConvergence):
+
+if(generateNetworkStatic):
+	networkDivergenceType = "linearStatic"
+elif(generateNetworkNonlinearConvergence):
 	networkDivergenceType = "nonLinearConverging"
 	
 	#if(applyNeuronThresholdBias):
@@ -184,34 +191,36 @@ def defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datase
 	
 	numberOfNetworks = numberOfNetworksSet
 
-	if((networkDivergenceType == "linearConverging") or (networkDivergenceType == "nonLinearConverging")):
-		firstHiddenLayerNumberNeurons = int(num_input_neurons*maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons)
+	firstHiddenLayerNumberNeurons = int(num_input_neurons*maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons)
 	
-	if(generateNetworkNonlinearConvergence):
-		#(networkDivergenceType == "nonLinearConverging")
-		#num_output_neurons = firstHiddenLayerNumberNeurons * networkDivergence^numLayers [eg 5 = 100*0.6^x]
-		#if a^c = b, then c = log_a(b)
-		b = float(num_output_neurons)/firstHiddenLayerNumberNeurons
-		#numLayers = math.log(b, networkDivergence)
-		
-		#now log_a(x) = log_b(x)/log_b(a)
-		#therefore log_a1/a2(b) = log_a2(b)/log_a2(a1/a2) = log_a2(b)/(log_a2(a1) - b)
-		numberOfLayers = math.log(b, networkDivergenceDenominator)/math.log(float(networkDivergenceNumerator)/networkDivergenceDenominator, networkDivergenceDenominator)
-		numberOfLayers = int(numberOfLayers)+1	#plus input layer
-		
-		print("numberOfLayers = ", numberOfLayers)
-		
+	if(networkDivergenceType == "linearStatic"):
+		numberOfLayers = 6
 	else:
-		if(dataset == "POStagSequence"):
-			if(trainMultipleFiles):
-				numberOfLayers = 6
-			else:
-				numberOfLayers = 3
-		elif(dataset == "SmallDataset"):
-			if(trainMultipleFiles):
-				numberOfLayers = 6	#trainMultipleFiles should affect number of neurons/parameters in network
-			else:
-				numberOfLayers = 3
+		if(generateNetworkNonlinearConvergence):
+			#(networkDivergenceType == "nonLinearConverging")
+			#num_output_neurons = firstHiddenLayerNumberNeurons * networkDivergence^numLayers [eg 5 = 100*0.6^x]
+			#if a^c = b, then c = log_a(b)
+			b = float(num_output_neurons)/firstHiddenLayerNumberNeurons
+			#numLayers = math.log(b, networkDivergence)
+
+			#now log_a(x) = log_b(x)/log_b(a)
+			#therefore log_a1/a2(b) = log_a2(b)/log_a2(a1/a2) = log_a2(b)/(log_a2(a1) - b)
+			numberOfLayers = math.log(b, networkDivergenceDenominator)/math.log(float(networkDivergenceNumerator)/networkDivergenceDenominator, networkDivergenceDenominator)
+			numberOfLayers = int(numberOfLayers)+1	#plus input layer
+
+			print("numberOfLayers = ", numberOfLayers)
+
+		else:
+			if(dataset == "POStagSequence"):
+				if(trainMultipleFiles):
+					numberOfLayers = 6
+				else:
+					numberOfLayers = 3
+			elif(dataset == "SmallDataset"):
+				if(trainMultipleFiles):
+					numberOfLayers = 6	#trainMultipleFiles should affect number of neurons/parameters in network
+				else:
+					numberOfLayers = 3
 
 	n_x = num_input_neurons #datasetNumFeatures
 	n_y = num_output_neurons  #datasetNumClasses
@@ -235,6 +244,9 @@ def defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datase
 				n_h_x = int(previousNumberLayerNeurons*networkDivergence)
 			n_h.append(n_h_x)
 			previousNumberLayerNeurons = n_h_x
+		elif(networkDivergenceType == "linearStatic"):
+			n_h_x = firstHiddenLayerNumberNeurons
+			n_h.append(n_h_x)
 		elif(networkDivergenceType == "linearDivergingThenConverging"):
 			#not yet coded
 			print("defineNetworkParametersANN error: linearDivergingThenConverging not yet coded")
