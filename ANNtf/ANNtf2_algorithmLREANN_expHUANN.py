@@ -25,21 +25,31 @@ import ANNtf2_operations
 import ANNtf2_globalDefs
 import math
 
-immutableConnections = True	#a fraction of connection weights (e.g. 1) is immutable, the others are used in its prediction
-sparseConnections = True	#a fraction of connections are active, the others are disabled
-positiveConnections = True	#all connections are positive
-if(immutableConnections):
-	immutableConnectionsFraction = 0.1	#0.1	#only ~1 connection will be immutable
-	#FUTURE: guarantee that at least one incoming connection per neuron is immutable
-	immutableConnectionsInitialise = True
-	mutableConnectionsInitialise = True
-	if(immutableConnectionsInitialise):
-		immutableConnectionsInitialiseWeight = 0.5	#high
-	if(mutableConnectionsInitialise):
-		mutableConnectionsInitialiseWeightMax = 0.1	#low
-if(sparseConnections):
-	activeConnectionsFraction = 0.5	#0.1	#only x connections will be active (connected)	#connectivity sparsity
-		
+LREANN_expHUANN2 = True
+if(LREANN_expHUANN2):
+	immutableConnections = True	#a fraction of connection weights (e.g. 1) is immutable, the others are used in its prediction
+	sparseConnections = False	#a fraction of connections are active, the others are disabled
+	positiveConnections = True	#all connections are positive
+	if(immutableConnections):
+		immutableConnectionsFraction = 0.1	#0.1	#only ~1 connection will be immutable
+		#FUTURE: guarantee that at least one incoming connection per neuron is immutable during initialisation
+		immutableConnectionsInitialise = True	#initialise immutableConnectionsInitialiseWeight (high)
+		mutableConnectionsInitialise = True	#apply mutableConnectionsInitialiseWeightMax (low)
+		mutableConnectionsWeightMaxRestrict = True	#restrict max weight of mutable connections
+		if(immutableConnectionsInitialise):
+			immutableConnectionsInitialiseWeight = 0.5	#high
+		if(mutableConnectionsInitialise):
+			mutableConnectionsInitialiseWeightMax = 0.1	#low
+		if(mutableConnectionsWeightMaxRestrict):
+			mutableConnectionsWeightMax = immutableConnectionsInitialiseWeight
+	if(sparseConnections):
+		activeConnectionsFraction = 0.5	#0.1	#only x connections will be active (connected)	#connectivity sparsity
+else:
+	immutableConnections = False
+	sparseConnections = False
+	positiveConnections = False
+
+	
 debugHebbianForwardPropOnlyTrainFinalSupervisedLayer = False
 applyWmaxCap = True	#max W = 1
 applyAmaxCap = True	#max A = 1
@@ -93,7 +103,7 @@ if(onlyTrainNeuronsIfActivationContributionAboveThreshold):
 if(enableForgetting):
 	if(immutableConnections):
 		enableForgettingRestrictToAPrevAndNotAConnections = False
-		enableForgettingRestrictToNotAPrevAndAConnections = False
+		enableForgettingRestrictToNotAPrevAndAConnections = True	#CHECKTHIS
 	else:
 		if(onlyTrainNeuronsIfLayerActivationIsSparse):
 			enableForgettingRestrictToAPrevAndNotAConnections = False	#required
@@ -108,6 +118,7 @@ if(sparseConnections):
 	Wactive = {}	#tf.dtypes.bool
 if(immutableConnections):
 	Wmutable = {}	#tf.dtypes.bool
+	Wimmutable = {}	#tf.dtypes.bool
 
 #Network parameters
 n_h = []
@@ -195,6 +206,7 @@ def defineNeuralNetworkParametersLREANN():
 				Wmutable[generateParameterNameNetwork(networkIndex, l, "Wmutable")]	= WmutableBool
 				WmutableFloat = tf.dtypes.cast(WmutableBool, tf.float32)  
 				WimmutableBool = tf.math.logical_not(WmutableBool) 
+				Wimmutable[generateParameterNameNetwork(networkIndex, l, "Wimmutable")]	= WimmutableBool
 				WimmutableFloat = tf.dtypes.cast(WimmutableBool, tf.float32) 
 				#print("WmutableBool = ", WmutableBool)
 				if(immutableConnectionsInitialise):
@@ -204,7 +216,7 @@ def defineNeuralNetworkParametersLREANN():
 					Wfloat = tf.add(Wfloat, WimmutableComponentsFloat)
 					W[generateParameterNameNetwork(networkIndex, l, "W")] = Wfloat
 					#print("W = ", Wfloat)
-				if(immutableConnectionsInitialise):
+				if(mutableConnectionsInitialise):
 					Wfloat = W[generateParameterNameNetwork(networkIndex, l, "W")]
 					WmutableComponentsFloat = tf.multiply(WmutableFloat, Wfloat)
 					WmutableComponentsFloat = tf.minimum(WmutableComponentsFloat, mutableConnectionsInitialiseWeightMax)
@@ -382,10 +394,10 @@ def trainLayerLREANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainH
 						#print("Wmod2 = ", Wmod2)
 				
 				if(immutableConnections):
-					#WmutableFloat = tf.dtypes.cast(Wmutable[generateParameterNameNetwork(networkIndex, l, "Wmutable")], tf.float32)  
+					WmutableFloat = tf.dtypes.cast(Wmutable[generateParameterNameNetwork(networkIndex, l, "Wmutable")], tf.float32)  
 					Wmod2 = tf.multiply(Wmod2, WmutableFloat)
 				if(sparseConnections):
-					#WactiveFloat = tf.dtypes.cast(Wactive[generateParameterNameNetwork(networkIndex, l, "Wactive")], tf.float32)  
+					WactiveFloat = tf.dtypes.cast(Wactive[generateParameterNameNetwork(networkIndex, l, "Wactive")], tf.float32)  
 					Wmod2 = tf.multiply(Wmod2, WactiveFloat)
 				
 				#print("Wmod2 = ", Wmod2)
@@ -396,7 +408,16 @@ def trainLayerLREANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainH
 				Wfloat = W[generateParameterNameNetwork(networkIndex, l, "W")]
 				Wfloat = tf.clip_by_value(Wfloat, 0.0, applyNeuronThresholdBiasValue*2.0)
 				W[generateParameterNameNetwork(networkIndex, l, "W")] = Wfloat
-				
+			if(mutableConnectionsWeightMaxRestrict):
+				WmutableFloat = tf.dtypes.cast(Wmutable[generateParameterNameNetwork(networkIndex, l, "Wmutable")], tf.float32)  
+				WimmutableFloat = tf.dtypes.cast(Wimmutable[generateParameterNameNetwork(networkIndex, l, "Wimmutable")], tf.float32)  
+				Wfloat = W[generateParameterNameNetwork(networkIndex, l, "W")]
+				WmutableComponentsFloat = tf.multiply(WmutableFloat, Wfloat)
+				WmutableComponentsFloat = tf.minimum(WmutableComponentsFloat, mutableConnectionsWeightMax)
+				Wfloat = tf.multiply(Wfloat, WimmutableFloat)	#zero all mutable weights
+				Wfloat = tf.add(Wfloat, WmutableComponentsFloat)
+				W[generateParameterNameNetwork(networkIndex, l, "W")] = Wfloat
+							
 			#print("W after learning = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
 				
 			if(applyWmaxCap):
