@@ -1,24 +1,24 @@
-# -*- coding: utf-8 -*-
 """ANNtf2_algorithmSANIsharedModules.py
 
-# Requirements:
-Python 3 and Tensorflow 2.1+ 
+# Author:
+Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 # License:
 MIT License
+
+# Installation:
+see ANNtf2.py
 
 # Usage:
 see ANNtf2.py
 
 # Description:
 
-Define Sequentially Activated Neuronal Input (SANI) neural net - shared modules 
+ANNtf algorithm SANI shared modules - define Sequentially Activated Neuronal Input neural network with shared modules
 
 Neural modules can be shared between different areas of input sequence, eg sentence (cf RNN).
 This code mirrors that of GIA Sequence Grammar ANN.
 Can parse (by default expects to parse) full sentences; ie features for each word in sentence.
-
-- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 """
 

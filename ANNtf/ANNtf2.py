@@ -1,20 +1,19 @@
-# -*- coding: utf-8 -*-
 """ANNtf2.py
 
-# Requirements:
-Python 3 and Tensorflow 2.1+ 
+# Author:
+Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 # License:
 MIT License
 
+# Installation:
+Python 3 and Tensorflow 2.1+ 
+
 # Usage:
 python3 ANNtf2.py
 
-# Description
-
-Train an artificial neural network (ANN/SANI/LREANN/FBANN/EIANN)
-
-- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
+# Description:
+ANNtf - train an experimental artificial neural network (ANN/SANI/LREANN/FBANN/EIANN/BAANN)
 
 """
 
@@ -36,10 +35,10 @@ from ANNtf2_algorithmSANIglobalDefs import algorithmSANI
 
 #algorithm = "ANN"	#standard artificial neural network (backprop)
 #algorithm = "SANI"	#sequentially activated neuronal input artificial neural network
-algorithm = "LREANN"	#learning rule experiment artificial neural network
+#algorithm = "LREANN"	#learning rule experiment artificial neural network
 #algorithm = "FBANN"	#feedback artificial neural network (reverse connectivity)
 #algorithm = "EIANN"	#excitatory/inhibitory artificial neural network
-
+algorithm = "BAANN"	#breakaway artificial neural network
 
 suppressGradientDoNotExistForVariablesWarnings = True
 
@@ -59,13 +58,13 @@ elif(algorithm == "SANI"):
 	elif(algorithmSANI == "repeatedModules"):
 		import ANNtf2_algorithmSANIrepeatedModules as ANNtf2_algorithmSANI
 elif(algorithm == "LREANN"):
-	algorithmLREANN = "LREANN_expHUANN"
+	#algorithmLREANN = "LREANN_expHUANN"
 	#algorithmLREANN = "LREANN_expSUANN"
 	#algorithmLREANN = "LREANN_expAUANN"
 	#algorithmLREANN = "LREANN_expCUANN"
 	#algorithmLREANN = "LREANN_expXUANN"
 	#algorithmLREANN = "LREANN_expMUANN"
-	#algorithmLREANN = "LREANN_expRUANN"
+	algorithmLREANN = "LREANN_expRUANN"
 	if(algorithmLREANN == "LREANN_expHUANN"):
 		import ANNtf2_algorithmLREANN_expHUANN as ANNtf2_algorithmLREANN
 	elif(algorithmLREANN == "LREANN_expSUANN"):
@@ -87,7 +86,10 @@ elif(algorithm == "FBANN"):
 	import ANNtf2_algorithmFBANN as ANNtf2_algorithmFBANN
 elif(algorithm == "EIANN"):
 	import ANNtf2_algorithmEIANN as ANNtf2_algorithmEIANN
-					
+elif(algorithm == "BAANN"):
+	import ANNtf2_algorithmBAANN as ANNtf2_algorithmBAANN
+	
+						
 #learningRate, trainingSteps, batchSize, displayStep, numEpochs = -1
 
 #performance enhancements for development environment only: 
@@ -159,7 +161,13 @@ elif(algorithm == "EIANN"):
 	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 3	#default: 1		
+elif(algorithm == "BAANN"):
+	#dataset = "POStagSequence"
+	dataset = "SmallDataset"
+	#trainMultipleNetworks = True	#default: False
+	#numberOfNetworks = 3	#default: 1		
 	
+		
 if(dataset == "SmallDataset"):
 	smallDatasetIndex = 0 #default: 0 (New Thyroid)
 	#trainMultipleFiles = False	#required
@@ -241,7 +249,7 @@ def executeLearningLREANN_expXUANN(x, y, samplePositiveX, samplePositiveY, sampl
 
 
 			
-def executeOptimisation(x, y, networkIndex=1):
+def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, networkIndex=1):
 	with tf.GradientTape() as gt:
 		pred = neuralNetworkPropagation(x, networkIndex)
 		loss = crossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits)
@@ -387,19 +395,13 @@ def executeOptimisation(x, y, networkIndex=1):
 			   print("neuronEI = ", neuronEI)
 			   print("Blayer = ", Blayer)
 						
-																
-if __name__ == "__main__":
 
-	#generate network parameters based on dataset properties:
+def loadDataset(fileIndex):
 
-	#global learningRate, trainingSteps, batchSize, displayStep, numEpochs
-	
-	datasetNumExamplesTemp = 0
 	datasetNumFeatures = 0
 	datasetNumClasses = 0
-
-	fileIndexTemp = 0
-	fileIndexStr = str(fileIndexTemp).zfill(4)
+	
+	fileIndexStr = str(fileIndex).zfill(4)
 	if(dataset == "POStagSequence"):
 		datasetType1FileNameX = dataset1FileNameXstart + fileIndexStr + datasetFileNameXend
 		datasetType1FileNameY = dataset1FileNameYstart + fileIndexStr + datasetFileNameYend
@@ -413,12 +415,25 @@ if __name__ == "__main__":
 
 	numberOfLayers = 0
 	if(dataset == "POStagSequence"):
-		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
+		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
 	elif(dataset == "POStagSentence"):
-		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType3(datasetType3FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain, useSmallSentenceLengths)
+		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType3(datasetType3FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain, useSmallSentenceLengths)
 	elif(dataset == "SmallDataset"):
-		datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType2(datasetType2FileName, datasetClassColumnFirst)
+		datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType2(datasetType2FileName, datasetClassColumnFirst)
+		numberOfFeaturesPerWord = None
+		paddingTagIndex = None
+	
+	return numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_xTemp, train_yTemp, test_xTemp, test_yTemp
 
+
+def main():
+																
+	#generate network parameters based on dataset properties:
+
+	#global learningRate, trainingSteps, batchSize, displayStep, numEpochs
+
+	fileIndexTemp = 0	
+	numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = loadDataset(fileIndexTemp)
 
 	#Model constants
 	num_input_neurons = datasetNumFeatures  #train_x.shape[1]
@@ -486,27 +501,8 @@ if __name__ == "__main__":
 
 			#print("fileIndex = ", fileIndex)
 			
-			datasetNumExamples = 0
-
-			fileIndexStr = str(fileIndex).zfill(4)
-			if(dataset == "POStagSequence"):
-				datasetType1FileNameX = dataset1FileNameXstart + fileIndexStr + datasetFileNameXend
-				datasetType1FileNameY = dataset1FileNameYstart + fileIndexStr + datasetFileNameYend
-			elif(dataset == "POStagSentence"):
-				datasetType3FileNameX = dataset3FileNameXstart + fileIndexStr + datasetFileNameXend	
-			elif(dataset == "SmallDataset"):
-				if(trainMultipleFiles):
-					datasetType2FileName = dataset2FileNameStart + fileIndexStr + datasetFileNameEnd
-				else:
-					datasetType2FileName = dataset2FileName
-
-			if(dataset == "POStagSequence"):
-				numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = ANNtf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
-			if(dataset == "POStagSentence"):
-				numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = ANNtf2_loadDataset.loadDatasetType3(datasetType3FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain, useSmallSentenceLengths)
-			elif(dataset == "SmallDataset"):
-				datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = ANNtf2_loadDataset.loadDatasetType2(datasetType2FileName, datasetClassColumnFirst)
-
+			numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = loadDataset(fileIndex)
+			
 			shuffleSize = datasetNumExamples	#heuristic: 10*batchSize
 			
 			#new iteration method (only required for algorithm == "LREANN_expAUANN/LREANN_expCUANN"):	
@@ -541,7 +537,7 @@ if __name__ == "__main__":
 						sampleNegativeDataList = ANNtf2_algorithmLREANN.generateTFtrainDataFromNParraysLREANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=False)					
 					elif(XUANNnegativeSamplesAll):
 						#implementation limitation (sample negative contains a selection of experiences from all classes, not just negative classes) - this simplification deemed valid under assumptions: calculations will be averaged over large negative batch and numberClasses >> 2
-						sampleNegativeData = generateTFtrainDataFromNParrays(train_x, train_y, shuffleSize, batchSize)
+						sampleNegativeData = generateTFtrainDataFromNParrays(train_x, train_y, shuffleSize, batchSize)	#CHECKTHIS
 						sampleNegativeDataList = []
 						sampleNegativeDataList.append(sampleNegativeData)
 					elif(XUANNnegativeSamplesRandom):
@@ -612,7 +608,7 @@ if __name__ == "__main__":
 				for networkIndex in range(1, numberOfNetworks+1):
 
 					if(algorithm == "ANN"):
-						executeOptimisation(batchX, batchY, networkIndex)
+						executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)
 						if(batchIndex % displayStep == 0):
 							pred = neuralNetworkPropagation(batchX, networkIndex)
 							#print("pred.shape = ", pred.shape)
@@ -652,7 +648,7 @@ if __name__ == "__main__":
 							print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
 							predNetworkAverage = predNetworkAverage + pred
 					elif(algorithm == "FBANN"):
-						executeOptimisation(batchX, batchY, networkIndex)
+						executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)
 						if(batchIndex % displayStep == 0):
 							pred = neuralNetworkPropagation(batchX, networkIndex)
 							#print("pred = ", pred)
@@ -661,7 +657,7 @@ if __name__ == "__main__":
 							print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
 							predNetworkAverage = predNetworkAverage + pred
 					elif(algorithm == "EIANN"):
-						executeOptimisation(batchX, batchY, networkIndex)
+						executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)
 						if(batchIndex % displayStep == 0):
 							pred = neuralNetworkPropagation(batchX, networkIndex)
 							#print("pred.shape = ", pred.shape)
@@ -718,3 +714,13 @@ if __name__ == "__main__":
 					#print("predNetworkAverageAll", predNetworkAverageAll)
 					acc = calculateAccuracy(predNetworkAverageAll, test_y)
 					print("Test Accuracy: %f" % (acc))
+
+if __name__ == "__main__":
+	if(algorithm == "BAANN"):
+		fileIndexTemp = 0
+		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmBAANN.defineTrainingParametersBAANN(dataset, trainMultipleFiles)
+		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_x, train_y, test_x, test_y = loadDataset(fileIndexTemp)
+		ANNtf2_algorithmBAANN.BAANNmain(train_x, train_y, test_x, test_y, datasetNumFeatures, datasetNumClasses, batchSize, trainingSteps, numEpochs)
+	else:
+		main()
+	

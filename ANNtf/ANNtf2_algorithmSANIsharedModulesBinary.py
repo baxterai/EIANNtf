@@ -1,22 +1,21 @@
-# -*- coding: utf-8 -*-
 """ANNtf2_algorithmSANIsharedModulesBinary.py
 
-# Requirements:
-Python 3 and Tensorflow 2.1+ 
+# Author:
+Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 # License:
 MIT License
+
+# Installation:
+see ANNtf2.py
 
 # Usage:
 see ANNtf2.py
 
 # Description:
-
-Define Sequentially Activated Neuronal Input (SANI) neural net - shared modules binary
+ANNtf algorithm SANI shared modules binary - define Sequentially Activated Neuronal Input neural network with shared modules and binary weights and activation signals
 
 See shared modules
-
-- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 """
 

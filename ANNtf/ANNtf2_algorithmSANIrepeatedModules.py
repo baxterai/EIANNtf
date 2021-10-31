@@ -1,22 +1,21 @@
-# -*- coding: utf-8 -*-
 """ANNtf2_algorithmSANIrepeatedModules.py
 
-# Requirements:
-Python 3 and Tensorflow 2.1+ 
+# Author:
+Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 # License:
 MIT License
+
+# Installation:
+see ANNtf2.py
 
 # Usage:
 see ANNtf2.py
 
 # Description:
-
-Define Sequentially Activated Neuronal Input (SANI) neural net - repeated modules 
+ANNtf algorithm SANI repeated modules - define Sequentially Activated Neuronal Input neural network with repeated modules
 
 Neural modules cannot be shared between different areas of input sequence.
-
-- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 """
 

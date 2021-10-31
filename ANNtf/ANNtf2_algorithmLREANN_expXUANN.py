@@ -1,20 +1,19 @@
-# -*- coding: utf-8 -*-
 """ANNtf2_algorithmLREANN_expXUANN.py
 
-# Requirements:
-Python 3 and Tensorflow 2.1+ 
+# Author:
+Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 # License:
 MIT License
 
+# Installation:
+see ANNtf2.py
+
 # Usage:
 see ANNtf2.py
 
-# Description
-
-Define fully connected learning rule experiment artificial neural network - contrastive (pos/neg sample diff) update (LREANN_expXUANN)
-
-- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
+# Description:
+ANNtf algorithm LREANN expXUANN - define learning rule experiment artificial neural network with - contrastive (pos/neg sample diff) update
 
 """
 

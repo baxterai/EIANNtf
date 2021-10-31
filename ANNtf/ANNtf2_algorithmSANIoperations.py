@@ -1,20 +1,19 @@
-# -*- coding: utf-8 -*-
 """ANNtf2_algorithmSANIoperations.py
 
-# Requirements:
-Python 3 and Tensorflow 2.1+ 
+# Author:
+Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 # License:
 MIT License
+
+# Installation:
+see ANNtf2.py
 
 # Usage:
 see ANNtf2.py
 
 # Description:
-
-Define Sequentially Activated Neuronal Input (SANI) neural net - operations
-
-- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
+ANNtf algorithm SANI (Sequentially Activated Neuronal Input) operations
 
 """
 

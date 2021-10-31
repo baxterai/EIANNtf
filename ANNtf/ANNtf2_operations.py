@@ -1,20 +1,19 @@
-# -*- coding: utf-8 -*-
 """ANNtf2_operations.py
 
-# Requirements:
-Python 3 and Tensorflow 2.1+ 
+# Author:
+Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
 
 # License:
 MIT License
 
+# Installation:
+see ANNtf2.py
+
 # Usage:
 see ANNtf2.py
 
-# Description
-
-SANI operations
-
-- Author: Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
+# Description:
+ANNtf operations
 
 """
 
@@ -136,7 +135,7 @@ def filterNParraysByClassTargetInverse(train_x, train_y, classTargetFilterIndex=
 	train_xFiltered = train_x[rowFilter]
 	train_yFiltered = train_y[rowFilter]
 	return train_xFiltered, train_yFiltered
-	
+  
 def generateTFtrainDataFromNParrays(train_x, train_y, shuffleSize, batchSize):
 	#shuffleSize = shuffleBufferSize
 	trainDataUnbatched = generateTFtrainDataUnbatchedFromNParrays(train_x, train_y)
