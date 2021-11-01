@@ -32,6 +32,8 @@ import ANNtf2_globalDefs
 
 useTFdataset = True	#repeat and shuffle data
 
+onlyTrainFinalLayer = True
+
 numberLayers = 6
 
 def defineTrainingParametersBAANN(dataset, trainMultipleFiles):
@@ -114,6 +116,8 @@ def upgradeModelAddLayer(firstLayer, existingModel, num_input_neurons, num_outpu
 		#previousLayerOutput, previousLayerSkipConnectionOutput = existingModel([currentInput, skipConnectionInput], training=False)
 		previousLayerOutput, previousLayerSkipConnectionOutput = existingModel(currentInput, training=False)
 		layerInput = tf.keras.layers.Concatenate()([previousLayerOutput, previousLayerSkipConnectionOutput])	#add skip connections
+		if(onlyTrainFinalLayer):
+			layerInput = tf.stop_gradient(layerInput)
 		currentOutput = tf.keras.layers.Dense(num_output_neurons)(layerInput)
 		currentOutput = tf.keras.layers.Softmax()(currentOutput)
 		skipConnectionOutput = layerInput
