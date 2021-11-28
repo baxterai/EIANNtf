@@ -38,7 +38,8 @@ from ANNtf2_algorithmSANIglobalDefs import algorithmSANI
 #algorithm = "LREANN"	#learning rule experiment artificial neural network
 #algorithm = "FBANN"	#feedback artificial neural network (reverse connectivity)
 #algorithm = "EIANN"	#excitatory/inhibitory artificial neural network
-algorithm = "BAANN"	#breakaway artificial neural network
+#algorithm = "BAANN"	#breakaway artificial neural network
+algorithm = "LIANN"	#local inhibition artificial neural network
 
 suppressGradientDoNotExistForVariablesWarnings = True
 
@@ -88,6 +89,8 @@ elif(algorithm == "EIANN"):
 	import ANNtf2_algorithmEIANN as ANNtf2_algorithmEIANN
 elif(algorithm == "BAANN"):
 	import ANNtf2_algorithmBAANN as ANNtf2_algorithmBAANN
+elif(algorithm == "LIANN"):
+	import ANNtf2_algorithmLIANN as ANNtf2_algorithmLIANN
 	
 						
 #learningRate, trainingSteps, batchSize, displayStep, numEpochs = -1
@@ -166,7 +169,12 @@ elif(algorithm == "BAANN"):
 	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 3	#default: 1		
-	
+elif(algorithm == "LIANN"):
+	#dataset = "POStagSequence"
+	dataset = "SmallDataset"
+	#trainMultipleNetworks = True	#default: False
+	#numberOfNetworks = 3	#default: 1		
+		
 		
 if(dataset == "SmallDataset"):
 	smallDatasetIndex = 0 #default: 0 (New Thyroid)
@@ -217,6 +225,8 @@ def neuralNetworkPropagation(x, networkIndex=1):
 		pred = ANNtf2_algorithmFBANN.neuralNetworkPropagationFBANNwrapper(x, networkIndex)
 	elif(algorithm == "EIANN"):
 		pred = ANNtf2_algorithmEIANN.neuralNetworkPropagationEIANN(x, networkIndex)
+	elif(algorithm == "LIANN"):
+		pred = ANNtf2_algorithmLIANN.neuralNetworkPropagationLIANN(x, networkIndex)
 	return pred
 	
 
@@ -246,6 +256,10 @@ def executeLearningLREANN_expAUANN(x, y, exemplarsX, exemplarsY, currentClassTar
 def executeLearningLREANN_expXUANN(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex):
 	#learning algorithm: perform contrast training (diff of interclass experience with current experience, and diff of extraclass experience with current experience) at each layer of network
 	pred = ANNtf2_algorithmLREANN.neuralNetworkPropagationLREANN_expXUANNtrain(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex)
+
+def executeLearningLIANN(x, y, networkIndex):
+	#first learning algorithm: perform neuron independence training
+	pred = ANNtf2_algorithmLIANN.neuralNetworkPropagationLIANNtrain(x, y, networkIndex)
 
 
 			
@@ -311,6 +325,21 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 			else:	
 				Wlist.append(ANNtf2_algorithmEIANN.W[generateParameterNameNetwork(networkIndex, l, "W")])
 				Blist.append(ANNtf2_algorithmEIANN.B[generateParameterNameNetwork(networkIndex, l, "B")])
+		trainableVariables = Wlist + Blist
+		WlistLength = len(Wlist)
+		BlistLength = len(Blist)
+	elif(algorithm == "LIANN"):
+		#second learning algorithm (final layer hebbian connections to output class targets):
+		Wlist = []
+		Blist = []
+		for l in range(1, numberOfLayers+1):
+			if(ANNtf2_algorithmLIANN.onlyTrainFinalLayer):
+				if(l == numberOfLayers):
+					Wlist.append(ANNtf2_algorithmLIANN.W[generateParameterNameNetwork(networkIndex, l, "W")])
+					Blist.append(ANNtf2_algorithmLIANN.B[generateParameterNameNetwork(networkIndex, l, "B")])				
+			else:	
+				Wlist.append(ANNtf2_algorithmLIANN.W[generateParameterNameNetwork(networkIndex, l, "W")])
+				Blist.append(ANNtf2_algorithmLIANN.B[generateParameterNameNetwork(networkIndex, l, "B")])
 		trainableVariables = Wlist + Blist
 		WlistLength = len(Wlist)
 		BlistLength = len(Blist)
@@ -463,7 +492,11 @@ def main():
 		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmEIANN.defineTrainingParametersEIANN(dataset, trainMultipleFiles)
 		numberOfLayers = ANNtf2_algorithmEIANN.defineNetworkParametersEIANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
 		ANNtf2_algorithmEIANN.defineNeuralNetworkParametersEIANN()
-					
+	elif(algorithm == "LIANN"):
+		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmLIANN.defineTrainingParametersLIANN(dataset, trainMultipleFiles)
+		numberOfLayers = ANNtf2_algorithmLIANN.defineNetworkParametersLIANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
+		ANNtf2_algorithmLIANN.defineNeuralNetworkParametersLIANN()
+							
 	#define epochs:
 	
 	if(trainMultipleFiles):
@@ -665,7 +698,22 @@ def main():
 							acc = calculateAccuracy(pred, batchY)
 							print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
 							predNetworkAverage = predNetworkAverage + pred
-							
+					elif(algorithm == "LIANN"):
+						#first learning algorithm: perform neuron independence training
+						batchYoneHot = tf.one_hot(batchY, depth=datasetNumClasses)
+						executeLearningLIANN(batchX, batchYoneHot, networkIndex)
+						
+						#second learning algorithm (final layer hebbian connections to output class targets):
+						executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)
+						if(batchIndex % displayStep == 0):
+							pred = neuralNetworkPropagation(batchX, networkIndex)
+							#print("pred.shape = ", pred.shape)
+							loss = crossEntropy(pred, batchY, datasetNumClasses, costCrossEntropyWithLogits)
+							acc = calculateAccuracy(pred, batchY)
+							print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
+							predNetworkAverage = predNetworkAverage + pred
+
+									
 				if(algorithm == "LREANN"):
 					if(algorithmLREANN == "LREANN_expAUANN"):
 						#batchYactual = ANNtf2_algorithmLREANN.generateTFYActualfromYandExemplarYLREANN_expAUANN(batchY, exemplarsY)
@@ -708,7 +756,11 @@ def main():
 					pred = neuralNetworkPropagation(test_x, networkIndex)	#test_x batch may be too large to propagate simultaneously and require subdivision
 					print("Test Accuracy: networkIndex: %i, %f" % (networkIndex, calculateAccuracy(pred, test_y)))
 					predNetworkAverageAll = predNetworkAverageAll + pred
-			
+				elif(algorithm == "LIANN"):
+					pred = neuralNetworkPropagation(test_x, networkIndex)	#test_x batch may be too large to propagate simultaneously and require subdivision
+					print("Test Accuracy: networkIndex: %i, %f" % (networkIndex, calculateAccuracy(pred, test_y)))
+					predNetworkAverageAll = predNetworkAverageAll + pred
+								
 			if(trainMultipleNetworks):
 					predNetworkAverageAll = predNetworkAverageAll / numberOfNetworks
 					#print("predNetworkAverageAll", predNetworkAverageAll)
