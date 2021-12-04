@@ -80,7 +80,7 @@ elif(learningAlgorithm == "backpropApproximation3"):
 	errorStorageAlgorithm = "useAideal"
 elif(learningAlgorithm == "backpropApproximation4"):
 	errorStorageAlgorithm = "useAideal"
-	useWeightUpdateDirectionHeuristicBasedOnExcitatoryInhibitorySynapseType = True	#enables rapid weight updates, else use stocastic (test both +/-) weight upates
+	useWeightUpdateDirectionHeuristicBasedOnExcitatoryInhibitorySynapseType = True	#enables rapid weight updates, else use stochastic (test both +/-) weight upates
 	useMultiplicationRatherThanAdditionOfDeltaValues = True	#CHECKTHIS #this ensures that Aideal/weight updates are normalised across their local layer (to minimise the probability an alternate class data propagation will be interferred with by the update)
 elif(learningAlgorithm == "backpropApproximation5"):
 	errorStorageAlgorithm = "useAideal"
@@ -502,8 +502,8 @@ def calculateAerrorTopLayer(y_pred, y_true, networkIndex=1):
 			AerrorVec = calculateDeltaTF(AdeltaMax, topLayerIdealAproximity, True, applyMinimia=False)
 
 	if(averageAerrorAcrossBatch):
-		AerrorVec = tf.reduce_mean(AerrorVec, axis=0)      #average across all batches 
-		y_pred = tf.reduce_mean(y_pred, axis=0)      #average across all batches 
+		AerrorVec = tf.reduce_mean(AerrorVec, axis=0)      #average across batch 
+		y_pred = tf.reduce_mean(y_pred, axis=0)      #average across batch 
 		
 	return AerrorVec, y_pred
 
@@ -511,7 +511,7 @@ def calculateAerrorTopLayer(y_pred, y_true, networkIndex=1):
 def calculateAndSetAerrorBottomLayer(x, minLayerToTrain, networkIndex=1):
 	
 	if(averageAerrorAcrossBatch):
-		xAveraged = tf.reduce_mean(x, axis=0)      #average across all batches
+		xAveraged = tf.reduce_mean(x, axis=0)      #average across batch
 	else:
 		xAveraged = x
 		
@@ -525,7 +525,7 @@ def calculateAndSetAerrorBottomLayer(x, minLayerToTrain, networkIndex=1):
 
 def calculateAndSetAerror(l, networkIndex=1, y=None):
 
-	#stocastically identify Aideal of l (lower) based on Aideal of l+1
+	#stochastically identify Aideal of l (lower) based on Aideal of l+1
 		#this is biologically achieved by temporarily/independently adjusting the firing rate (~bias) of each neuron (index k) on l, and seeing if this better achieves Aideal of l+1
 		#feedback (positive/negtive trial) is given from higher level l+1 to l_k in the form of "simple" [boolean] ~local chemical signal
 
@@ -570,7 +570,7 @@ def calculateAerrorBackpropStrict(A, l, networkIndex):
 	
 	if(averageAerrorAcrossBatch):
 		AerrorVec = tf.squeeze(AerrorVec)
-		A = tf.reduce_mean(A, axis=0)   #average across all batches
+		A = tf.reduce_mean(A, axis=0)   #average across batch
 		
 	return AerrorVec
 
@@ -693,7 +693,7 @@ def trialAerrorMod(applyAboveLayerError, A, k, l, networkIndex):
 	AtrialAbove, ZtrialAbove = neuralNetworkPropagationLREANNlayerLK(A, k, l+1, networkIndex)
 
 	if(averageAerrorAcrossBatch):
-		ZtrialAbove = tf.reduce_mean(ZtrialAbove, axis=0)   #average across all batches
+		ZtrialAbove = tf.reduce_mean(ZtrialAbove, axis=0)   #average across batch
 	else:
 		None
 			
@@ -736,9 +736,9 @@ def trialAidealMod(direction, A, k, l, networkIndex):
 		AtrialKdelta = tf.squeeze(AtrialKdelta)
 			
 	if(averageAerrorAcrossBatch):
-		AtrialAbove = getAcomparison(AtrialAbove)	#average across all batches
+		AtrialAbove = getAcomparison(AtrialAbove)	#average across batch
 		#AtrialKdelta is already averaged across all batches
-		AtrialK = getAcomparison(AtrialK)	#average across all batches
+		AtrialK = getAcomparison(AtrialK)	#average across batch
 		if(learningAlgorithm == "backpropApproximation4"):
 			AtrialKdelta = getAcomparison(AtrialKdelta)
 		
@@ -868,13 +868,13 @@ def updateWeightsBasedOnAerror(l, x, y, networkIndex):
 		#OLD:
 		#AtraceBelow = getAtraceComparison(l-1, networkIndex)	
 		#if(not averageAerrorAcrossBatch):
-		#	AtraceBelow = tf.reduce_mean(AtraceBelow, axis=0)      #average across all batches 
-		#	AerrorLayer = tf.reduce_mean(AerrorLayer, axis=0)      #average across all batches 
+		#	AtraceBelow = tf.reduce_mean(AtraceBelow, axis=0)      #average across batch 
+		#	AerrorLayer = tf.reduce_mean(AerrorLayer, axis=0)      #average across batch 
 		#AtraceBelow = tf.expand_dims(AtraceBelow, axis=1)	#required for matmul preparation
 		#AerrorLayer = tf.expand_dims(AerrorLayer, axis=0)	#required for matmul preparation
 
 		if(averageAerrorAcrossBatch):
-			AtraceBelow = tf.reduce_mean(AtraceBelow, axis=0)      #average across all batches
+			AtraceBelow = tf.reduce_mean(AtraceBelow, axis=0)      #average across batch
 			AtraceBelow = tf.expand_dims(AtraceBelow, axis=0)	#required for matmul preparation
 			AerrorLayer = tf.expand_dims(AerrorLayer, axis=0)
 
@@ -916,7 +916,7 @@ def updateWeightsBasedOnAerror(l, x, y, networkIndex):
 			updateWeightsBasedOnAidealHeuristic(l, networkIndex, errorVec)
 		else:
 			lossBase = calculateErrorAtrial(AtrialBase, AidealLayer, networkIndex)		#lossBase will be averaged across all batches, across k neurons on l
-			updateWeightsBasedOnAidealStocastic(l, AprevLayer, AidealLayer, networkIndex, lossBase, x)
+			updateWeightsBasedOnAidealStochastic(l, AprevLayer, AidealLayer, networkIndex, lossBase, x)
 
 def updateWeightsBasedOnAidealHeuristic(l, networkIndex, errorVec):
 
@@ -940,9 +940,9 @@ def updateWeightsBasedOnAidealHeuristic(l, networkIndex, errorVec):
 	
 	W[generateParameterNameNetwork(networkIndex, l, "W")] = WlayerNew
 
-def updateWeightsBasedOnAidealStocastic(l, AprevLayer, AidealLayer, networkIndex, lossBase, x):
+def updateWeightsBasedOnAidealStochastic(l, AprevLayer, AidealLayer, networkIndex, lossBase, x):
 
-	#stocastic algorithm extracted from neuralNetworkPropagationLREANN_expSUANNtrain_updateNeurons()g
+	#stochastic algorithm extracted from neuralNetworkPropagationLREANN_expSUANNtrain_updateNeurons()g
 
 	if(useBinaryWeights):
 		variationDirections = 1
@@ -995,7 +995,7 @@ def updateWeightsBasedOnAidealStocastic(l, AprevLayer, AidealLayer, networkIndex
 					B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
 			
 				Atrial, Ztrial = neuralNetworkPropagationLREANNlayerL(AprevLayer, l, networkIndex)
-				error = calculateErrorAtrial(Atrial, AidealLayer, networkIndex)	#average across all batches, across k neurons on l
+				error = calculateErrorAtrial(Atrial, AidealLayer, networkIndex)	#average across batch, across k neurons on l
 				
 				if(error < lossBase):
 					accuracyImprovementDetected = True
@@ -1081,9 +1081,9 @@ def calculateErrorAtrial(Atrial, AidealLayer, networkIndex, averageType="all"):
 			error = error
 	else:
 		if(averageType == "all"):
-			error = tf.reduce_mean(error)	#average across all batches, across k neurons on l
+			error = tf.reduce_mean(error)	#average across batch, across k neurons on l
 		elif(averageType == "vector"):
-			error = tf.reduce_mean(error, axis=0)	#average across all batches	
+			error = tf.reduce_mean(error, axis=0)	#average across batch	
 		elif(averageType == "none"):
 			error = error
 									
@@ -1188,7 +1188,7 @@ def getAtraceComparison(l, networkIndex=1):
 	
 def getAcomparison(A):		
 	if(averageAerrorAcrossBatch):
-		A = tf.reduce_mean(A, axis=0)      #average across all batches
+		A = tf.reduce_mean(A, axis=0)      #average across batch
 	return A
 
 def activationFunctionPrime(z):

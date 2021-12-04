@@ -171,7 +171,7 @@ def defineNetworkParametersLREANN(num_input_neurons, num_output_neurons, dataset
 	global numberOfLayers
 	global numberOfNetworks
 	
-	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet)
+	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork=True, generateNetworkStatic=True)
 
 	return numberOfLayers
 

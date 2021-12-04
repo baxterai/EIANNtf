@@ -13,7 +13,7 @@ Python 3 and Tensorflow 2.1+
 python3 ANNtf2.py
 
 # Description:
-ANNtf - train an experimental artificial neural network (ANN/SANI/LREANN/FBANN/EIANN/BAANN)
+ANNtf - train an experimental artificial neural network (ANN/SANI/LREANN/FBANN/EIANN/BAANN/LIANN)
 
 """
 
@@ -226,7 +226,7 @@ def neuralNetworkPropagation(x, networkIndex=1):
 	elif(algorithm == "EIANN"):
 		pred = ANNtf2_algorithmEIANN.neuralNetworkPropagationEIANN(x, networkIndex)
 	elif(algorithm == "LIANN"):
-		pred = ANNtf2_algorithmLIANN.neuralNetworkPropagationLIANN(x, networkIndex)
+		pred = ANNtf2_algorithmLIANN.neuralNetworkPropagationLIANNtest(x, networkIndex)
 	return pred
 	
 
@@ -248,7 +248,7 @@ def executeLearningLREANN(x, y, networkIndex=1):
 		#learning algorithm embedded in multiple forward propagation and synaptic delta calculations
 		pred = ANNtf2_algorithmLREANN.neuralNetworkPropagationLREANN_expMUANNtrain(x, y, networkIndex)
 	elif(algorithmLREANN == "LREANN_expRUANN"):
-		#learning algorithm: in reverse order, stocastically establishing Aideal of each layer (by temporarily biasing firing rate of neurons) to better achieve Aideal of higher layer (through multiple local/single layer forward propagations), then (simultaneous/parallel layer processing) stocastically adjusting weights to fine tune towards Aideal of their higher layers
+		#learning algorithm: in reverse order, stochastically establishing Aideal of each layer (by temporarily biasing firing rate of neurons) to better achieve Aideal of higher layer (through multiple local/single layer forward propagations), then (simultaneous/parallel layer processing) stochastically adjusting weights to fine tune towards Aideal of their higher layers
 		pred = ANNtf2_algorithmLREANN.neuralNetworkPropagationLREANN_expRUANNtrain(x, y, networkIndex)
 def executeLearningLREANN_expAUANN(x, y, exemplarsX, exemplarsY, currentClassTarget, networkIndex=1):
 	#learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
@@ -333,7 +333,7 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 		Wlist = []
 		Blist = []
 		for l in range(1, numberOfLayers+1):
-			if(ANNtf2_algorithmLIANN.onlyTrainFinalLayer):
+			if(ANNtf2_algorithmLIANN.learningAlgorithmHebbianFinalLayer):
 				if(l == numberOfLayers):
 					Wlist.append(ANNtf2_algorithmLIANN.W[generateParameterNameNetwork(networkIndex, l, "W")])
 					Blist.append(ANNtf2_algorithmLIANN.B[generateParameterNameNetwork(networkIndex, l, "B")])				

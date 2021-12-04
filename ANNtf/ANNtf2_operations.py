@@ -26,39 +26,6 @@ debugSingleLayerNetwork = False
 
 
 #if(useBinaryWeights) or if(generateFirstLayerSDR)
-
-generateLargeNetwork = True	#default: True
-if(generateLargeNetwork):
-	generateNetworkStatic = True
-	if(generateNetworkStatic):
-		maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 5.0
-	else:
-		maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 3.0	#default: 3.0	#2.0 
-		generateNetworkNonlinearConvergence = True
-else:
-	#maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.5
-	#generateNetworkNonlinearConvergence = True
-	maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.8	#default: 0.8
-	generateNetworkNonlinearConvergence = False	#default: False
-
-
-if(generateNetworkStatic):
-	networkDivergenceType = "linearStatic"
-elif(generateNetworkNonlinearConvergence):
-	networkDivergenceType = "nonLinearConverging"
-	
-	#if(applyNeuronThresholdBias):
-	#	#this will affect the optimimum convergence angle
-	#	networkOptimumConvergenceAngle = 0.5+applyNeuronThresholdBiasValue
-		
-	networkOptimumConvergenceAngle = 0.5	#if angle > 0.5, then more obtuse triange, if < 0.5 then more acute triangle	#fractional angle between 0 and 90 degrees
-	networkDivergence = 1.0-networkOptimumConvergenceAngle 
-	#required for Logarithms with a Fraction as Base:
-	networkDivergenceNumerator = int(networkDivergence*10)
-	networkDivergenceDenominator = 10
-else:
-	networkDivergenceType = "linearConverging"
-	#networkDivergenceType = "linearDivergingThenConverging"	#not yet coded
 	
 		
 def generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, arrayName):
@@ -153,11 +120,11 @@ def generateTFtrainDataFromTrainDataUnbatched(trainDataUnbatched, shuffleSize, b
 	return trainData
 
 
-def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork=True, generateNetworkStatic=False):
 	if(debugSingleLayerNetwork):
 		n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = defineNetworkParametersANNsingleLayer(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet)
 	else:
-		n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet)
+		n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork, generateNetworkStatic)
 	return n_h, numberOfLayers, numberOfNetworks, datasetNumClasses
 
 def defineNetworkParametersANNsingleLayer(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
@@ -180,7 +147,41 @@ def defineNetworkParametersANNsingleLayer(num_input_neurons, num_output_neurons,
 	return 	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses
 	
 	
-def defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+def defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork, generateNetworkStatic):
+
+	#configuration:
+	if(generateLargeNetwork):
+		if(generateNetworkStatic):
+			maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 5.0
+			generateNetworkNonlinearConvergence = False
+		else:
+			maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 3.0	#default: 3.0	#2.0 
+			generateNetworkNonlinearConvergence = True
+	else:
+		#maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.5
+		#generateNetworkNonlinearConvergence = True
+		maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons = 0.8	#default: 0.8
+		generateNetworkNonlinearConvergence = False	#default: False
+		
+	if(generateNetworkStatic):
+		networkDivergenceType = "linearStatic"
+	elif(generateNetworkNonlinearConvergence):
+		networkDivergenceType = "nonLinearConverging"
+
+		#if(applyNeuronThresholdBias):
+		#	#this will affect the optimimum convergence angle
+		#	networkOptimumConvergenceAngle = 0.5+applyNeuronThresholdBiasValue
+
+		networkOptimumConvergenceAngle = 0.5	#if angle > 0.5, then more obtuse triange, if < 0.5 then more acute triangle	#fractional angle between 0 and 90 degrees
+		networkDivergence = 1.0-networkOptimumConvergenceAngle 
+		#required for Logarithms with a Fraction as Base:
+		networkDivergenceNumerator = int(networkDivergence*10)
+		networkDivergenceDenominator = 10
+	else:
+		networkDivergenceType = "linearConverging"
+		#networkDivergenceType = "linearDivergingThenConverging"	#not yet coded
+		
+		
 
 	#Network parameters
 	n_h = []
