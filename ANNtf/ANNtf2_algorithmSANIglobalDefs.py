@@ -21,7 +21,7 @@ import tensorflow as tf
 import numpy as np
 import ANNtf2_globalDefs
 
-
+#select algorithmSANI:
 algorithmSANI = "sharedModulesHebbian"
 #algorithmSANI = "sharedModulesBinary"
 #algorithmSANI = "sharedModules"

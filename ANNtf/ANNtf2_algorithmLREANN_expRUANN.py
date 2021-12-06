@@ -247,29 +247,16 @@ optimizer = tf.optimizers.SGD(learningRate)
 def getNoisySampleGenerationNumSamples():
 	return noisySampleGeneration, noisySampleGenerationNumSamples, noiseStandardDeviation
 	
-def defineTrainingParametersLREANN(dataset, trainMultipleFiles):
-	
-	if(trainMultipleFiles):
-		if(dataset == "POStagSequence"):
-			trainingSteps = 10000
-		elif(dataset == "SmallDataset"):
-			if(debugFastTrain):
-				trainingSteps = 1000
-			else:
-				trainingSteps = 10000
-		numEpochs = 10
+def defineTrainingParametersLREANN(dataset):
+
+	if(debugFastTrain):
+		trainingSteps = 1000
 	else:
-		if(dataset == "POStagSequence"):
-			trainingSteps = 10000
-		elif(dataset == "SmallDataset"):
-			if(debugFastTrain):
-				trainingSteps = 1000
-			else:
-				trainingSteps = 10000
-		if(useBatch):
-			numEpochs = 100	#10
-		else:
-			numEpochs = 100
+		trainingSteps = 10000
+	if(useBatch):
+		numEpochs = 100	#10
+	else:
+		numEpochs = 100
 	
 	displayStep = 100
 

@@ -33,13 +33,14 @@ from numpy import random
 import ANNtf2_loadDataset
 from ANNtf2_algorithmSANIglobalDefs import algorithmSANI
 
+#select algorithm:
 #algorithm = "ANN"	#standard artificial neural network (backprop)
-#algorithm = "SANI"	#sequentially activated neuronal input artificial neural network
+#algorithm = "SANI"	#sequentially activated neuronal input artificial neural network	#incomplete+non-convergent
 #algorithm = "LREANN"	#learning rule experiment artificial neural network
-#algorithm = "FBANN"	#feedback artificial neural network (reverse connectivity)
-#algorithm = "EIANN"	#excitatory/inhibitory artificial neural network
+#algorithm = "FBANN"	#feedback artificial neural network (reverse connectivity)	#incomplete
+#algorithm = "EIANN"	#excitatory/inhibitory artificial neural network	#incomplete+non-convergent
 #algorithm = "BAANN"	#breakaway artificial neural network
-algorithm = "LIANN"	#local inhibition artificial neural network
+algorithm = "LIANN"	#local inhibition artificial neural network	#incomplete+non-convergent
 
 suppressGradientDoNotExistForVariablesWarnings = True
 
@@ -59,13 +60,14 @@ elif(algorithm == "SANI"):
 	elif(algorithmSANI == "repeatedModules"):
 		import ANNtf2_algorithmSANIrepeatedModules as ANNtf2_algorithmSANI
 elif(algorithm == "LREANN"):
-	#algorithmLREANN = "LREANN_expHUANN"
-	#algorithmLREANN = "LREANN_expSUANN"
-	#algorithmLREANN = "LREANN_expAUANN"
-	#algorithmLREANN = "LREANN_expCUANN"
-	#algorithmLREANN = "LREANN_expXUANN"
-	#algorithmLREANN = "LREANN_expMUANN"
-	algorithmLREANN = "LREANN_expRUANN"
+	#select algorithmLREANN:
+	#algorithmLREANN = "LREANN_expHUANN"	#incomplete+non-convergent
+	#algorithmLREANN = "LREANN_expSUANN"	
+	#algorithmLREANN = "LREANN_expAUANN"	#incomplete+non-convergent
+	#algorithmLREANN = "LREANN_expCUANN"	#incomplete+non-convergent
+	#algorithmLREANN = "LREANN_expXUANN"	#incomplete
+	#algorithmLREANN = "LREANN_expMUANN"	#incomplete+non-convergent
+	algorithmLREANN = "LREANN_expRUANN"		
 	if(algorithmLREANN == "LREANN_expHUANN"):
 		import ANNtf2_algorithmLREANN_expHUANN as ANNtf2_algorithmLREANN
 	elif(algorithmLREANN == "LREANN_expSUANN"):
@@ -144,33 +146,27 @@ if(algorithm == "SANI"):
 		if(not ANNtf2_algorithmSANI.SANIsharedModules):	#only implementation
 			dataset = "POStagSequence"
 elif(algorithm == "ANN"):
-	#dataset = "POStagSequence"
 	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 3	#default: 1
 elif(algorithm == "LREANN"):
-	#dataset = "POStagSequence"
 	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 5	#default: 1
 	trainHebbianBackprop = False	#default: False
 elif(algorithm == "FBANN"):
-	#dataset = "POStagSequence"
 	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 5	#default: 1
 elif(algorithm == "EIANN"):
-	#dataset = "POStagSequence"
 	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 3	#default: 1		
 elif(algorithm == "BAANN"):
-	#dataset = "POStagSequence"
 	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 3	#default: 1		
 elif(algorithm == "LIANN"):
-	#dataset = "POStagSequence"
 	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 3	#default: 1		
@@ -472,7 +468,7 @@ def main():
 			num_output_neurons = ANNtf2_algorithmLREANN.calculateOutputNeuronsLREANN_expAUANN(datasetNumClasses)
 
 	if(algorithm == "ANN"):
-		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmANN.defineTrainingParametersANN(dataset, trainMultipleFiles)
+		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmANN.defineTrainingParametersANN(dataset)
 		numberOfLayers = ANNtf2_algorithmANN.defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
 		ANNtf2_algorithmANN.defineNeuralNetworkParametersANN()
 	elif(algorithm == "SANI"):
@@ -481,19 +477,19 @@ def main():
 		ANNtf2_algorithmSANI.defineNetworkParametersSANIwrapper(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, useSmallSentenceLengths, numberOfFeaturesPerWord)
 		ANNtf2_algorithmSANI.defineNeuralNetworkParametersSANI()
 	elif(algorithm == "LREANN"):
-		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmLREANN.defineTrainingParametersLREANN(dataset, trainMultipleFiles)
+		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmLREANN.defineTrainingParametersLREANN(dataset)
 		numberOfLayers = ANNtf2_algorithmLREANN.defineNetworkParametersLREANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
 		ANNtf2_algorithmLREANN.defineNeuralNetworkParametersLREANN()
 	elif(algorithm == "FBANN"):
-		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmFBANN.defineTrainingParametersFBANN(dataset, trainMultipleFiles)
+		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmFBANN.defineTrainingParametersFBANN(dataset)
 		numberOfLayers = ANNtf2_algorithmFBANN.defineNetworkParametersFBANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
 		ANNtf2_algorithmFBANN.defineNeuralNetworkParametersFBANN()
 	elif(algorithm == "EIANN"):
-		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmEIANN.defineTrainingParametersEIANN(dataset, trainMultipleFiles)
+		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmEIANN.defineTrainingParametersEIANN(dataset)
 		numberOfLayers = ANNtf2_algorithmEIANN.defineNetworkParametersEIANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
 		ANNtf2_algorithmEIANN.defineNeuralNetworkParametersEIANN()
 	elif(algorithm == "LIANN"):
-		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmLIANN.defineTrainingParametersLIANN(dataset, trainMultipleFiles)
+		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmLIANN.defineTrainingParametersLIANN(dataset)
 		numberOfLayers = ANNtf2_algorithmLIANN.defineNetworkParametersLIANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
 		ANNtf2_algorithmLIANN.defineNeuralNetworkParametersLIANN()
 							
@@ -770,7 +766,7 @@ def main():
 if __name__ == "__main__":
 	if(algorithm == "BAANN"):
 		fileIndexTemp = 0
-		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmBAANN.defineTrainingParametersBAANN(dataset, trainMultipleFiles)
+		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmBAANN.defineTrainingParametersBAANN(dataset)
 		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_x, train_y, test_x, test_y = loadDataset(fileIndexTemp)
 		ANNtf2_algorithmBAANN.BAANNmain(train_x, train_y, test_x, test_y, datasetNumFeatures, datasetNumClasses, batchSize, trainingSteps, numEpochs)
 	else:

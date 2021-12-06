@@ -36,32 +36,15 @@ onlyTrainFinalLayer = True
 
 numberLayers = 6
 
-def defineTrainingParametersBAANN(dataset, trainMultipleFiles):
-	if(trainMultipleFiles):
-		learningRate = 0.0001
-		batchSize = 100
-		numEpochs = 10
-		if(dataset == "POStagSequence"):
-			trainingSteps = 10000
-		elif(dataset == "SmallDataset"):
-			if(useTFdataset):
-				trainingSteps = 1000
-			else:
-				trainingSteps = 25
-
+def defineTrainingParametersBAANN(dataset):
+	learningRate = 0.001
+	batchSize = 100
+	numEpochs = 10	#100 #10
+	if(useTFdataset):
+		trainingSteps = 1000
 	else:
-		learningRate = 0.001
-		batchSize = 100
-		numEpochs = 10	#100 #10
-		if(dataset == "POStagSequence"):
-			trainingSteps = 10000
-		elif(dataset == "SmallDataset"):
-			if(useTFdataset):
-				trainingSteps = 1000
-			else:
-				trainingSteps = 25
+		trainingSteps = 25
 
-		
 	displayStep = 100
 			
 	return learningRate, trainingSteps, batchSize, displayStep, numEpochs

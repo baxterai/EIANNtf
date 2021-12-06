@@ -101,41 +101,29 @@ batchSize = 0
 def getNoisySampleGenerationNumSamples():
 	return noisySampleGeneration, noisySampleGenerationNumSamples, noiseStandardDeviation
 	
-def defineTrainingParametersLREANN(dataset, trainMultipleFiles):
+def defineTrainingParametersLREANN(dataset):
 
 	global learningRate
 	global forgetRate
 	global batchSize
 	
-	if(trainMultipleFiles):
-		learningRate = 0.0001
-		if(dataset == "POStagSequence"):
-			trainingSteps = 10000
-		elif(dataset == "SmallDataset"):
-			trainingSteps = 1000
-		batchSize = 100
-		numEpochs = 10
-	else:
-		if(biologicalConstraints):
-			if(useBatch):
-				learningRate = 0.01
-			else:
-				learningRate = 0.001
+	if(biologicalConstraints):
+		if(useBatch):
+			learningRate = 0.01
 		else:
 			learningRate = 0.001
-		if(dataset == "POStagSequence"):
-			trainingSteps = 10000
-		elif(dataset == "SmallDataset"):
-			trainingSteps = 1000
-		if(useBatch):
-			batchSize = 100
-			if(debugLongTrain):
-				numEpochs = 100
-			else:
-				numEpochs = 10
-		else:
-			batchSize = 1
+	else:
+		learningRate = 0.001
+	trainingSteps = 1000
+	if(useBatch):
+		batchSize = 100
+		if(debugLongTrain):
 			numEpochs = 100
+		else:
+			numEpochs = 10
+	else:
+		batchSize = 1
+		numEpochs = 100
 	
 	displayStep = 100
 

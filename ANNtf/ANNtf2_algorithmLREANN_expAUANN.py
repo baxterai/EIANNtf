@@ -113,23 +113,13 @@ def calculateOutputNeuronsLREANN_expAUANN(datasetNumClasses):
 def getNoisySampleGenerationNumSamples():
 	return noisySampleGeneration, noisySampleGenerationNumSamples, noiseStandardDeviation
 	
-def defineTrainingParametersLREANN(dataset, trainMultipleFiles):
-	
-	if(trainMultipleFiles):
-		if(dataset == "POStagSequence"):
-			trainingSteps = 10000
-		elif(dataset == "SmallDataset"):
-			trainingSteps = 1000
+def defineTrainingParametersLREANN(dataset):
+
+	trainingSteps = 1000
+	if(useBatch):
 		numEpochs = 10
 	else:
-		if(dataset == "POStagSequence"):
-			trainingSteps = 10000
-		elif(dataset == "SmallDataset"):
-			trainingSteps = 1000
-		if(useBatch):
-			numEpochs = 10
-		else:
-			numEpochs = 100
+		numEpochs = 100
 	
 	displayStep = 100
 

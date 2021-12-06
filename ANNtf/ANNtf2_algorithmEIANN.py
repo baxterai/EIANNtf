@@ -39,29 +39,14 @@ numberOfLayers = 0
 numberOfNetworks = 0
 
 
-def defineTrainingParametersEIANN(dataset, trainMultipleFiles):
-	if(trainMultipleFiles):
-		learningRate = 0.0001
-		batchSize = 100
-		numEpochs = 10
-		if(dataset == "POStagSequence"):
-			trainingSteps = 10000
-		elif(dataset == "SmallDataset"):
-			if(debugFastTrain):
-				trainingSteps = batchSize
-			else:
-				trainingSteps = 10000	#1000
+def defineTrainingParametersEIANN(dataset):
+	learningRate = 0.001
+	batchSize = 100
+	numEpochs = 10	#100 #10
+	if(debugFastTrain):
+		trainingSteps = batchSize
 	else:
-		learningRate = 0.001
-		batchSize = 100
-		numEpochs = 10	#100 #10
-		if(dataset == "POStagSequence"):
-			trainingSteps = 10000
-		elif(dataset == "SmallDataset"):
-			if(debugFastTrain):
-				trainingSteps = batchSize
-			else:
-				trainingSteps = 10000	#1000
+		trainingSteps = 10000	#1000
 		
 	displayStep = 100
 			
