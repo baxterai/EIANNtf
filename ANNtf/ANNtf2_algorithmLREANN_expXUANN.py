@@ -354,7 +354,7 @@ def reluCustom(Z, prevLayerSize=None):
 	if(useBinaryWeights):	
 		#offset required because negative weights are not used:
 		Zoffset = tf.ones(Z.shape)
-		Zoffset = tf.multiply(Zoffset, averageTotalInput)
+		Zoffset = tf.multiply(Zoffset, averageTotalInput)	#CHECKTHIS: averageTotalInput = 1
 		Zoffset = tf.multiply(Zoffset, prevLayerSize/2)
 		#print("Zoffset = ", Zoffset)
 		Z = tf.subtract(Z, Zoffset) 

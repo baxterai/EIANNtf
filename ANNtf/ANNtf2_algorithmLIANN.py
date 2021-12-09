@@ -26,17 +26,19 @@ import ANNtf2_operations
 import ANNtf2_globalDefs
 import copy
 
-#select learningAlgorithm:
+debugFastTrain = False
+debugSmallBatchSize = True	#small batch size for debugging matrix output
+
+#select learningAlgorithm (unsupervised learning algorithm for intermediate layers):
+learningAlgorithmShuffle = True
 learningAlgorithmStochastic = False
 learningAlgorithmStochasticPermanence = False
-learningAlgorithmHebbian = True	#strengthen weights of successfully activated neurons
+learningAlgorithmHebbian = False	#strengthen weights of successfully activated neurons
 
-learningAlgorithmHebbianFinalLayer = True	#only apply backprop (effective hebbian) learning at final layer
+#select learningAlgorithmFinalLayer (supervised learning algorithm for final layer/testing):
+learningAlgorithmFinalLayerHebbian = True	#only apply backprop (effective hebbian) learning at final layer
 
 #supportSkipLayers = True #fully connected skip layer network	#TODO: add support for skip layers	#see ANNtf2_algorithmFBANN for template
-
-debugSingleLayerNetwork = False
-debugFastTrain = False
 
 #forward excitatory connections;
 W = {}
@@ -46,16 +48,38 @@ if(learningAlgorithmStochastic):
 	Bbackup = {}
 useBinaryWeights = False
 
-Wmean = 0.0
-WstdDev = 0.05
+positiveExcitatoryWeights = True	#mandatory for most learningAlgorithms
+if(positiveExcitatoryWeights):
+	positiveExcitatoryThreshold = 0.5	#1.0	#weights are centred around positiveExcitatoryThreshold, from 0.0 to positiveExcitatoryThreshold*2
+	Wmean = positiveExcitatoryThreshold
+	WstdDev = 0.05	#stddev of weight initialisations	#CHECKTHIS
+else:
+	Wmean = 0.0
+	WstdDev = 0.05	#stddev of weight initialisations
 	
-if(learningAlgorithmHebbianFinalLayer):
+if(learningAlgorithmFinalLayerHebbian):
 	positiveExcitatoryWeightsFinalLayer = False	#allow negative weights on final layer to emulate standard backprop/hebbian learning
-	
-if(learningAlgorithmStochastic):
-	inhibitionFactor1 = 1.0
-	inhibitionFactor2 = -(WstdDev*2)		#inhibition contributes a significant (nullifying) effect on layer activation	#CHECKTHIS: requires calibration
-	positiveExcitatoryWeights = True	#mandatory
+
+inhibitionAlgorithmMoreThanOneLateralNeuronActive = True	#simplified inhibition algorithm implementation
+if(not inhibitionAlgorithmMoreThanOneLateralNeuronActive):
+	#TODO: inhibitionFactor1/inhibitionFactor2 requires recalibration for activationFunction:positiveExcitatoryWeights
+	singleInhibitoryNeuronPerLayer = True	#simplified inhibitory layer
+	estNetworkActivationSparsity = 0.5	#50% of neurons are expected to be active during standard propagation (no inhibition)
+
+
+if(learningAlgorithmShuffle):
+	#positiveExcitatoryWeights mandatory
+	#inhibitionAlgorithmMoreThanOneLateralNeuronActive mandatory
+	enableInhibitionTrainSpecificLayerOnly = True
+	applyInhibitoryNetworkDuringTest = False
+	learningRate = 0.0	#defined by defineTrainingParametersLIANN
+	fractionIndependentInstancesAcrossBatchRequired = 0.3	#divide by number of neurons on layer	#if found x% of independent instances, then record neuron as independent (solidify weights)	#FUTURE: will depend on number of neurons on current layer and previous layer	#CHECKTHIS: requires calibration
+	randomlyActivateWeightsDuringTrain = False
+elif(learningAlgorithmStochastic):
+	if(not inhibitionAlgorithmMoreThanOneLateralNeuronActive):
+		inhibitionFactor1 = 1.0	#pass through signal	#positiveExcitatoryThreshold	#CHECKTHIS: requires recalibration for activationFunction:positiveExcitatoryWeights
+		inhibitionFactor2 = estNetworkActivationSparsity	#-(WstdDev/2)		#inhibition contributes a significant (nullifying) effect on layer activation	#CHECKTHIS: requires calibration
+	#positiveExcitatoryWeights mandatory
 	enableInhibitionTrainSpecificLayerOnly = True
 	applyInhibitoryNetworkDuringTest = False
 	randomlyActivateWeightsDuringTrain = False
@@ -79,9 +103,10 @@ if(learningAlgorithmStochastic):
 	NETWORK_PARAM_INDEX_VARIATION_DIRECTION = 4
 	learningRate = 0.0	#defined by defineTrainingParametersLIANN
 elif(learningAlgorithmStochasticPermanence):
-	inhibitionFactor1 = 1.0
-	inhibitionFactor2 = -(WstdDev*2)	#-1.0		#inhibition contributes a significant (nullifying) effect on layer activation	#CHECKTHIS: requires calibration
-	positiveExcitatoryWeights = True	#only allow positive excitatory neuron weights
+	if(not inhibitionAlgorithmMoreThanOneLateralNeuronActive):
+		inhibitionFactor1 = 1.0	#pass through signal	#positiveExcitatoryThreshold	#CHECKTHIS: requires recalibration for activationFunction:positiveExcitatoryWeights
+		inhibitionFactor2 = estNetworkActivationSparsity	#-(WstdDev/2)	#-1.0		#inhibition contributes a significant (nullifying) effect on layer activation	#CHECKTHIS: requires calibration
+	#positiveExcitatoryWeights optional?
 	enableInhibitionTrainSpecificLayerOnly = False	#CHECKTHIS (set True)
 	applyInhibitoryNetworkDuringTest = True	#CHECKTHIS (set False)
 	randomlyActivateWeightsDuringTrain = False
@@ -94,9 +119,10 @@ elif(learningAlgorithmStochasticPermanence):
 	permanenceNumberBatches = 10	#if permanenceUpdateRate=1, average number of batches to reset W to random values
 	solidificationRate = 0.1
 elif(learningAlgorithmHebbian):
-	inhibitionFactor1 = 1.0
-	inhibitionFactor2 = -(WstdDev*4)	#inhibition contributes a significant (nullifying) effect on layer activation	#CHECKTHIS: requires calibration
-	positiveExcitatoryWeights = True	#mandatory
+	if(not inhibitionAlgorithmMoreThanOneLateralNeuronActive):
+		inhibitionFactor1 = 1.0	#pass through signal	#positiveExcitatoryThreshold	#CHECKTHIS: requires recalibration for activationFunction:positiveExcitatoryWeights
+		inhibitionFactor2 = estNetworkActivationSparsity	#-(WstdDev)	#inhibition contributes a significant (nullifying) effect on layer activation	#CHECKTHIS: requires calibration
+	#positiveExcitatoryWeights mandatory
 	enableInhibitionTrainSpecificLayerOnly = True	#CHECKTHIS
 	applyInhibitoryNetworkDuringTest = False
 	randomlyActivateWeightsDuringTrain = True	#randomly activate x weights (simulating input at simulataneous time interval t)
@@ -110,21 +136,25 @@ elif(learningAlgorithmHebbian):
 		weightDecayRate = 0.0	#defined by defineTrainingParametersLIANN		
 	maxWeightUpdateThreshold = True	#max threshold weight updates to learningRate	
 	#TODO: ensure learning algorithm does not result in runnaway weight increases
-	if(randomlyActivateWeightsDuringTrain):
-		inhibitionFactor1 = inhibitionFactor1
-		inhibitionFactor2 = (inhibitionFactor2*randomlyActivateWeightsProbability)	#the lower the average activation, the lower the inhibition
+	if(not inhibitionAlgorithmMoreThanOneLateralNeuronActive):
+		if(randomlyActivateWeightsDuringTrain):
+			inhibitionFactor1 = inhibitionFactor1
+			inhibitionFactor2 = (inhibitionFactor2*randomlyActivateWeightsProbability)	#the lower the average activation, the lower the inhibition
 
+if(not inhibitionAlgorithmMoreThanOneLateralNeuronActive):
+	#lateral inhibitory connections (incoming/outgoing);
+	IWi = {}
+	IBi = {}
+	IWo = {}
+	IWiWeights = inhibitionFactor1	#need at least 1/IWiWeights active neurons per layer for the inhibitory neuron to become activated	#CHECKTHIS: requires calibration	#WstdDev*2	#0.5	#0.3
+	IWoWeights = inhibitionFactor2	#will depend on activation sparsity of network (higher the positive activation, higher the inhibition required)	#requires calibration such that more than x (e.g. 1) active neuron on a layer will inhibit the layer
+	In_h = []
+
+if(learningAlgorithmShuffle):
+	Bindependent = {}	#independent neurons previously identified	#effective boolean (0.0 or 1.0)	#FUTURE: consider making this a continuous variable, such that the higher the independence the less the variable is randomly shuffled per training iteration
 	
-#lateral inhibitory connections (incoming/outgoing);
-IWi = {}
-IBi = {}
-IWo = {}
-IBiWeights = inhibitionFactor1	#WstdDev*2	#0.5	#0.3	#need at least 1/IBiWeights active neurons per layer for the inhibitory neuron to become activated	#CHECKTHIS: requires calibration
-IBoWeights = inhibitionFactor2
-
 #Network parameters
 n_h = []
-In_h = []
 numberOfLayers = 0
 numberOfNetworks = 0
 
@@ -139,7 +169,13 @@ def defineTrainingParametersLIANN(dataset):
 	if(learningAlgorithmHebbian):
 		learningRate = 0.001
 		weightDecayRate = learningRate/10.0	#CHECKTHIS	#will depend on learningRate
-	batchSize = 100	#3	#100
+	if(debugSmallBatchSize):
+		batchSize = 10
+	else:
+		if(learningAlgorithmShuffle):
+			batchSize = 1000	#current implementation: batch size should contain all examples in training set
+		else:
+			batchSize = 100	#3	#100
 	numEpochs = 10	#100 #10
 	if(debugFastTrain):
 		trainingSteps = batchSize
@@ -157,12 +193,17 @@ def defineNetworkParametersLIANN(num_input_neurons, num_output_neurons, datasetN
 	global n_h
 	global numberOfLayers
 	global numberOfNetworks
-	global In_h
+	if(not inhibitionAlgorithmMoreThanOneLateralNeuronActive):
+		global In_h
 	
 	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork=False)
 	
-	In_h = copy.copy(n_h)	#create one inhibitory neuron for every excitatory neuron
-	
+	if(not inhibitionAlgorithmMoreThanOneLateralNeuronActive):
+		if(singleInhibitoryNeuronPerLayer):
+			In_h = 1 * len(n_h)	#create one inhibitory neuron per layer
+		else:
+			In_h = copy.copy(n_h)	#create one inhibitory neuron for every excitatory neuron
+		
 	return numberOfLayers
 	
 
@@ -180,13 +221,12 @@ def defineNeuralNetworkParametersLIANN():
 			if(learningAlgorithmHebbian):
 				EWlayer = tf.multiply(EWlayer, WinitialisationFactor)
 				EBlayer = tf.multiply(EBlayer, BinitialisationFactor)
-			if(positiveExcitatoryWeights):
-				if((l < numberOfLayers) or positiveExcitatoryWeightsFinalLayer):
-					EWlayer = tf.abs(EWlayer)
 			W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(EWlayer)
 			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(EBlayer)
-			
-			if(learningAlgorithmStochastic):
+	
+			if(learningAlgorithmShuffle):
+				Bindependent[generateParameterNameNetwork(networkIndex, l, "Bindependent")] = tf.Variable(EBlayer)		#initialise all neurons to zero (false)
+			elif(learningAlgorithmStochastic):
 				Wbackup[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(W[generateParameterNameNetwork(networkIndex, l, "W")])
 				Bbackup[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(B[generateParameterNameNetwork(networkIndex, l, "B")])			
 			elif(learningAlgorithmStochasticPermanence):
@@ -195,16 +235,19 @@ def defineNeuralNetworkParametersLIANN():
 				Wpermanence[generateParameterNameNetwork(networkIndex, l, "Wpermanence")] = tf.Variable(EWlayerPermanence)
 				Bpermanence[generateParameterNameNetwork(networkIndex, l, "Bpermanence")] = tf.Variable(EBlayerPermanence)
 			
-						
-			#lateral inhibitory connections (incoming/outgoing);
-			#do not currently train inhibitory weights;
-			IWilayer = tf.multiply(tf.ones([n_h[l], In_h[l]]), IBiWeights)		#CHECKTHIS: inhibitory neuron firing is a function of current (lateral) layer (not previous layer)
-			IBilayer = tf.zeros(In_h[l])
-			IWolayer = tf.multiply(tf.ones([In_h[l], n_h[l]]), IBoWeights)
-			IWi[generateParameterNameNetwork(networkIndex, l, "IWi")] = tf.Variable(IWilayer)
-			IBi[generateParameterNameNetwork(networkIndex, l, "IBi")] = tf.Variable(IBilayer)
-			IWo[generateParameterNameNetwork(networkIndex, l, "IWo")] = tf.Variable(IWolayer)
-			
+			if(not inhibitionAlgorithmMoreThanOneLateralNeuronActive):			
+				#lateral inhibitory connections (incoming/outgoing);
+				#do not currently train inhibitory weights;
+				IWilayer = tf.multiply(tf.ones([n_h[l], In_h[l]]), IWiWeights)		#CHECKTHIS: inhibitory neuron firing is a function of current (lateral) layer (not previous layer)
+				IBilayer = tf.zeros(In_h[l])
+				if(singleInhibitoryNeuronPerLayer):
+					IWoWeightsL = IWoWeights
+				else:
+					IWoWeightsL = IWoWeights/In_h[l]	#normalise across number inhibitory neurons
+				IWolayer = tf.multiply(tf.ones([In_h[l], n_h[l]]), IWoWeightsL)
+				IWi[generateParameterNameNetwork(networkIndex, l, "IWi")] = tf.Variable(IWilayer)
+				IBi[generateParameterNameNetwork(networkIndex, l, "IBi")] = tf.Variable(IBilayer)
+				IWo[generateParameterNameNetwork(networkIndex, l, "IWo")] = tf.Variable(IWolayer)
 
 def neuralNetworkPropagationLIANNtest(x, networkIndex=1):
 	return neuralNetworkPropagationLIANN(x, None, networkIndex, trainWeights=False)
@@ -221,7 +264,7 @@ def neuralNetworkPropagationLIANNtrain(x, y, networkIndex=1):
 	
 def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, layerToTrain=None):
 
-	randomNormal = tf.initializers.RandomNormal()
+	randomNormal = tf.initializers.RandomNormal(mean=Wmean, stddev=WstdDev)
 	
 	if(trainWeights):
 		if(enableInhibitionTrainSpecificLayerOnly):
@@ -231,10 +274,11 @@ def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, laye
 	else:
 		maxLayer = numberOfLayers
 
-	if(useBinaryWeights):
-		variationDirections = 1
-	else:
-		variationDirections = 2
+	if(learningAlgorithmStochastic):
+		if(useBinaryWeights):
+			variationDirections = 1
+		else:
+			variationDirections = 2
 			
 	AprevLayer = x
 	for l in range(1, maxLayer+1):
@@ -259,7 +303,7 @@ def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, laye
 				enableInhibition = True
 	
 		finalLayerHebbian = False	
-		if(learningAlgorithmHebbianFinalLayer):
+		if(learningAlgorithmFinalLayerHebbian):
 			if(l == numberOfLayers):
 				finalLayerHebbian = True			
 		if(finalLayerHebbian):
@@ -272,7 +316,68 @@ def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, laye
 			if(trainLayer):
 				#CHECKTHIS: verify learning algorithm (how to modify weights to maximise independence between neurons on each layer)
 
-				if(learningAlgorithmStochastic):
+				if(learningAlgorithmShuffle):
+					layerHasDependentNeurons = True
+					Bind = Bindependent[generateParameterNameNetwork(networkIndex, l, "Bindependent")]
+					if(count_zero(Bind) > 0):	#more than 1 dependent neuron on layer
+						layerHasDependentNeurons = True
+					else:
+						layerHasDependentNeurons = False
+						
+					while(layerHasDependentNeurons):
+						Afinal, Zfinal, _ = forwardIteration(networkIndex, AprevLayer, l, enableInhibition, randomlyActivateWeights)	#batched
+						
+						AnumActive = tf.math.count_nonzero(Afinal, axis=1)	#batched
+						Aindependent = tf.equal(AnumActive, 1)	#batched
+						Aindependent = tf.dtypes.cast(Aindependent, dtype=tf.dtypes.float32)	#batched
+						Aindependent = tf.expand_dims(Aindependent, 1)	#batched
+						#print("Afinal = ", Afinal)
+						#print("AnumActive = ", AnumActive)
+						print("Aindependent = ", Aindependent)
+						
+						Aactive = tf.greater(Afinal, 0)	#2D: batched, for every k neuron
+						Aactive = tf.dtypes.cast(Aactive, dtype=tf.dtypes.float32) 	#2D: batched, for every k neuron
+						#print("Aactive = ", Aactive)
+						#ex
+						
+						AactiveAndIndependent = tf.multiply(Aactive, Aindependent)	#2D: batched, for every k neuron	
+						AactiveAndIndependent = tf.reduce_sum(AactiveAndIndependent, axis=0) #for every k neuron
+						
+						AactiveAndIndependentPass = tf.greater(AactiveAndIndependent, fractionIndependentInstancesAcrossBatchRequired*n_h[l])	 #for every k neuron
+						
+						BindBool = tf.dtypes.cast(Bind, dtype=tf.dtypes.bool)
+						AactiveAndIndependentPassRequiresSolidifying = tf.logical_and(AactiveAndIndependentPass, tf.logical_not(BindBool))
+						#print("BindBool = ", BindBool)
+						#print("AactiveAndIndependentPassRequiresSolidifying = ", AactiveAndIndependentPassRequiresSolidifying)
+						BindNew = tf.logical_and(BindBool, AactiveAndIndependentPassRequiresSolidifying)
+						BdepNew = tf.logical_not(BindNew)
+						
+						#update layer weights (reinitialise weights for all dependent neurons);
+						BindNew = tf.dtypes.cast(BindNew, dtype=tf.dtypes.float32)
+						BdepNew = tf.dtypes.cast(BdepNew, dtype=tf.dtypes.float32)
+						EWlayerDep = randomNormal([n_h[l-1], n_h[l]]) 
+						EBlayerDep = tf.zeros(n_h[l])
+						EWlayerDep = tf.multiply(EWlayerDep, BdepNew)	#requires broadcasting
+						EBlayerDep = tf.multiply(EBlayerDep, BdepNew)				
+						EWlayerInd = W[generateParameterNameNetwork(networkIndex, l, "W")] 
+						EBlayerInd = B[generateParameterNameNetwork(networkIndex, l, "B")]
+						EWlayerInd = tf.multiply(EWlayerInd, BindNew)	#requires broadcasting
+						EBlayerInd = tf.multiply(EBlayerInd, BindNew)
+						EWlayerNew = tf.add(EWlayerDep, EWlayerInd)
+						EBlayerNew = tf.add(EBlayerDep, EBlayerInd)					
+						W[generateParameterNameNetwork(networkIndex, l, "W")] = EWlayerNew
+						B[generateParameterNameNetwork(networkIndex, l, "B")] = EBlayerNew	
+						#print("EWlayerNew = ", EWlayerNew)				
+	
+						Bindependent[generateParameterNameNetwork(networkIndex, l, "Bindependent")] = BindNew	#update independence record
+						Bind = BindNew
+						if(count_zero(Bind) > 0):	#more than 1 dependent neuron on layer
+							layerHasDependentNeurons = True
+							#print("layerHasDependentNeurons: count_zero(Bind) = ", count_zero(Bind))
+						else:
+							layerHasDependentNeurons = False	
+							#print("!layerHasDependentNeurons")
+				elif(learningAlgorithmStochastic):
 					#code from ANNtf2_algorithmLREANN_expSUANN;
 					for s in range(numberStochasticIterations):
 						for hIndexCurrentLayer in range(0, n_h[l]):
@@ -402,17 +507,19 @@ def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, laye
 						#print("AWdecay = ", AWdecay)
 					W[generateParameterNameNetwork(networkIndex, l, "W")] = AW
 
-				A, Z, _ = forwardIteration(networkIndex, AprevLayer, l, enableInhibition=False, randomlyActivateWeights=False)	#in case !learningAlgorithmHebbianFinalLayer
+				A, Z, _ = forwardIteration(networkIndex, AprevLayer, l, enableInhibition=False, randomlyActivateWeights=False)	#in case !learningAlgorithmFinalLayerHebbian
 			else:
 				A, Z, _ = forwardIteration(networkIndex, AprevLayer, l, enableInhibition, randomlyActivateWeights)
 
-			if(learningAlgorithmHebbianFinalLayer):
+			if(learningAlgorithmFinalLayerHebbian):
 				A = tf.stop_gradient(A)
 				
 			AprevLayer = A
 
 	return tf.nn.softmax(Z)
-	
+
+#def forwardIterationDetectIndependentNeurons(networkIndex, AprevLayer, l, enableInhibition=False, randomlyActivateWeights=False):
+
 def forwardIteration(networkIndex, AprevLayer, l, enableInhibition=False, randomlyActivateWeights=False):
 
 	#forward excitatory connections;
@@ -430,23 +537,31 @@ def forwardIteration(networkIndex, AprevLayer, l, enableInhibition=False, random
 
 	#lateral inhibitory connections (incoming/outgoing);
 	if(enableInhibition):
-		#if((l < numberOfLayers) or positiveExcitatoryWeightsFinalLayer):
+		if(inhibitionAlgorithmMoreThanOneLateralNeuronActive):
+			numActiveLateralNeurons = tf.math.count_nonzero(A, axis=1)
+			inhibitionResult = tf.greater(numActiveLateralNeurons, 1)
+			inhibitionResult = tf.dtypes.cast(inhibitionResult, dtype=tf.dtypes.float32)
+			inhibitionResult = tf.expand_dims(inhibitionResult, axis=1)
+			Zfinal = tf.multiply(Z, inhibitionResult)	#requires broadcasting
+			Afinal = tf.multiply(A, inhibitionResult)	#requires broadcasting
+		else:
+			#if((l < numberOfLayers) or positiveExcitatoryWeightsFinalLayer):
 
-		#print("AprevLayer = ", AprevLayer)
-		#print("Z = ", Z)
+			#print("AprevLayer = ", AprevLayer)
+			#print("Z = ", Z)
 
-		IZi = tf.matmul(A, IWi[generateParameterNameNetwork(networkIndex, l, "IWi")])	#CHECKTHIS: inhibitory neuron firing is a function of current (lateral) layer (not previous layer)
-		IAi = activationFunction(IZi)
-		#print("IZi = ", IZi)
-		#print("IAi = ", IAi)
-		IZo = tf.matmul(IAi, IWo[generateParameterNameNetwork(networkIndex, l, "IWo")])
-		#print("W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
-		#print("IZo = ", IZo)
-		
-		#final activations;
-		Zfinal = tf.add(Z, IZo)
-		#print("Zfinal = ", Zfinal)
-		Afinal = activationFunction(Zfinal)
+			IZi = tf.matmul(A, IWi[generateParameterNameNetwork(networkIndex, l, "IWi")])	#CHECKTHIS: inhibitory neuron firing is a function of current (lateral) layer (not previous layer)
+			IAi = activationFunction(IZi)
+			#print("IZi = ", IZi)
+			#print("IAi = ", IAi)
+			IZo = tf.matmul(IAi, IWo[generateParameterNameNetwork(networkIndex, l, "IWo")])
+			#print("W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
+			#print("IZo = ", IZo)
+
+			#final activations;
+			Zfinal = tf.add(Z, IZo)
+			#print("Zfinal = ", Zfinal)
+			Afinal = activationFunction(Zfinal)
 	else:
 		Zfinal = Z
 		Afinal = A
@@ -513,8 +628,29 @@ def getRandomNetworkParameter(networkIndex, currentSubsetOfParameters):
 
 
 def activationFunction(Z):
-	A = tf.nn.relu(Z)
-	#A = tf.nn.sigmoid(Z)
+	if(positiveExcitatoryWeights):
+		#CHECKTHIS: consider sigmoid instead of relu
+		#offset required because negative weights are not used:
+		Zoffset = positiveExcitatoryThreshold
+		Z = tf.subtract(Z, Zoffset) 
+		A = tf.nn.relu(Z)
+		A = tf.multiply(A, 2.0)	#double the slope of A to normalise the input:output signal
+		#print("A = ", A)
+	else:
+		A = tf.nn.relu(Z)
+		#A = tf.nn.sigmoid(Z)
 	return A
 	
+
+def count_zero(M, axis=None):	#emulates count_nonzero behaviour
+	if axis is not None:
+		nonZeroElements = tf.math.count_nonzero(M, axis=axis)
+		totalElements = tf.shape(M)[axis]
+		zeroElements = tf.subtract(totalElements, nonZeroElements)
+	else:
+		totalElements = tf.size(M)
+		nonZeroElements = tf.math.count_nonzero(M).numpy()
+		zeroElements = tf.subtract(totalElements, nonZeroElements)
+		zeroElements = zeroElements.numpy()
+	return zeroElements
 
