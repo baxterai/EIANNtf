@@ -158,12 +158,14 @@ def neuralNetworkPropagationLREANNfinal(x, networkIndex=1):
 
 def neuralNetworkPropagationLREANN(x, networkIndex=1, enableFinalLayerWeightUpdatesOnly=False):
 			
+	global averageTotalInput
+	
 	AprevLayer = x
 
-	#if(useBinaryWeights):
-	#	if(averageTotalInput == -1):
-	#		averageTotalInput = tf.math.reduce_mean(x)
-	#		print("averageTotalInput = ", averageTotalInput)	 
+	if(useBinaryWeights):
+		if(averageTotalInput == -1):
+			averageTotalInput = tf.math.reduce_mean(x)	#CHECKTHIS: why was disabled?
+			print("averageTotalInput = ", averageTotalInput)	 
 	#print("x = ", x)
 	
 	for l in range(1, numberOfLayers+1):
@@ -177,10 +179,10 @@ def neuralNetworkPropagationLREANN(x, networkIndex=1, enableFinalLayerWeightUpda
 				Z = tf.add(tf.matmul(AprevLayer, Wfloat), Bfloat)
 			else:
 				Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-			A = reluCustom(Z, n_h[l-1])
+			A = activationFunction(Z, n_h[l-1])
 		else:
 			Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-			A = reluCustom(Z)
+			A = activationFunction(Z)
 
 		if(enableFinalLayerWeightUpdatesOnly):
 			if(l < numberOfLayers):
@@ -195,13 +197,15 @@ def neuralNetworkPropagationLREANN(x, networkIndex=1, enableFinalLayerWeightUpda
 	return pred
 
 def neuralNetworkPropagationLREANNsub(x, samplePositiveX, sampleNegativeX, lTrain, networkIndex=1):
+
+	global averageTotalInput
 	
 	AprevLayer = [x, samplePositiveX, sampleNegativeX]
 
-	#if(useBinaryWeights):
-	#	if(averageTotalInput == -1):
-	#		averageTotalInput = tf.math.reduce_mean(x)
-	#		print("averageTotalInput = ", averageTotalInput)	 
+	if(useBinaryWeights):
+		if(averageTotalInput == -1):
+			averageTotalInput = tf.math.reduce_mean(x)	#CHECKTHIS: why was disabled? 
+			print("averageTotalInput = ", averageTotalInput)
 	
 	#print("x.shape = ", x.shape)
 	#print("samplePositiveX.shape = ", samplePositiveX.shape)
@@ -223,10 +227,10 @@ def neuralNetworkPropagationLREANNsub(x, samplePositiveX, sampleNegativeX, lTrai
 					Z = tf.add(tf.matmul(AprevLayer[t], Wfloat), Bfloat)
 				else:
 					Z = tf.add(tf.matmul(AprevLayer[t], W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-				A = reluCustom(Z, n_h[l-1])
+				A = activationFunction(Z, n_h[l-1])
 			else:
 				Z = tf.add(tf.matmul(AprevLayer[t], W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-				A = reluCustom(Z)
+				A = activationFunction(Z)
 	
 			if(l < lTrain):
 				A = tf.stop_gradient(A)
@@ -348,13 +352,16 @@ def executeOptimisationFinal(x, y, networkIndex=1):
 			print("executeOptimisationFinal after: l = ", l, ", W = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
 			
 	
+
+def activationFunction(Z, prevLayerSize=None):
+	return reluCustom(Z, prevLayerSize)
 	
 def reluCustom(Z, prevLayerSize=None):
 	
 	if(useBinaryWeights):	
 		#offset required because negative weights are not used:
 		Zoffset = tf.ones(Z.shape)
-		Zoffset = tf.multiply(Zoffset, averageTotalInput)	#CHECKTHIS: averageTotalInput = 1
+		Zoffset = tf.multiply(Zoffset, averageTotalInput)
 		Zoffset = tf.multiply(Zoffset, prevLayerSize/2)
 		#print("Zoffset = ", Zoffset)
 		Z = tf.subtract(Z, Zoffset) 

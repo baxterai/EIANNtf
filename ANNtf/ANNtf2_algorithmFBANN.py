@@ -151,7 +151,7 @@ def neuralNetworkPropagationANN(x, networkIndex=1):
 	#AprevLayer = x
 	#for l in range(1, numberOfLayers+1):
 	#	Z = tf.add(tf.matmul(AprevLayer, Wf[generateParameterNameNetwork(networkIndex, l, "Wf")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-	#	A = reluCustom(Z)	
+	#	A = activationFunction(Z)	
 	#	AprevLayer = A
 	#return tf.nn.softmax(Z)
 		
@@ -176,7 +176,7 @@ def neuralNetworkPropagationANNfeedForward(x, networkIndex=1):
 				Z = tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wf[generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, "Wf")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
 		else:
 			Z = tf.add(tf.matmul(AprevLayer, Wf[generateParameterNameNetwork(networkIndex, l1, "Wf")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])		
-		A = reluCustom(Z)
+		A = activationFunction(Z)
 		AprevLayer = A
 		#print(Z)
 		
@@ -237,7 +237,7 @@ def neuralNetworkPropagationFBANNfeedForward(x, additiveZ=False, networkIndex=1)
 		
 		Z = tf.add(Z, Zmod)
 		
-		A = reluCustom(Z)
+		A = activationFunction(Z)
 			
 		Ztrace[generateParameterNameNetwork(networkIndex, l1, "Ztrace")] = Z
 		Atrace[generateParameterNameNetwork(networkIndex, l1, "Atrace")] = A
@@ -276,7 +276,7 @@ def neuralNetworkPropagationFBANNfeedBackward(AhighestLayer, additiveZ=True, net
 		
 		Z = tf.add(Z, Zmod)
 		
-		A = reluCustom(Z)
+		A = activationFunction(Z)
 		
 		Ztrace[generateParameterNameNetwork(networkIndex, l1, "Ztrace")] = Z
 		Atrace[generateParameterNameNetwork(networkIndex, l1, "Atrace")] = A
@@ -291,8 +291,11 @@ def neuralNetworkPropagationFBANNfeedBackward(AhighestLayer, additiveZ=True, net
 		
 	return ZlowestLayer, AlowestLayer
 	
-		
-def reluCustom(Z):
+
+def activationFunction(Z):
+	return reluBasic(Z)
+			
+def reluBasic(Z):
 
 	A = tf.nn.relu(Z)
 	

@@ -220,7 +220,7 @@ def neuralNetworkPropagationLREANN(x, networkIndex=1):
 		#print("l = " + str(l))
 
 		Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-		A = reluCustom(Z, train=False)
+		A = activationFunction(Z, train=False)
 			
 		AprevLayer = A
 			
@@ -245,7 +245,7 @@ def neuralNetworkPropagationLREANN_expHUANNtrain(x, y=None, networkIndex=1, trai
 		#print("\nl = " + str(l))
 
 		Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])	
-		A = reluCustom(Z, train=True)
+		A = activationFunction(Z, train=True)
 		
 		if(trainHebbianBackprop):
 			Alayers.append(A)
@@ -414,7 +414,7 @@ def trainLayerLREANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainH
 		
 		
 
-def reluCustom(Z, train):
+def activationFunction(Z, train):
 
 	if(applyNeuronThresholdBias):
 		applyBias = False

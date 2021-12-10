@@ -152,14 +152,16 @@ def neuralNetworkPropagationLREANN(x, networkIndex=1, recordAtrace=False):
 	return pred
 	
 def neuralNetworkPropagationLREANNlayer(x, lTrain, networkIndex=1, recordAtrace=False):
-			
+	
+	global averageTotalInput
+		
 	AprevLayer = x
 	#Atrace[generateParameterNameNetwork(networkIndex, 0, "Atrace")] = x
 
-	#if(useBinaryWeights):
-	#	if(averageTotalInput == -1):
-	#		averageTotalInput = tf.math.reduce_mean(x)
-	#		print("averageTotalInput = ", averageTotalInput)	 
+	if(useBinaryWeights):
+		if(averageTotalInput == -1):
+			averageTotalInput = tf.math.reduce_mean(x)	#CHECKTHIS: why was disabled?
+			print("averageTotalInput = ", averageTotalInput)	 
 	#print("x = ", x)
 	
 	for l in range(1, lTrain+1):

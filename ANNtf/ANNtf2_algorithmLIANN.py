@@ -27,7 +27,7 @@ import ANNtf2_globalDefs
 import copy
 
 debugFastTrain = False
-debugSmallBatchSize = True	#small batch size for debugging matrix output
+debugSmallBatchSize = False	#small batch size for debugging matrix output
 
 #select learningAlgorithm (unsupervised learning algorithm for intermediate layers):
 learningAlgorithmShuffle = True
@@ -50,8 +50,9 @@ useBinaryWeights = False
 
 positiveExcitatoryWeights = True	#mandatory for most learningAlgorithms
 if(positiveExcitatoryWeights):
-	positiveExcitatoryThreshold = 0.5	#1.0	#weights are centred around positiveExcitatoryThreshold, from 0.0 to positiveExcitatoryThreshold*2
-	Wmean = positiveExcitatoryThreshold
+	normalisedAverageInput = 1.0	#normalise input signal	#arbitrary
+	positiveExcitatoryThreshold = 0.5	#1.0	#weights are centred around positiveExcitatoryThreshold, from 0.0 to positiveExcitatoryThreshold*2	#arbitrary
+	Wmean = 0.5	#arbitrary
 	WstdDev = 0.05	#stddev of weight initialisations	#CHECKTHIS
 else:
 	Wmean = 0.0
@@ -212,12 +213,16 @@ def defineNeuralNetworkParametersLIANN():
 	print("numberOfNetworks", numberOfNetworks)
 	
 	randomNormal = tf.initializers.RandomNormal(mean=Wmean, stddev=WstdDev)
+	randomNormalFinalLayer = tf.initializers.RandomNormal()
 	
 	for networkIndex in range(1, numberOfNetworks+1):
 		for l in range(1, numberOfLayers+1):
 			#forward excitatory connections;
 			EWlayer = randomNormal([n_h[l-1], n_h[l]]) 
 			EBlayer = tf.zeros(n_h[l])
+			if(positiveExcitatoryWeights):
+				if((l == numberOfLayers) and not positiveExcitatoryWeightsFinalLayer):
+					EWlayer = randomNormalFinalLayer([n_h[l-1], n_h[l]])
 			if(learningAlgorithmHebbian):
 				EWlayer = tf.multiply(EWlayer, WinitialisationFactor)
 				EBlayer = tf.multiply(EBlayer, BinitialisationFactor)
@@ -265,7 +270,13 @@ def neuralNetworkPropagationLIANNtrain(x, y, networkIndex=1):
 def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, layerToTrain=None):
 
 	randomNormal = tf.initializers.RandomNormal(mean=Wmean, stddev=WstdDev)
-	
+
+	if(positiveExcitatoryWeights):
+		averageTotalInput = tf.math.reduce_mean(x)
+		#print("averageTotalInput = ", averageTotalInput)
+		x = tf.multiply(x, normalisedAverageInput/averageTotalInput)	#normalise input wrt positiveExcitatoryThreshold
+		#averageTotalInput = tf.math.reduce_mean(x)
+
 	if(trainWeights):
 		if(enableInhibitionTrainSpecificLayerOnly):
 			maxLayer = layerToTrain
@@ -333,7 +344,7 @@ def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, laye
 						Aindependent = tf.expand_dims(Aindependent, 1)	#batched
 						#print("Afinal = ", Afinal)
 						#print("AnumActive = ", AnumActive)
-						print("Aindependent = ", Aindependent)
+						#print("Aindependent = ", Aindependent)
 						
 						Aactive = tf.greater(Afinal, 0)	#2D: batched, for every k neuron
 						Aactive = tf.dtypes.cast(Aactive, dtype=tf.dtypes.float32) 	#2D: batched, for every k neuron
@@ -344,12 +355,14 @@ def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, laye
 						AactiveAndIndependent = tf.reduce_sum(AactiveAndIndependent, axis=0) #for every k neuron
 						
 						AactiveAndIndependentPass = tf.greater(AactiveAndIndependent, fractionIndependentInstancesAcrossBatchRequired*n_h[l])	 #for every k neuron
+						#print("AactiveAndIndependentPass = ", AactiveAndIndependentPass)
 						
 						BindBool = tf.dtypes.cast(Bind, dtype=tf.dtypes.bool)
 						AactiveAndIndependentPassRequiresSolidifying = tf.logical_and(AactiveAndIndependentPass, tf.logical_not(BindBool))
+						#print("AactiveAndIndependentPass = ", AactiveAndIndependentPass)
 						#print("BindBool = ", BindBool)
-						#print("AactiveAndIndependentPassRequiresSolidifying = ", AactiveAndIndependentPassRequiresSolidifying)
-						BindNew = tf.logical_and(BindBool, AactiveAndIndependentPassRequiresSolidifying)
+						print("AactiveAndIndependentPassRequiresSolidifying = ", AactiveAndIndependentPassRequiresSolidifying)
+						BindNew = tf.logical_or(BindBool, AactiveAndIndependentPassRequiresSolidifying)
 						BdepNew = tf.logical_not(BindNew)
 						
 						#update layer weights (reinitialise weights for all dependent neurons);
@@ -369,6 +382,9 @@ def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, laye
 						B[generateParameterNameNetwork(networkIndex, l, "B")] = EBlayerNew	
 						#print("EWlayerNew = ", EWlayerNew)				
 	
+						#print("BdepNew = ", BdepNew)
+						#print("BindNew = ", BindNew)
+						
 						Bindependent[generateParameterNameNetwork(networkIndex, l, "Bindependent")] = BindNew	#update independence record
 						Bind = BindNew
 						if(count_zero(Bind) > 0):	#more than 1 dependent neuron on layer
@@ -533,15 +549,18 @@ def forwardIteration(networkIndex, AprevLayer, l, enableInhibition=False, random
 		#EWactive = tf.dtypes.cast(tf.random.uniform(shape=EW.shape, minval=0, maxval=2, dtype=tf.dtypes.int32), dtype=tf.dtypes.float32)
 		EW = tf.multiply(EW, EWactive)
 	Z = tf.add(tf.matmul(AprevLayer, EW), B[generateParameterNameNetwork(networkIndex, l, "B")])
-	A = activationFunction(Z)
+	A = activationFunction(Z, n_h[l-1])
 
 	#lateral inhibitory connections (incoming/outgoing);
 	if(enableInhibition):
 		if(inhibitionAlgorithmMoreThanOneLateralNeuronActive):
 			numActiveLateralNeurons = tf.math.count_nonzero(A, axis=1)
 			inhibitionResult = tf.greater(numActiveLateralNeurons, 1)
+			inhibitionResult = tf.logical_not(inhibitionResult)
 			inhibitionResult = tf.dtypes.cast(inhibitionResult, dtype=tf.dtypes.float32)
 			inhibitionResult = tf.expand_dims(inhibitionResult, axis=1)
+			#print("numActiveLateralNeurons = ", numActiveLateralNeurons)
+			#print("inhibitionResult = ", inhibitionResult)
 			Zfinal = tf.multiply(Z, inhibitionResult)	#requires broadcasting
 			Afinal = tf.multiply(A, inhibitionResult)	#requires broadcasting
 		else:
@@ -551,7 +570,7 @@ def forwardIteration(networkIndex, AprevLayer, l, enableInhibition=False, random
 			#print("Z = ", Z)
 
 			IZi = tf.matmul(A, IWi[generateParameterNameNetwork(networkIndex, l, "IWi")])	#CHECKTHIS: inhibitory neuron firing is a function of current (lateral) layer (not previous layer)
-			IAi = activationFunction(IZi)
+			IAi = activationFunction(IZi, n_h[l-1])
 			#print("IZi = ", IZi)
 			#print("IAi = ", IAi)
 			IZo = tf.matmul(IAi, IWo[generateParameterNameNetwork(networkIndex, l, "IWo")])
@@ -561,7 +580,7 @@ def forwardIteration(networkIndex, AprevLayer, l, enableInhibition=False, random
 			#final activations;
 			Zfinal = tf.add(Z, IZo)
 			#print("Zfinal = ", Zfinal)
-			Afinal = activationFunction(Zfinal)
+			Afinal = activationFunction(Zfinal, n_h[l-1])
 	else:
 		Zfinal = Z
 		Afinal = A
@@ -627,11 +646,22 @@ def getRandomNetworkParameter(networkIndex, currentSubsetOfParameters):
 	return networkParameterIndex				
 
 
-def activationFunction(Z):
+def activationFunction(Z, prevLayerSize=None):
+	return reluCustomPositive(Z, prevLayerSize)
+	
+def reluCustomPositive(Z, prevLayerSize=None):
 	if(positiveExcitatoryWeights):
 		#CHECKTHIS: consider sigmoid instead of relu
 		#offset required because negative weights are not used:
-		Zoffset = positiveExcitatoryThreshold
+		
+		#Zoffset = tf.ones(Z.shape)
+		#Zoffset = tf.multiply(Zoffset, normalisedAverageInput)
+		#Zoffset = tf.multiply(Zoffset, Wmean)
+		#Zoffset = tf.multiply(Zoffset, prevLayerSize)
+		Zpred = prevLayerSize*normalisedAverageInput*Wmean
+		Zoffset = Zpred
+		#print("Zoffset = ", Zoffset)
+		
 		Z = tf.subtract(Z, Zoffset) 
 		A = tf.nn.relu(Z)
 		A = tf.multiply(A, 2.0)	#double the slope of A to normalise the input:output signal

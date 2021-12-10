@@ -329,7 +329,7 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 		Wlist = []
 		Blist = []
 		for l in range(1, numberOfLayers+1):
-			if(ANNtf2_algorithmLIANN.learningAlgorithmHebbianFinalLayer):
+			if(ANNtf2_algorithmLIANN.learningAlgorithmFinalLayerHebbian):
 				if(l == numberOfLayers):
 					Wlist.append(ANNtf2_algorithmLIANN.W[generateParameterNameNetwork(networkIndex, l, "W")])
 					Blist.append(ANNtf2_algorithmLIANN.B[generateParameterNameNetwork(networkIndex, l, "B")])				

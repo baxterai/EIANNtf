@@ -193,10 +193,10 @@ def neuralNetworkPropagationLREANN(x, networkIndex=1, recordAtrace=False):
 				Z = tf.add(tf.matmul(AprevLayer, Wfloat), Bfloat)
 			else:
 				Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-			A = reluCustom(Z, n_h[l-1])
+			A = activationFunction(Z, n_h[l-1])
 		else:
 			Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-			A = reluCustom(Z)
+			A = activationFunction(Z)
 		
 		if(recordAtrace):
 			if(onlyTrainNeuronsIfActivationContributionAboveThresholdExemplar):
@@ -311,10 +311,10 @@ def neuralNetworkPropagationLREANN_expAUANNtrain(x, y, exemplarsX, exemplarsY, c
 				Z = tf.add(tf.matmul(AprevLayer, Wfloat), Bfloat)
 			else:
 				Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-			A = reluCustom(Z, n_h[l-1])
+			A = activationFunction(Z, n_h[l-1])
 		else:
 			Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-			A = reluCustom(Z)		
+			A = activationFunction(Z)		
 
 		if(onlyTrainNeuronsIfActivationContributionAboveThreshold):
 			#apply threshold to AprevLayer
@@ -368,6 +368,9 @@ def neuralNetworkPropagationLREANN_expAUANNtrain(x, y, exemplarsX, exemplarsY, c
 
 	
 
+def activationFunction(Z, prevLayerSize=None):
+	return reluCustom(Z, prevLayerSize)
+	
 def reluCustom(Z, prevLayerSize=None):
 	
 	if(useBinaryWeights):	

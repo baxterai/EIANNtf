@@ -328,6 +328,14 @@ def neuralNetworkPropagationLREANN(x, networkIndex=1, recordAtrace=False):
 	return pred
 
 def neuralNetworkPropagationLREANNlayer(x, lTrainMax, networkIndex=1, recordAtrace=False):
+
+	global averageTotalInput
+	
+	if(useBinaryWeights):
+		if(averageTotalInput == -1):
+			averageTotalInput = tf.math.reduce_mean(x)	#CHECKTHIS: why was disabled? 
+			print("averageTotalInput = ", averageTotalInput)
+			
 	AprevLayer = x
 	return neuralNetworkPropagationLREANNlayer(AprevLayer, lTrainMax, lTrainMin=1, networkIndex=networkIndex, recordAtrace=recordAtrace)
 		
@@ -1001,7 +1009,10 @@ def updateWeightsBasedOnAidealStochastic(l, AprevLayer, AidealLayer, networkInde
 
 
 def activationFunction(Z, prevLayerSize=None):
+	return activationFunctionCustom(Z, prevLayerSize)
 	
+def activationFunctionCustom(Z, prevLayerSize=None):
+
 	if(useBinaryWeights):	
 		#offset required because negative weights are not used:
 		Zoffset = tf.ones(Z.shape)
