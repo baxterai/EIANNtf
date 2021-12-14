@@ -55,13 +55,15 @@ if(learningAlgorithmStochastic):
 	Bbackup = {}
 useBinaryWeights = False
 
-positiveExcitatoryWeights = True	#mandatory for most learningAlgorithms
+positiveExcitatoryWeights = False	#required for biological plausibility of most learningAlgorithms
 if(positiveExcitatoryWeights):
+	normaliseInput = False	#TODO: verify that the normalisation operation will not disort the code's capacity to process a new data batch the same as an old data batch;
 	normalisedAverageInput = 1.0	#normalise input signal	#arbitrary
 	positiveExcitatoryThreshold = 0.5	#1.0	#weights are centred around positiveExcitatoryThreshold, from 0.0 to positiveExcitatoryThreshold*2	#arbitrary
 	Wmean = 0.5	#arbitrary
 	WstdDev = 0.05	#stddev of weight initialisations	#CHECKTHIS
 else:
+	normaliseInput = False
 	Wmean = 0.0
 	WstdDev = 0.05	#stddev of weight initialisations
 
@@ -80,7 +82,7 @@ if(not inhibitionAlgorithmMoreThanOneLateralNeuronActive):
 	#positiveExcitatoryWeights optional	
 	#INCOMPLETE
 if(learningAlgorithmShuffle):
-	#positiveExcitatoryWeights mandatory
+	#positiveExcitatoryWeights optional
 	#inhibitionAlgorithmMoreThanOneLateralNeuronActive mandatory
 	enableInhibitionTrainSpecificLayerOnly = True
 	applyInhibitoryNetworkDuringTest = False
@@ -90,9 +92,11 @@ if(learningAlgorithmShuffle):
 elif(learningAlgorithmStochastic):
 	if(learningAlgorithmStochasticCorrelation):
 		learningAlgorithmStochasticAlgorithm = "correlation"
+		#positiveExcitatoryWeights optional
 		#learning objective function: minimise the correlation between layer neurons
 	elif(learningAlgorithmStochasticMaximiseAndEvenSignal):
 		learningAlgorithmStochasticAlgorithm = "maximiseAndEvenSignal"
+		#positiveExcitatoryWeights optional?
 		if(not inhibitionAlgorithmMoreThanOneLateralNeuronActive):
 			inhibitionFactor1 = 1.0	#pass through signal	#positiveExcitatoryThreshold	#CHECKTHIS: requires recalibration for activationFunction:positiveExcitatoryWeights
 			inhibitionFactor2 = estNetworkActivationSparsity	#-(WstdDev/2)		#inhibition contributes a significant (nullifying) effect on layer activation	#CHECKTHIS: requires calibration
@@ -101,7 +105,6 @@ elif(learningAlgorithmStochastic):
 			#2: ensure that all layer neurons receive even activation across multiple batches (entire dataset)		
 		metric1Weighting = 1.0
 		metric2Weighting = 1000.0	#normalise metric2Weighting relative to metric1Weighting; eg metric1 =  0.9575, metric2 =  0.000863842
-	#positiveExcitatoryWeights mandatory
 	enableInhibitionTrainSpecificLayerOnly = True
 	applyInhibitoryNetworkDuringTest = False
 	randomlyActivateWeightsDuringTrain = False
@@ -237,6 +240,7 @@ def defineNeuralNetworkParametersLIANN():
 			EWlayer = randomNormal([n_h[l-1], n_h[l]]) 
 			EBlayer = tf.zeros(n_h[l])
 			if(positiveExcitatoryWeights):
+				EWlayer = tf.abs(EWlayer)	#ensure randomNormal generated weights are positive
 				if((l == numberOfLayers) and not positiveExcitatoryWeightsFinalLayer):
 					EWlayer = randomNormalFinalLayer([n_h[l-1], n_h[l]])
 			if(learningAlgorithmHebbian):
@@ -287,7 +291,7 @@ def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, laye
 
 	randomNormal = tf.initializers.RandomNormal(mean=Wmean, stddev=WstdDev)
 
-	if(positiveExcitatoryWeights):
+	if(normaliseInput):
 		#TODO: verify that the normalisation operation will not disort the code's capacity to process a new data batch the same as an old data batch
 		averageTotalInput = tf.math.reduce_mean(x)
 		#print("averageTotalInput = ", averageTotalInput)
@@ -388,6 +392,8 @@ def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, laye
 						BindNew = tf.dtypes.cast(BindNew, dtype=tf.dtypes.float32)
 						BdepNew = tf.dtypes.cast(BdepNew, dtype=tf.dtypes.float32)
 						EWlayerDep = randomNormal([n_h[l-1], n_h[l]]) 
+						if(positiveExcitatoryWeights):
+							EWlayerDep = tf.abs(EWlayerDep)	#ensure randomNormal generated weights are positive
 						EBlayerDep = tf.zeros(n_h[l])
 						EWlayerDep = tf.multiply(EWlayerDep, BdepNew)	#requires broadcasting
 						EBlayerDep = tf.multiply(EBlayerDep, BdepNew)				
@@ -462,7 +468,10 @@ def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, laye
 														#print("newVal = ", newVal)
 												else:
 													newVal = currentVal + variationDiff
-																								
+							
+												if(positiveExcitatoryWeights):
+													newVal = max(newVal, 0)	#do not allow weights fall below zero [CHECKTHIS]	
+																	
 												W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")][networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
 
 												#print("W2 = ", W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")])
@@ -478,6 +487,10 @@ def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, laye
 														newVal = float(not bool(currentVal))
 												else:
 													newVal = currentVal + variationDiff
+													
+												if(positiveExcitatoryWeights):
+													newVal = max(newVal, 0)	#do not allow weights fall below zero [CHECKTHIS]	
+													
 												B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
 
 										metricAfterStochasticUpdate = learningAlgorithmStochasticCalculateMetric(networkIndex, AprevLayer, l)
@@ -515,6 +528,8 @@ def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, laye
 					Wupdate = tf.divide(Wupdate, Wpermanence[generateParameterNameNetwork(networkIndex, l, "Wpermanence")])
 					Wupdate = tf.divide(Wupdate, permanenceNumberBatches)
 					Wnew = tf.add(W[generateParameterNameNetwork(networkIndex, l, "W")], Wupdate)
+					if(positiveExcitatoryWeights):
+						Wnew = tf.maximum(Wnew, 0)	#do not allow weights fall below zero [CHECKTHIS]
 					W[generateParameterNameNetwork(networkIndex, l, "W")] = Wnew
 					#print("Wupdate = ", Wupdate)
 				elif(learningAlgorithmHebbian):
@@ -535,8 +550,8 @@ def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, laye
 						AWdecay = -weightDecayRate
 						#print("AWdecay = ", AWdecay)
 						AW = tf.add(AW, AWdecay)
-						#do not allow weights fall below zero [CHECKTHIS];
-						AW = tf.maximum(AW, 0)
+						if(positiveExcitatoryWeights):
+							AW = tf.maximum(AW, 0)	#do not allow weights fall below zero [CHECKTHIS]
 						#print("AWdecay = ", AWdecay)
 					W[generateParameterNameNetwork(networkIndex, l, "W")] = AW
 
@@ -635,24 +650,34 @@ def learningAlgorithmStochasticCalculateMetric(networkIndex, AprevLayer, l):
 		metric = learningAlgorithmStochasticCalculateMetricMaximiseAndEvenSignal(Afinal)
 	return metric
 
-def learningAlgorithmStochasticCalculateMetricCorrelation(A):	
-	metric = 1 - calculateCorrelationMean(A)
+def learningAlgorithmStochasticCalculateMetricCorrelation(A):
+	#print("A = ", A)	
+	meanCorrelation = calculateCorrelationMean(A)
+	print("meanCorrelation = ", meanCorrelation)
+	metric = 1 - meanCorrelation
 	#print("metric = ", metric)
 	return metric
 	
 def calculateCorrelationMean(A):
 	Anumpy = A.numpy()
-	correlationMatrix = np.corrcoef(Anumpy)	#create correlation matrix across all k neuron dimensions (for every sample instance in the batch)
+	correlationMatrixX = np.transpose(Anumpy)	#2-D array containing multiple variables and observations. Each row of x represents a variable, and each column a single observation of all those variables. Also see rowvar below.	#https://numpy.org/doc/stable/reference/generated/numpy.corrcoef.html
+	correlationMatrix = np.corrcoef(correlationMatrixX)	#create correlation matrix across all k neuron dimensions (for every sample instance in the batch)
+
+	#print("correlationMatrixX = ", correlationMatrixX)
+	#print("correlationMatrix = ", correlationMatrix)
+	#correlationMatrix values will be nan if a column (neuron k) of A has the same value (e.g. 0.0) in every cell
+	
 	offdiagonalIndices = np.triu_indices_from(correlationMatrix,1)	#get off diagonal correlations	#https://stackoverflow.com/questions/14129979/mean-of-a-correlation-matrix-pandas-data-fram
 	#print("offdiagonalIndices = ", offdiagonalIndices)
 	#offdiagonalIndicesList = offdiagonalIndices.tolist()
 	#print("offdiagonalIndicesList = ", offdiagonalIndicesList)
-	correlationMatrix[np.isnan(correlationMatrix)] = 1.0	#set all nan entries as 1.0	(high correlation)
-	#print("correlationMatrix = ", correlationMatrix)
+	correlationMatrix[np.isnan(correlationMatrix)] = 1.0	#set all correlationMatrix nan entries as 1.0 (high correlation), to disincentivise all values of a neuron k being the same value across the batch
+	print("correlationMatrix = ", correlationMatrix)
 	correlations = correlationMatrix[offdiagonalIndices[0], offdiagonalIndices[1]]	
 	#print("correlations = ", correlations)
 	meanCorrelation = calculateCorrelationMatrixOffDiagonalsMean(correlations)
 	#print("meanCorrelation = ", meanCorrelation)
+	
 	return meanCorrelation
 	
 	#alternate methods;
@@ -663,6 +688,7 @@ def calculateCorrelationMean(A):
 	
 def calculateCorrelationMatrixOffDiagonalsMean(correlations):
 	#alternate methods:
+	correlations = np.abs(correlations)	#account for negative correlations
 	meanCorrelation = np.mean(correlations)
 
 	#this method assumes bivariate normality - CHECKTHIS assumption is not violated
