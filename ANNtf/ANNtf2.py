@@ -256,6 +256,9 @@ def executeLearningLREANN_expXUANN(x, y, samplePositiveX, samplePositiveY, sampl
 def executeLearningLIANN(x, y, networkIndex):
 	#first learning algorithm: perform neuron independence training
 	pred = ANNtf2_algorithmLIANN.neuralNetworkPropagationLIANNtrain(x, y, networkIndex)
+def executeLearningEIANN(x, y, networkIndex):
+	#first learning algorithm: perform neuron independence training
+	pred = ANNtf2_algorithmEIANN.neuralNetworkPropagationEIANNtrain(x, networkIndex)
 
 
 			
@@ -314,7 +317,7 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 		Wlist = []
 		Blist = []
 		for l in range(1, numberOfLayers+1):
-			if(ANNtf2_algorithmEIANN.debugOnlyTrainFinalLayer):
+			if(ANNtf2_algorithmEIANN.learningAlgorithmFinalLayerBackpropHebbian):
 				if(l == numberOfLayers):
 					Wlist.append(ANNtf2_algorithmEIANN.W[generateParameterNameNetwork(networkIndex, l, "W")])
 					Blist.append(ANNtf2_algorithmEIANN.B[generateParameterNameNetwork(networkIndex, l, "B")])				
@@ -329,7 +332,7 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 		Wlist = []
 		Blist = []
 		for l in range(1, numberOfLayers+1):
-			if(ANNtf2_algorithmLIANN.learningAlgorithmFinalLayerHebbian):
+			if(ANNtf2_algorithmLIANN.learningAlgorithmFinalLayerBackpropHebbian):
 				if(l == numberOfLayers):
 					Wlist.append(ANNtf2_algorithmLIANN.W[generateParameterNameNetwork(networkIndex, l, "W")])
 					Blist.append(ANNtf2_algorithmLIANN.B[generateParameterNameNetwork(networkIndex, l, "B")])				
@@ -686,6 +689,11 @@ def main():
 							print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
 							predNetworkAverage = predNetworkAverage + pred
 					elif(algorithm == "EIANN"):
+						if(ANNtf2_algorithmEIANN.learningAlgorithmFinalLayerBackpropHebbian):
+							#first learning algorithm: perform neuron independence training
+							batchYoneHot = tf.one_hot(batchY, depth=datasetNumClasses)
+							executeLearningEIANN(batchX, batchYoneHot, networkIndex)
+							#second learning algorithm (final layer hebbian connections to output class targets):
 						executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)
 						if(batchIndex % displayStep == 0):
 							pred = neuralNetworkPropagation(batchX, networkIndex)
@@ -698,18 +706,17 @@ def main():
 						#first learning algorithm: perform neuron independence training
 						batchYoneHot = tf.one_hot(batchY, depth=datasetNumClasses)
 						executeLearningLIANN(batchX, batchYoneHot, networkIndex)
-						
-						#second learning algorithm (final layer hebbian connections to output class targets):
-						executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)
-						if(batchIndex % displayStep == 0):
-							pred = neuralNetworkPropagation(batchX, networkIndex)
-							#print("pred.shape = ", pred.shape)
-							loss = crossEntropy(pred, batchY, datasetNumClasses, costCrossEntropyWithLogits)
-							acc = calculateAccuracy(pred, batchY)
-							print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
-							predNetworkAverage = predNetworkAverage + pred
-
-									
+						if(ANNtf2_algorithmLIANN.learningAlgorithmFinalLayerBackpropHebbian):
+							#second learning algorithm (final layer hebbian connections to output class targets):
+							executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)
+							if(batchIndex % displayStep == 0):
+								pred = neuralNetworkPropagation(batchX, networkIndex)
+								#print("pred.shape = ", pred.shape)
+								loss = crossEntropy(pred, batchY, datasetNumClasses, costCrossEntropyWithLogits)
+								acc = calculateAccuracy(pred, batchY)
+								print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
+								predNetworkAverage = predNetworkAverage + pred
+		
 				if(algorithm == "LREANN"):
 					if(algorithmLREANN == "LREANN_expAUANN"):
 						#batchYactual = ANNtf2_algorithmLREANN.generateTFYActualfromYandExemplarYLREANN_expAUANN(batchY, exemplarsY)

@@ -24,6 +24,8 @@ import ANNtf2_operations
 import ANNtf2_globalDefs
 import math
 
+useZAcoincidenceMatrix = True	#else use AAcoincidenceMatrix
+ 
 LREANN_expHUANN2 = True
 if(LREANN_expHUANN2):
 	immutableConnections = True	#a fraction of connection weights (e.g. 1) is immutable, the others are used in its prediction
@@ -52,7 +54,10 @@ else:
 debugHebbianForwardPropOnlyTrainFinalSupervisedLayer = False
 applyWmaxCap = True	#max W = 1
 applyAmaxCap = True	#max A = 1
-enableForgetting = True
+if(useZAcoincidenceMatrix):
+	enableForgetting = False	#ZAcoincidence matrix naturally provides negative Wmod updates
+else:
+	enableForgetting = True
 #debugSparseActivatedNetwork = False	#creates much larger network
 
 if(immutableConnections):
@@ -233,10 +238,13 @@ def neuralNetworkPropagationLREANN_expHUANNtrain(x, y=None, networkIndex=1, trai
 	#print("learningRate = ", learningRate)
 	
 	AprevLayer = x
+	ZprevLayer = x
 
 	Alayers = []
+	Zlayers = []	#CHECKTHIS (not implemented)
 	if(trainHebbianBackprop):
 		Alayers.append(AprevLayer)
+		Zlayers.append(ZprevLayer)
 	
 	#print("x = ", x)
 	
@@ -249,14 +257,16 @@ def neuralNetworkPropagationLREANN_expHUANNtrain(x, y=None, networkIndex=1, trai
 		
 		if(trainHebbianBackprop):
 			Alayers.append(A)
+			Zlayers.append(Z)
 					
 		if(applyAmaxCap):
 			A = tf.clip_by_value(A, clip_value_min=-1.0, clip_value_max=1.0)
 
 		if(trainHebbianForwardprop):
-			trainLayerLREANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackprop=trainHebbianBackprop, trainHebbianLastLayerSupervision=trainHebbianLastLayerSupervision)
+			trainLayerLREANN_expHUANN(y, networkIndex, l, AprevLayer, ZprevLayer, A, Alayers, trainHebbianBackprop=trainHebbianBackprop, trainHebbianLastLayerSupervision=trainHebbianLastLayerSupervision)
 
 		AprevLayer = A
+		ZprevLayer = Z
 	
 	if(trainHebbianBackprop):
 		for l in reversed(range(1, numberOfLayers+1)):
@@ -266,12 +276,12 @@ def neuralNetworkPropagationLREANN_expHUANNtrain(x, y=None, networkIndex=1, trai
 			AprevLayer = Alayers[l-1]
 			A = Alayers[l]
 			
-			trainLayerLREANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackprop=trainHebbianBackprop, trainHebbianLastLayerSupervision=trainHebbianLastLayerSupervision)
+			trainLayerLREANN_expHUANN(y, networkIndex, l, AprevLayer, ZprevLayer, A, Alayers, trainHebbianBackprop=trainHebbianBackprop, trainHebbianLastLayerSupervision=trainHebbianLastLayerSupervision)
 							
 	return tf.nn.softmax(Z)
 
 
-def trainLayerLREANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainHebbianBackprop=False, trainHebbianLastLayerSupervision=False):
+def trainLayerLREANN_expHUANN(y, networkIndex, l, AprevLayer, ZprevLayer, A, Alayers, trainHebbianBackprop=False, trainHebbianLastLayerSupervision=False):
 
 		#print("train")
 		isLastLayerSupervision = False
@@ -299,6 +309,7 @@ def trainLayerLREANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainH
 			#strengthen those connections that caused the current layer neuron to fire (and weaken those that did not)
 
 			AprevLayerLearn = AprevLayer
+			ZprevLayerLearn = ZprevLayer
 			if(onlyTrainNeuronsIfActivationContributionAboveThreshold):
 				#apply threshold to AprevLayer
 				AprevLayerAboveThreshold = tf.math.greater(AprevLayer, onlyTrainNeuronsIfActivationContributionAboveThresholdValue)
@@ -326,20 +337,23 @@ def trainLayerLREANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainH
 				#print("batchIndexLearnFloat.shape = ", batchIndexLearnFloat.shape)
 				Alearn = tf.math.multiply(Alearn, batchIndexLearnFloat)	#only learn connections which result in an activated higher layer neuron
 						
-
-			AcoincidenceMatrix = tf.matmul(tf.transpose(AprevLayerLearn), Alearn)
-			#Bmod = 0*learningRate	#biases are not currently used
-			Wmod = AcoincidenceMatrix/batchSize*learningRate
+			if(useZAcoincidenceMatrix):
+				AcoincidenceMatrix = tf.matmul(tf.transpose(ZprevLayerLearn), Alearn)	#ZAcoincidenceMatrix
+			else:
+				AcoincidenceMatrix = tf.matmul(tf.transpose(AprevLayerLearn), Alearn)
+				#Bmod = 0*learningRate	#biases are not currently used
 			
+			Wmod = AcoincidenceMatrix/batchSize*learningRate
+
 			if(immutableConnections):
 				WmutableFloat = tf.dtypes.cast(Wmutable[generateParameterNameNetwork(networkIndex, l, "Wmutable")], tf.float32)  
 				Wmod = tf.multiply(Wmod, WmutableFloat)
 			if(sparseConnections):
 				WactiveFloat = tf.dtypes.cast(Wactive[generateParameterNameNetwork(networkIndex, l, "Wactive")], tf.float32)  
 				Wmod = tf.multiply(Wmod, WactiveFloat)
-	
+
 			#print("Wmod = ", Wmod)
-				
+
 			#B[generateParameterNameNetwork(networkIndex, l, "B")] = B[generateParameterNameNetwork(networkIndex, l, "B")] + Bmod
 			W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] + Wmod
 
@@ -375,18 +389,18 @@ def trainLayerLREANN_expHUANN(y, networkIndex, l, AprevLayer, A, Alayers, trainH
 						AcoincidenceMatrixIsZeroFloat = tf.dtypes.cast(AcoincidenceMatrixIsZero, dtype=tf.float32)
 						Wmod2 = tf.square(AcoincidenceMatrixIsZeroFloat)/batchSize*forgetRate	#tf.square(AcoincidenceMatrixIsZeroFloat) - square is required to normalise the forget rate relative to the learn rate [assumes input tensor is < 1]
 						#print("Wmod2 = ", Wmod2)
-				
+
 				if(immutableConnections):
 					WmutableFloat = tf.dtypes.cast(Wmutable[generateParameterNameNetwork(networkIndex, l, "Wmutable")], tf.float32)  
 					Wmod2 = tf.multiply(Wmod2, WmutableFloat)
 				if(sparseConnections):
 					WactiveFloat = tf.dtypes.cast(Wactive[generateParameterNameNetwork(networkIndex, l, "Wactive")], tf.float32)  
 					Wmod2 = tf.multiply(Wmod2, WactiveFloat)
-				
+
 				#print("Wmod2 = ", Wmod2)
-								
+
 				W[generateParameterNameNetwork(networkIndex, l, "W")] = W[generateParameterNameNetwork(networkIndex, l, "W")] - Wmod2
-				
+
 			if(positiveConnections):
 				Wfloat = W[generateParameterNameNetwork(networkIndex, l, "W")]
 				Wfloat = tf.clip_by_value(Wfloat, 0.0, applyNeuronThresholdBiasValue*2.0)
