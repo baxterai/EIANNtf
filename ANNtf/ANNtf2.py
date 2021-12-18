@@ -67,7 +67,7 @@ elif(algorithm == "LREANN"):
 	#algorithmLREANN = "LREANN_expCUANN"	#incomplete+non-convergent
 	#algorithmLREANN = "LREANN_expXUANN"	#incomplete
 	#algorithmLREANN = "LREANN_expMUANN"	#incomplete+non-convergent
-	algorithmLREANN = "LREANN_expRUANN"		
+	algorithmLREANN = "LREANN_expRUANN"
 	if(algorithmLREANN == "LREANN_expHUANN"):
 		import ANNtf2_algorithmLREANN_expHUANN as ANNtf2_algorithmLREANN
 	elif(algorithmLREANN == "LREANN_expSUANN"):

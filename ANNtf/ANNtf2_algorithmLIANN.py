@@ -28,7 +28,9 @@ import copy
 
 debugFastTrain = False
 debugSmallBatchSize = False	#small batch size for debugging matrix output
+
 generateLargeNetwork = False	#large number of layer neurons is required for learningAlgorithmHebbian:useZAcoincidenceMatrix
+generateNetworkStatic = False
 
 #select learningAlgorithm (unsupervised learning algorithm for intermediate layers):
 learningAlgorithmStochasticCorrelation = False	#stochastic optimise weights based on objective function; minimise the correlation between layer neurons
@@ -59,9 +61,11 @@ useBinaryWeights = False
 
 positiveExcitatoryWeights = True	#required for biological plausibility of most learningAlgorithms
 if(positiveExcitatoryWeights):
-	normaliseInput = False	#TODO: verify that the normalisation operation will not disort the code's capacity to process a new data batch the same as an old data batch;
+	positiveExcitatoryWeightsActivationFunctionOffset = True
+	normaliseInput = False	#TODO: verify that the normalisation operation will not disort the code's capacity to process a new data batch the same as an old data batch
 	normalisedAverageInput = 1.0	#normalise input signal	#arbitrary
-	positiveExcitatoryThreshold = 0.5	#1.0	#weights are centred around positiveExcitatoryThreshold, from 0.0 to positiveExcitatoryThreshold*2	#arbitrary
+	if(positiveExcitatoryWeightsActivationFunctionOffset):
+		positiveExcitatoryThreshold = 0.5	#1.0	#weights are centred around positiveExcitatoryThreshold, from 0.0 to positiveExcitatoryThreshold*2	#arbitrary
 	Wmean = 0.5	#arbitrary
 	WstdDev = 0.05	#stddev of weight initialisations	#CHECKTHIS
 else:
@@ -77,6 +81,9 @@ estNetworkActivationSparsity = 0.5	#50% of neurons are expected to be active dur
 inhibitionAlgorithmArtificial = False	#simplified inhibition algorithm implementation
 inhibitionAlgorithmArtificialMoreThanXLateralNeuronActive = False	#inhibit layer if more than x lateral neurons active
 inhibitionAlgorithmArtificialSparsity = False	#inhibition signal increases with number of simultaneously active neurons
+
+Athreshold = False
+AthresholdValue = 1.0	#do not allow output signal to exceed 1.0
 
 #if(learningAlgorithmCorrelation):
 	#positiveExcitatoryWeights optional	
@@ -137,13 +144,17 @@ elif(learningAlgorithmShufflePermanence):
 elif(learningAlgorithmHebbian):
 	useZAcoincidenceMatrix = True	#reduce connection weights for unassociated neurons
 	#positiveExcitatoryWeights mandatory
+	positiveExcitatoryWeightsThresholds = True	#do not allow weights to exceed 1.0 / fall below 0.0 [CHECKTHIS]
+	Athreshold = True	#prevents incremental increase in signal per layer
 	alwaysApplyInhibition = False	
 	if(useZAcoincidenceMatrix):
 		alwaysApplyInhibition = True	#inhibition is theoretically allowed at all times with useZAcoincidenceMatrix as it simply biases the network against a correlation between layer k neurons (inhibition is not set up to only allow X/1 neuron to fire)
 	if(alwaysApplyInhibition):
 		#TODO: note network sparsity/inhibition must be configured such that at least one neuron fires per layer
+		positiveExcitatoryWeightsActivationFunctionOffset = False	#activation function will always be applied to Z signal comprising positive+negative components
 		inhibitionAlgorithmArtificialSparsity = True
 		generateLargeNetwork = True 	#large is required because it will be sparsely activated due to constant inhibition
+		generateNetworkStatic = True	#equal number neurons per layer for unsupervised layers/testing
 		enableInhibitionTrainSpecificLayerOnly = False
 		applyInhibitoryNetworkDuringTest = True
 	else:
@@ -170,7 +181,7 @@ elif(learningAlgorithmHebbian):
 		useZAcoincidenceMatrix = False
 		normaliseWeightUpdates = False
 		
-	maxWeightUpdateThreshold = True	#max threshold weight updates to learningRate	
+	maxWeightUpdateThreshold = False	#max threshold weight updates to learningRate	
 	#TODO: ensure learning algorithm does not result in runnaway weight increases
 
 
@@ -247,7 +258,7 @@ def defineNetworkParametersLIANN(num_input_neurons, num_output_neurons, datasetN
 	if(not inhibitionAlgorithmArtificial):
 		global In_h
 	
-	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork=generateLargeNetwork)
+	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork=generateLargeNetwork, generateNetworkStatic=generateNetworkStatic)
 	
 	if(not inhibitionAlgorithmArtificial):
 		if(singleInhibitoryNeuronPerLayer):
@@ -567,7 +578,7 @@ def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, laye
 				elif(learningAlgorithmHebbian):
 					AW = W[generateParameterNameNetwork(networkIndex, l, "W")] 
 					Afinal, Zfinal, EWactive = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
-					print("Zfinal = ", Zfinal)
+					#print("Zfinal = ", Zfinal)
 					
 					if(useZAcoincidenceMatrix):
 						AWcontribution = tf.matmul(tf.transpose(ZprevLayer), Afinal)	#increase excitatory weights that contributed to the output signal	#hebbian
@@ -594,13 +605,15 @@ def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, laye
 						AWdecay = -weightDecayRate
 						#print("AWdecay = ", AWdecay)
 						AW = tf.add(AW, AWdecay)
-						if(positiveExcitatoryWeights):
-							AW = tf.maximum(AW, 0)	#do not allow weights fall below zero [CHECKTHIS]
 						#print("AWdecay = ", AWdecay)
-						
+					
+					if(positiveExcitatoryWeightsThresholds):
+						AW = tf.minimum(AW, 1.0)	#do not allow weights to exceed 1.0 [CHECKTHIS]
+						AW = tf.maximum(AW, 0)	#do not allow weights fall below zero [CHECKTHIS]
+								
 					W[generateParameterNameNetwork(networkIndex, l, "W")] = AW
 
-				A, Z, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition=False, randomlyActivateWeights=False)	#in case !learningAlgorithmFinalLayerBackpropHebbian
+				A, Z, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition=(not enableInhibitionTrainSpecificLayerOnly), randomlyActivateWeights=False)	#in case !learningAlgorithmFinalLayerBackpropHebbian
 			else:
 				A, Z, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
 
@@ -640,9 +653,13 @@ def forwardIterationInhibition(networkIndex, AprevLayer, ZprevLayer, l, A, Z):
 		if(inhibitionAlgorithmArtificialSparsity):
 			prevLayerSize = n_h[l-1]
 			inhibitionResult = tf.math.reduce_mean(AprevLayer, axis=1)	#or ZprevLayer?	#batched
-			inhibitionResult = tf.divide(inhibitionResult, prevLayerSize)	#normalise by prev layer size		#batched
+			#print("inhibitionResult = ", inhibitionResult)
+			inhibitionResult = tf.multiply(inhibitionResult, prevLayerSize)	#normalise by prev layer size		#batched
+			inhibitionResult = tf.multiply(inhibitionResult, Wmean)	#normalise by average weight
 			inhibitionResult = tf.expand_dims(inhibitionResult, axis=1)	#batched
 			Zfinal = tf.subtract(Z, inhibitionResult)	#requires broadcasting
+			#print("Z = ", Z)
+			#print("Zfinal = ", Zfinal)
 			Afinal = activationFunction(Zfinal, prevLayerSize=prevLayerSize)
 		elif(inhibitionAlgorithmArtificialMoreThanXLateralNeuronActive):
 			layerSize = n_h[l]
@@ -681,6 +698,10 @@ def forwardIterationInhibition(networkIndex, AprevLayer, ZprevLayer, l, A, Z):
 		Zfinal = tf.add(Z, IZo)
 		#print("Zfinal = ", Zfinal)
 		Afinal = activationFunction(Zfinal, n_h[l-1])
+		
+	if(Athreshold):
+		Afinal = tf.minimum(Afinal, AthresholdValue)
+		#print("Afinal = ", Afinal)
 		
 	return Afinal, Zfinal
 
@@ -827,7 +848,7 @@ def activationFunction(Z, prevLayerSize=None):
 	return reluCustomPositive(Z, prevLayerSize)
 	
 def reluCustomPositive(Z, prevLayerSize=None):
-	if(positiveExcitatoryWeights):
+	if(positiveExcitatoryWeightsActivationFunctionOffset):
 		#CHECKTHIS: consider sigmoid instead of relu
 		#offset required because negative weights are not used:
 		
