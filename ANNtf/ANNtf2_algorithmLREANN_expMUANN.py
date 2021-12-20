@@ -205,7 +205,7 @@ def neuralNetworkPropagationLREANN_test(x, y, networkIndex=1):
 
 	pred = neuralNetworkPropagationLREANN(x, networkIndex)
 	costCrossEntropyWithLogits = False	#binary classification
-	loss = ANNtf2_operations.crossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=costCrossEntropyWithLogits)
+	loss = ANNtf2_operations.calculateLossCrossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=costCrossEntropyWithLogits)
 	acc = ANNtf2_operations.calculateAccuracy(pred, y)
 	
 	return loss, acc
@@ -230,10 +230,10 @@ def neuralNetworkPropagationLREANN_expMUANNtrainBackprop(x, y, networkIndex=1):
 		
 def lossFunction(y_pred, y_true, lTrain):
 	if(debugActivationFunctionAllSoftmax):
-		loss = crossEntropy(y_pred, y_true, n_h[lTrain], costCrossEntropyWithLogits=False, oneHotEncoded=True)
+		loss = calculateLossCrossEntropy(y_pred, y_true, n_h[lTrain], costCrossEntropyWithLogits=False, oneHotEncoded=True)
 	else:
 		#loss = lossFunctionCustom(y_pred, y_true)
-		loss = crossEntropy(y_pred, y_true, n_h[lTrain], costCrossEntropyWithLogits=False, oneHotEncoded=True)
+		loss = calculateLossCrossEntropy(y_pred, y_true, n_h[lTrain], costCrossEntropyWithLogits=False, oneHotEncoded=True)
 	print("y_pred = ", y_pred)
 	print("y_true = ", y_true)
 	#print("loss = ", loss)
@@ -299,7 +299,7 @@ def neuralNetworkPropagationLREANN_expMUANNtrainBio(x, y, networkIndex=1):
 
 	#perform highest layer weight updates
 	pred, ATop = neuralNetworkPropagationLREANNlayer(x, numberOfLayers, networkIndex)
-	AexpectedTop = tf.one_hot(y, depth=datasetNumClasses)	#see ANNtf2_operations.crossEntropy;
+	AexpectedTop = tf.one_hot(y, depth=datasetNumClasses)	#see ANNtf2_operations.calculateLossCrossEntropy;
 	ADeltaTop = calculateAdelta(AexpectedTop, ATop)
 	ADeltaTop = tf.reduce_mean(ADeltaTop, axis=0)	#average over entire batch
 	

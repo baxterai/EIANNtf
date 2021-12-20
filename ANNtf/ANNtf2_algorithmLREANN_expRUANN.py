@@ -406,7 +406,7 @@ def neuralNetworkPropagationLREANNlayerLK(AprevLayer, k, l, networkIndex=1):
 def neuralNetworkPropagationLREANN_test(x, y, networkIndex=1):
 
 	pred = neuralNetworkPropagationLREANN(x, networkIndex)
-	loss = ANNtf2_operations.crossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=False)
+	loss = ANNtf2_operations.calculateLossCrossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=False)
 	acc = ANNtf2_operations.calculateAccuracy(pred, y)
 	
 	return loss, acc
@@ -475,9 +475,9 @@ def calculateAerrorTopLayer(y_pred, y_true, networkIndex=1):
 	
 	if(applyFinalLayerLossFunction):
 		if(activationFunctionTypeFinalLayer == "softmax"):
-			loss = ANNtf2_operations.crossEntropy(y_pred, y_true, datasetNumClasses, costCrossEntropyWithLogits=False, oneHotEncoded=True, reduceMean=False)
+			loss = ANNtf2_operations.calculateLossCrossEntropy(y_pred, y_true, datasetNumClasses, costCrossEntropyWithLogits=False, oneHotEncoded=True, reduceMean=False)
 		elif(activationFunctionTypeFinalLayer == "sigmoid"):		
-			loss = ANNtf2_operations.crossEntropy(y_pred, y_true, datasetNumClasses=None, costCrossEntropyWithLogits=True, reduceMean=False)	#loss = tf.nn.sigmoid_cross_entropy_with_logits(y_true, y_pred)
+			loss = ANNtf2_operations.calculateLossCrossEntropy(y_pred, y_true, datasetNumClasses=None, costCrossEntropyWithLogits=True, reduceMean=False)	#loss = tf.nn.sigmoid_cross_entropy_with_logits(y_true, y_pred)
 		else:
 			print("activationFunctionTypeFinalLayer not currently supported by RUANN = ", activationFunctionTypeFinalLayer)
 			exit()

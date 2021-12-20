@@ -66,7 +66,7 @@ def printAverage(tensor, tensorName, indentation):
 		indentationString = indentationString + "\t"
 	print(indentationString + tensorName + "Average: %f" % (tensorAverage))
 
-def crossEntropy(y_pred, y_true, datasetNumClasses, costCrossEntropyWithLogits=False, oneHotEncoded=False, reduceMean=True):
+def calculateLossCrossEntropy(y_pred, y_true, datasetNumClasses, costCrossEntropyWithLogits=False, oneHotEncoded=False, reduceMean=True):
 	if(costCrossEntropyWithLogits):
 		cost = tf.nn.sigmoid_cross_entropy_with_logits(logits=tf.squeeze(y_pred), labels=tf.cast(y_true, tf.float32))
 		if(reduceMean):
@@ -80,6 +80,10 @@ def crossEntropy(y_pred, y_true, datasetNumClasses, costCrossEntropyWithLogits=F
 			cost = tf.reduce_sum(cost)
 	
 	return cost
+
+def calculateLossMeanSquaredError(y_pred, y_true):
+	loss = tf.reduce_mean(tf.math.squared_difference(y_pred, y_true))
+	return loss
 
 def calculateAccuracy(y_pred, y_true):
 	correct_prediction = calculateCorrectPrediction(y_pred, y_true) 

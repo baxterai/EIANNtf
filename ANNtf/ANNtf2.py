@@ -9,11 +9,16 @@ MIT License
 # Installation:
 Python 3 and Tensorflow 2.1+ 
 
+conda create -n anntf2 python=3.7
+source activate anntf2
+conda install -c tensorflow tensorflow=2.3
+conda install scikit-learn (ANNtf2_algorithmLIANN_PCAsimulation only)
+	
 # Usage:
 python3 ANNtf2.py
 
 # Description:
-ANNtf - train an experimental artificial neural network (ANN/SANI/LREANN/FBANN/EIANN/BAANN/LIANN)
+ANNtf - train an experimental artificial neural network (ANN/SANI/LREANN/FBANN/EIANN/BAANN/LIANN/AEANN)
 
 """
 
@@ -40,7 +45,8 @@ from ANNtf2_algorithmSANIglobalDefs import algorithmSANI
 #algorithm = "FBANN"	#feedback artificial neural network (reverse connectivity)	#incomplete
 #algorithm = "EIANN"	#excitatory/inhibitory artificial neural network	#incomplete+non-convergent
 #algorithm = "BAANN"	#breakaway artificial neural network
-algorithm = "LIANN"	#local inhibition artificial neural network	#incomplete+non-convergent
+#algorithm = "LIANN"	#local inhibition artificial neural network	#incomplete+non-convergent
+algorithm = "AEANN"	#autoencoder artificial neural network	#incomplete+non-convergent?
 
 suppressGradientDoNotExistForVariablesWarnings = True
 
@@ -93,6 +99,8 @@ elif(algorithm == "BAANN"):
 	import ANNtf2_algorithmBAANN as ANNtf2_algorithmBAANN
 elif(algorithm == "LIANN"):
 	import ANNtf2_algorithmLIANN as ANNtf2_algorithmLIANN
+elif(algorithm == "AEANN"):
+	import ANNtf2_algorithmAEANN as ANNtf2_algorithmAEANN
 	
 						
 #learningRate, trainingSteps, batchSize, displayStep, numEpochs = -1
@@ -170,7 +178,10 @@ elif(algorithm == "LIANN"):
 	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
 	#numberOfNetworks = 3	#default: 1		
-		
+elif(algorithm == "AEANN"):
+	dataset = "SmallDataset"
+	#trainMultipleNetworks = True	#default: False
+	#numberOfNetworks = 3	#default: 1				
 		
 if(dataset == "SmallDataset"):
 	smallDatasetIndex = 0 #default: 0 (New Thyroid)
@@ -210,7 +221,7 @@ datasetFileNameEnd = ".dat"
 
 	
 	
-def neuralNetworkPropagation(x, networkIndex=1):
+def neuralNetworkPropagation(x, networkIndex=1, l=None):
 	if(algorithm == "SANI"):
 		pred = ANNtf2_algorithmSANI.neuralNetworkPropagationSANI(x)
 	elif(algorithm == "ANN"):
@@ -253,19 +264,33 @@ def executeLearningLREANN_expXUANN(x, y, samplePositiveX, samplePositiveY, sampl
 	#learning algorithm: perform contrast training (diff of interclass experience with current experience, and diff of extraclass experience with current experience) at each layer of network
 	pred = ANNtf2_algorithmLREANN.neuralNetworkPropagationLREANN_expXUANNtrain(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex)
 
-def executeLearningLIANN(x, y, networkIndex):
-	#first learning algorithm: perform neuron independence training
-	pred = ANNtf2_algorithmLIANN.neuralNetworkPropagationLIANNtrain(x, y, networkIndex)
 def executeLearningEIANN(x, y, networkIndex):
 	#first learning algorithm: perform neuron independence training
 	pred = ANNtf2_algorithmEIANN.neuralNetworkPropagationEIANNtrain(x, networkIndex)
+def executeLearningLIANN(x, y, networkIndex):
+	#first learning algorithm: perform neuron independence training
+	pred = ANNtf2_algorithmLIANN.neuralNetworkPropagationLIANNtrain(x, y, networkIndex)
+#def executeLearningAEANN(x, y, networkIndex):
+#	#first learning algorithm: perform neuron independence training
+#	pred = ANNtf2_algorithmAEANN.neuralNetworkPropagationAEANNtrain(x, y, networkIndex)
 
 
 			
-def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, networkIndex=1):
+def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, networkIndex=1, l=None):
 	with tf.GradientTape() as gt:
-		pred = neuralNetworkPropagation(x, networkIndex)
-		loss = crossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits)
+		if(algorithm == "AEANN"):
+			if(l == numberOfLayers):
+				pred = ANNtf2_algorithmAEANN.neuralNetworkPropagationAEANNfinalLayer(x, networkIndex)
+				target = y 
+				loss = calculateLossCrossEntropy(pred, target, datasetNumClasses, costCrossEntropyWithLogits)
+			else:
+				pred = ANNtf2_algorithmAEANN.neuralNetworkPropagationAEANNautoencoderLayer(x, l, networkIndex)
+				target = ANNtf2_algorithmAEANN.neuralNetworkPropagationAEANNtestLayer(x, l-1, networkIndex)
+				loss = calculateLossMeanSquaredError(pred, target)
+		else:
+			pred = neuralNetworkPropagation(x, networkIndex, l)
+			target = y
+			loss = calculateLossCrossEntropy(pred, target, datasetNumClasses, costCrossEntropyWithLogits)
 		
 	if(algorithm == "ANN"):
 		Wlist = []
@@ -342,7 +367,21 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 		trainableVariables = Wlist + Blist
 		WlistLength = len(Wlist)
 		BlistLength = len(Blist)
-		
+	elif(algorithm == "AEANN"):
+		#train specific layer weights;
+		Wlist = []
+		Blist = []
+		if(l == numberOfLayers):
+			Wlist.append(ANNtf2_algorithmAEANN.Wf[generateParameterNameNetwork(networkIndex, l, "Wf")])
+			Blist.append(ANNtf2_algorithmAEANN.B[generateParameterNameNetwork(networkIndex, l, "B")])		
+		else:
+			Wlist.append(ANNtf2_algorithmAEANN.Wf[generateParameterNameNetwork(networkIndex, l, "Wf")])
+			Wlist.append(ANNtf2_algorithmAEANN.Wb[generateParameterNameNetwork(networkIndex, l, "Wb")])
+			Blist.append(ANNtf2_algorithmAEANN.B[generateParameterNameNetwork(networkIndex, l, "B")])
+		trainableVariables = Wlist + Blist
+		WlistLength = len(Wlist)
+		BlistLength = len(Blist)
+			
 	gradients = gt.gradient(loss, trainableVariables)
 						
 	if(suppressGradientDoNotExistForVariablesWarnings):
@@ -495,7 +534,11 @@ def main():
 		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmLIANN.defineTrainingParametersLIANN(dataset)
 		numberOfLayers = ANNtf2_algorithmLIANN.defineNetworkParametersLIANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
 		ANNtf2_algorithmLIANN.defineNeuralNetworkParametersLIANN()
-							
+	elif(algorithm == "AEANN"):
+		learningRate, trainingSteps, batchSize, displayStep, numEpochs = ANNtf2_algorithmAEANN.defineTrainingParametersAEANN(dataset)
+		numberOfLayers = ANNtf2_algorithmAEANN.defineNetworkParametersAEANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
+		ANNtf2_algorithmAEANN.defineNeuralNetworkParametersAEANN()
+									
 	#define epochs:
 	
 	if(trainMultipleFiles):
@@ -644,7 +687,7 @@ def main():
 						if(batchIndex % displayStep == 0):
 							pred = neuralNetworkPropagation(batchX, networkIndex)
 							#print("pred.shape = ", pred.shape)
-							loss = crossEntropy(pred, batchY, datasetNumClasses, costCrossEntropyWithLogits)
+							loss = calculateLossCrossEntropy(pred, batchY, datasetNumClasses, costCrossEntropyWithLogits)
 							acc = calculateAccuracy(pred, batchY)
 							print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
 							predNetworkAverage = predNetworkAverage + pred
@@ -675,7 +718,7 @@ def main():
 							executeLearningLREANN(batchX, batchY, networkIndex)
 						if(batchIndex % displayStep == 0):
 							pred = neuralNetworkPropagation(batchX, networkIndex)
-							loss = crossEntropy(pred, batchYactual, datasetNumClasses, costCrossEntropyWithLogits)
+							loss = calculateLossCrossEntropy(pred, batchYactual, datasetNumClasses, costCrossEntropyWithLogits)
 							acc = calculateAccuracy(pred, batchYactual)
 							print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
 							predNetworkAverage = predNetworkAverage + pred
@@ -684,7 +727,7 @@ def main():
 						if(batchIndex % displayStep == 0):
 							pred = neuralNetworkPropagation(batchX, networkIndex)
 							#print("pred = ", pred)
-							loss = crossEntropy(pred, batchY, datasetNumClasses, costCrossEntropyWithLogits)
+							loss = calculateLossCrossEntropy(pred, batchY, datasetNumClasses, costCrossEntropyWithLogits)
 							acc = calculateAccuracy(pred, batchY)
 							print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
 							predNetworkAverage = predNetworkAverage + pred
@@ -698,7 +741,7 @@ def main():
 						if(batchIndex % displayStep == 0):
 							pred = neuralNetworkPropagation(batchX, networkIndex)
 							#print("pred.shape = ", pred.shape)
-							loss = crossEntropy(pred, batchY, datasetNumClasses, costCrossEntropyWithLogits)
+							loss = calculateLossCrossEntropy(pred, batchY, datasetNumClasses, costCrossEntropyWithLogits)
 							acc = calculateAccuracy(pred, batchY)
 							print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
 							predNetworkAverage = predNetworkAverage + pred
@@ -712,11 +755,21 @@ def main():
 							if(batchIndex % displayStep == 0):
 								pred = neuralNetworkPropagation(batchX, networkIndex)
 								#print("pred.shape = ", pred.shape)
-								loss = crossEntropy(pred, batchY, datasetNumClasses, costCrossEntropyWithLogits)
+								loss = calculateLossCrossEntropy(pred, batchY, datasetNumClasses, costCrossEntropyWithLogits)
 								acc = calculateAccuracy(pred, batchY)
 								print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
 								predNetworkAverage = predNetworkAverage + pred
-		
+					elif(algorithm == "AEANN"):
+						for l in range(1, numberOfLayers+1):
+							executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex, l=l)
+						if(batchIndex % displayStep == 0):
+							pred = ANNtf2_algorithmAEANN.neuralNetworkPropagationAEANNtest(batchX, networkIndex)	#skip autoencoders
+							#print("pred.shape = ", pred.shape)
+							loss = calculateLossCrossEntropy(pred, batchY, datasetNumClasses, costCrossEntropyWithLogits)
+							acc = calculateAccuracy(pred, batchY)
+							print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
+							predNetworkAverage = predNetworkAverage + pred
+								
 				if(algorithm == "LREANN"):
 					if(algorithmLREANN == "LREANN_expAUANN"):
 						#batchYactual = ANNtf2_algorithmLREANN.generateTFYActualfromYandExemplarYLREANN_expAUANN(batchY, exemplarsY)
@@ -733,7 +786,7 @@ def main():
 				if(batchIndex % displayStep == 0):
 					if(trainMultipleNetworks):
 						predNetworkAverage = predNetworkAverage / numberOfNetworks
-						loss = crossEntropy(predNetworkAverage, batchYactual, datasetNumClasses, costCrossEntropyWithLogits)
+						loss = calculateLossCrossEntropy(predNetworkAverage, batchYactual, datasetNumClasses, costCrossEntropyWithLogits)
 						acc = calculateAccuracy(predNetworkAverage, batchYactual)
 						print("batchIndex: %i, loss: %f, accuracy: %f" % (batchIndex, loss, acc))	
 
@@ -760,10 +813,14 @@ def main():
 					print("Test Accuracy: networkIndex: %i, %f" % (networkIndex, calculateAccuracy(pred, test_y)))
 					predNetworkAverageAll = predNetworkAverageAll + pred
 				elif(algorithm == "LIANN"):
-					pred = neuralNetworkPropagation(test_x, networkIndex)	#test_x batch may be too large to propagate simultaneously and require subdivision
+					pred = neuralNetworkPropagation(test_x, networkIndex)
 					print("Test Accuracy: networkIndex: %i, %f" % (networkIndex, calculateAccuracy(pred, test_y)))
 					predNetworkAverageAll = predNetworkAverageAll + pred
-								
+				elif(algorithm == "AEANN"):
+					pred = ANNtf2_algorithmAEANN.neuralNetworkPropagationAEANNtest(test_x, networkIndex)	#skip autoencoders
+					print("Test Accuracy: networkIndex: %i, %f" % (networkIndex, calculateAccuracy(pred, test_y)))
+					predNetworkAverageAll = predNetworkAverageAll + pred
+													
 			if(trainMultipleNetworks):
 					predNetworkAverageAll = predNetworkAverageAll / numberOfNetworks
 					#print("predNetworkAverageAll", predNetworkAverageAll)

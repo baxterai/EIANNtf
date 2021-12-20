@@ -268,7 +268,7 @@ def neuralNetworkPropagationLREANN_test(x, y, networkIndex=1):
 
 	pred = neuralNetworkPropagationLREANN(x, networkIndex)
 	costCrossEntropyWithLogits = False	#binary classification
-	loss = ANNtf2_operations.crossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=costCrossEntropyWithLogits)
+	loss = ANNtf2_operations.calculateLossCrossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=costCrossEntropyWithLogits)
 	acc = ANNtf2_operations.calculateAccuracy(pred, y)
 	
 	return loss, acc
@@ -301,7 +301,7 @@ def executeOptimisationSub(x, y, samplePositiveX, samplePositiveY, sampleNegativ
 		pred = neuralNetworkPropagationLREANNsub(x, samplePositiveX, sampleNegativeX, lTrain, networkIndex)
 		#print("pred.shape = ", pred.shape)
 		#print("yIntermediaryArtificialTarget.shape = ", yIntermediaryArtificialTarget.shape)
-		loss = crossEntropy(pred, yIntermediaryArtificialTarget, yIntermediaryArtificialTargetNumClasses, costCrossEntropyWithLogits=False, oneHotEncoded=True)	#single intermediary (per layer) output neuron used for training
+		loss = calculateLossCrossEntropy(pred, yIntermediaryArtificialTarget, yIntermediaryArtificialTargetNumClasses, costCrossEntropyWithLogits=False, oneHotEncoded=True)	#single intermediary (per layer) output neuron used for training
 
 	if(debugVerifyGradientBackpropStopSub):
 		for l in range(1, numberOfLayers+1):
@@ -328,7 +328,7 @@ def executeOptimisationFinal(x, y, networkIndex=1):
 
 	with tf.GradientTape() as g:
 		pred = neuralNetworkPropagationLREANNfinal(x, networkIndex)
-		loss = crossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=False)
+		loss = calculateLossCrossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=False)
 		
 	Wlist = []
 	Blist = []

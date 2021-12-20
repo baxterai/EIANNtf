@@ -24,21 +24,24 @@ import numpy as np
 from ANNtf2_operations import *	#generateParameterNameSeq, generateParameterName, defineNetworkParameters
 import ANNtf2_operations
 import ANNtf2_globalDefs
+import ANNtf2_algorithmLIANN_PCAsimulation
 import copy
 
 debugFastTrain = False
 debugSmallBatchSize = False	#small batch size for debugging matrix output
 
+largeBatchSize = False
 generateLargeNetwork = False	#large number of layer neurons is required for learningAlgorithmHebbian:useZAcoincidenceMatrix
 generateNetworkStatic = False
 
 #select learningAlgorithm (unsupervised learning algorithm for intermediate layers):
-learningAlgorithmStochasticCorrelation = False	#stochastic optimise weights based on objective function; minimise the correlation between layer neurons
+learningAlgorithmPCAsimulation = False	#note layer construction is nonlinear (use ANNtf2_algorithmAEANN/autoencoder for nonlinear dimensionality reduction simulation)	#incomplete
+learningAlgorithmStochasticCorrelation = True	#stochastic optimise weights based on objective function; minimise the correlation between layer neurons
 learningAlgorithmCorrelation = False	#minimise correlation between layer neurons	#INCOMPLETE
 learningAlgorithmShuffle = False	#randomly shuffle neuron weights until independence is detected
 learningAlgorithmStochasticMaximiseAndEvenSignal = False	#stochastic optimise weights based on objective functions; #1: maximise the signal (ie successfully uninhibited) across multiple batches (entire dataset), #2: ensure that all layer neurons receive even activation across multiple batches (entire dataset)	
 learningAlgorithmShufflePermanence = False	#increase the permanence of uninhibited neuron weights, and stocastically modify weights based on their impermanence
-learningAlgorithmHebbian = True	#strengthen weights of successfully activated neurons
+learningAlgorithmHebbian = False	#strengthen weights of successfully activated neurons
 
 #select learningAlgorithmFinalLayer (supervised learning algorithm for final layer/testing):
 learningAlgorithmFinalLayerBackpropHebbian = True	#only apply backprop (effective hebbian) learning at final layer
@@ -85,17 +88,25 @@ inhibitionAlgorithmArtificialSparsity = False	#inhibition signal increases with 
 Athreshold = False
 AthresholdValue = 1.0	#do not allow output signal to exceed 1.0
 
-#if(learningAlgorithmCorrelation):
+learningRate = 0.0	#defined by defineTrainingParametersLIANN
+
+if(learningAlgorithmPCAsimulation):
+	#positiveExcitatoryWeights optional
+	enableInhibitionTrainSpecificLayerOnly = True	#optional?
+	applyInhibitoryNetworkDuringTest = False
+	randomlyActivateWeightsDuringTrain = False
+	largeBatchSize = True	#1 PCA is performed across entire dataset [per layer]
+#elif(learningAlgorithmCorrelation):
 	#positiveExcitatoryWeights optional	
 	#INCOMPLETE
-if(learningAlgorithmShuffle):
+elif(learningAlgorithmShuffle):
 	#positiveExcitatoryWeights optional
 	inhibitionAlgorithmArtificialMoreThanXLateralNeuronActive = True	#mandatory
 	enableInhibitionTrainSpecificLayerOnly = True
 	applyInhibitoryNetworkDuringTest = False
-	learningRate = 0.0	#defined by defineTrainingParametersLIANN
 	fractionIndependentInstancesAcrossBatchRequired = 0.3	#divide by number of neurons on layer	#if found x% of independent instances, then record neuron as independent (solidify weights)	#FUTURE: will depend on number of neurons on current layer and previous layer	#CHECKTHIS: requires calibration
 	randomlyActivateWeightsDuringTrain = False
+	largeBatchSize = True
 elif(learningAlgorithmStochastic):
 	inhibitionAlgorithmArtificialMoreThanXLateralNeuronActive = True	#optional
 	if(learningAlgorithmStochasticCorrelation):
@@ -126,7 +137,6 @@ elif(learningAlgorithmStochastic):
 	NETWORK_PARAM_INDEX_H_CURRENT_LAYER = 2
 	NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER = 3
 	NETWORK_PARAM_INDEX_VARIATION_DIRECTION = 4
-	learningRate = 0.0	#defined by defineTrainingParametersLIANN
 elif(learningAlgorithmShufflePermanence):
 	inhibitionAlgorithmArtificialMoreThanXLateralNeuronActive = True	#optional
 	#positiveExcitatoryWeights optional?
@@ -142,6 +152,7 @@ elif(learningAlgorithmShufflePermanence):
 	permanenceNumberBatches = 10	#if permanenceUpdateRate=1, average number of batches to reset W to random values
 	solidificationRate = 0.1
 elif(learningAlgorithmHebbian):
+	tuneInhibitionNeurons = False	#optional
 	useZAcoincidenceMatrix = True	#reduce connection weights for unassociated neurons
 	#positiveExcitatoryWeights mandatory
 	positiveExcitatoryWeightsThresholds = True	#do not allow weights to exceed 1.0 / fall below 0.0 [CHECKTHIS]
@@ -166,7 +177,6 @@ elif(learningAlgorithmHebbian):
 		randomlyActivateWeightsProbability = 1.0
 	WinitialisationFactor = 1.0	#initialise network with relatively low weights	#network will be trained (weights will be increased) up until point where activation inhibited
 	BinitialisationFactor = 1.0	#NOTUSED
-	learningRate = 0.0	#defined by defineTrainingParametersLIANN
 	weightDecay = False
 	if(useZAcoincidenceMatrix):
 		useZAcoincidenceMatrix = True	#reduce connection weights for unassociated neurons
@@ -228,13 +238,14 @@ def defineTrainingParametersLIANN(dataset):
 	
 	if(learningAlgorithmStochastic):
 		learningRate = 0.001
-	if(learningAlgorithmHebbian):
+	elif(learningAlgorithmHebbian):
 		learningRate = 0.001
 		weightDecayRate = learningRate/10.0	#CHECKTHIS	#will depend on learningRate
+	
 	if(debugSmallBatchSize):
 		batchSize = 10
 	else:
-		if(learningAlgorithmShuffle):
+		if(largeBatchSize):
 			batchSize = 1000	#current implementation: batch size should contain all examples in training set
 		else:
 			batchSize = 100	#3	#100
@@ -393,7 +404,16 @@ def neuralNetworkPropagationLIANN(x, y, networkIndex=1, trainWeights=False, laye
 
 				#if(learningAlgorithmCorrelation):
 				#	correlation, Aerror = forwardIterationInhibitionMeasureCorrelation(networkIndex, AprevLayer, l)
-				if(learningAlgorithmShuffle):
+				if(learningAlgorithmPCAsimulation):
+					#Afinal, Zfinal, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)	#batched
+					SVDinputMatrix = ANNtf2_algorithmLIANN_PCAsimulation.generateSVDinputMatrix(l, n_h, AprevLayer)
+					U, Sigma, VT = ANNtf2_algorithmLIANN_PCAsimulation.calculateSVD(M=SVDinputMatrix, k=n_h[l])
+					AW = ANNtf2_algorithmLIANN_PCAsimulation.calculateWeights(l, n_h, SVDinputMatrix, U, Sigma, VT)
+					W[generateParameterNameNetwork(networkIndex, l, "W")] = AW
+					
+					#weights = U -> Sigma -> VT	[linear]
+					#M_reduced = reduce_to_k_dim(M=spikeCoincidenceMatrix, k=n_h[l])
+				elif(learningAlgorithmShuffle):
 					layerHasDependentNeurons = True
 					Bind = Bindependent[generateParameterNameNetwork(networkIndex, l, "Bindependent")]
 					if(count_zero(Bind) > 0):	#more than 1 dependent neuron on layer
@@ -881,4 +901,6 @@ def count_zero(M, axis=None):	#emulates count_nonzero behaviour
 		zeroElements = tf.subtract(totalElements, nonZeroElements)
 		zeroElements = zeroElements.numpy()
 	return zeroElements
+
+
 

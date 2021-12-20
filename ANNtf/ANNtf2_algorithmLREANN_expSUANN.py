@@ -211,7 +211,7 @@ def neuralNetworkPropagationLREANN(x, networkIndex=1):
 def neuralNetworkPropagationLREANN_test(x, y, networkIndex=1):
 
 	pred = neuralNetworkPropagationLREANN(x, networkIndex)
-	loss = ANNtf2_operations.crossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=False)
+	loss = ANNtf2_operations.calculateLossCrossEntropy(pred, y, datasetNumClasses, costCrossEntropyWithLogits=False)
 	acc = ANNtf2_operations.calculateAccuracy(pred, y)
 	
 	return loss, acc

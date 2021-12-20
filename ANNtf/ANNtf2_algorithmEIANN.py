@@ -23,8 +23,7 @@ from ANNtf2_operations import *	#generateParameterNameSeq, generateParameterName
 import ANNtf2_operations
 import ANNtf2_globalDefs
 
-learningAlgorithmFinalLayerBackpropHebbian = False	#only apply backprop to final layer (all intermediary layers using hebbian algorithm)
-
+learningAlgorithmFinalLayerBackpropHebbian = True	#only apply backprop to final layer (all intermediary layers using hebbian algorithm)
 
 debugSingleLayerNetwork = False
 debugFastTrain = False
@@ -43,7 +42,7 @@ learningRate = 0.0
 
 if(learningAlgorithmFinalLayerBackpropHebbian):
 	useZAcoincidenceMatrix = True	#mandatory
-	onlyUpdatePositiveWeights = True
+	onlyUpdatePositiveWeights = False
 	#flattenInhibitoryWeights #unimplemented - equivalent to a single inhibitory neuron per layer with equal weights/effect on each neuron
 
 def defineTrainingParametersEIANN(dataset):
@@ -148,15 +147,28 @@ def neuralNetworkPropagationEIANNtrain(x, networkIndex=1):
 				
 			AWupdate = tf.multiply(AWcontribution, learningRate)
 
+			neuronEIprevious = neuronEI[generateParameterNameNetwork(networkIndex, l-1, "neuronEI")]
+			neuronEIprevious = tf.dtypes.cast(neuronEIprevious, dtype=tf.dtypes.float32)
 			if(onlyUpdatePositiveWeights):
-				neuronEIprevious = neuronEI[generateParameterNameNetwork(networkIndex, l-1, "neuronEI")]
-				neuronEIprevious = tf.dtypes.cast(neuronEIprevious, dtype=tf.dtypes.float32)
+				#zero inhibitory input weight updates;
 				neuronEIprevious = tf.expand_dims(neuronEIprevious, axis=1)	#for broadcasting
 				AWupdate = tf.multiply(neuronEIprevious, AWupdate)	#broadcasting required	#zero all weight updates corresponding to inhibitory input
+			#else:
+				#invert inhibitory input weight updates;
+				#neuronEIprevious = tf.multiply(neuronEIprevious, 2)
+				#neuronEIprevious = tf.subtract(neuronEIprevious, 1)
+				#neuronEIprevious = tf.expand_dims(neuronEIprevious, axis=1)	#for broadcasting
+				#AWupdate = tf.multiply(neuronEIprevious, AWupdate)	#broadcasting required	#zero all weight updates corresponding to inhibitory input				
 
-			AW = tf.add(AW, AWupdate)	#apply weight updates	
-
-			W[generateParameterNameNetwork(networkIndex, l, "W")] = AW
+			AWnew = tf.add(AW, AWupdate)	#apply weight updates	
+			
+			#zero weight updates if they result in a weight sign switch;
+			weightSignSwitch = tf.multiply(AW, AWnew)
+			weightSignSwitch = tf.greater(weightSignSwitch, 0)
+			weightSignSwitch = tf.dtypes.cast(weightSignSwitch, dtype=tf.dtypes.float32)
+			AWnew = tf.multiply(AWnew, weightSignSwitch)	
+			
+			W[generateParameterNameNetwork(networkIndex, l, "W")] = AWnew
 
 			#print("l = " + str(l))		
 			#print("W = ", W[generateParameterNameNetwork(networkIndex, l, "W")] )
