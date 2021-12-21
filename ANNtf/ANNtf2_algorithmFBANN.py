@@ -62,7 +62,7 @@ if(feedbackConnections):
 def getNoisySampleGenerationNumSamples():
 	return False, 0, 0
 	
-def defineTrainingParametersFBANN(dataset):
+def defineTrainingParameters(dataset):
 
 	global learningRate
 	global forgetRate
@@ -78,7 +78,7 @@ def defineTrainingParametersFBANN(dataset):
 	return learningRate, trainingSteps, batchSize, displayStep, numEpochs
 	
 
-def defineNetworkParametersFBANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
 
 	global n_h
 	global numberOfLayers
@@ -96,7 +96,7 @@ def defineNetworkParametersFBANN(num_input_neurons, num_output_neurons, datasetN
 	return numberOfLayers
 
 
-def defineNeuralNetworkParametersFBANN():
+def defineNeuralNetworkParameters():
 
 	randomNormal = tf.initializers.RandomNormal()
 	
@@ -139,7 +139,7 @@ def resetTraceNeuralNetworkParametersFBANN():
 				ZtraceBackwardFeedDelta[generateParameterNameNetwork(networkIndex, l1, "ZtraceBackwardFeedDelta")] = tf.Variable(tf.zeros(n_h[l1], dtype=tf.dtypes.float32))
 
 
-def neuralNetworkPropagationFBANNwrapper(x, networkIndex=1):
+def neuralNetworkPropagation(x, networkIndex=1):
 	if(feedbackConnections):
 		pred = neuralNetworkPropagationFBANN(x, networkIndex)
 	else:

@@ -45,7 +45,7 @@ if(learningAlgorithmFinalLayerBackpropHebbian):
 	onlyUpdatePositiveWeights = False
 	#flattenInhibitoryWeights #unimplemented - equivalent to a single inhibitory neuron per layer with equal weights/effect on each neuron
 
-def defineTrainingParametersEIANN(dataset):
+def defineTrainingParameters(dataset):
 	global learningRate
 	learningRate = 0.001
 	batchSize = 100
@@ -61,7 +61,7 @@ def defineTrainingParametersEIANN(dataset):
 	
 
 
-def defineNetworkParametersEIANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
 
 	global n_h
 	global numberOfLayers
@@ -72,7 +72,7 @@ def defineNetworkParametersEIANN(num_input_neurons, num_output_neurons, datasetN
 	return numberOfLayers
 	
 
-def defineNeuralNetworkParametersEIANN():
+def defineNeuralNetworkParameters():
 
 	print("numberOfNetworks", numberOfNetworks)
 	
@@ -122,6 +122,9 @@ def defineNeuralNetworkParametersEIANN():
 			#	W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
 			#	B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))	
 				
+
+def neuralNetworkPropagation(x, networkIndex=1):
+	return neuralNetworkPropagationEIANN(x, networkIndex)
 			
 #hebbian learning algorithm
 def neuralNetworkPropagationEIANNtrain(x, networkIndex=1):

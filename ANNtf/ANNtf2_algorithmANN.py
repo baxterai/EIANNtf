@@ -38,7 +38,7 @@ numberOfLayers = 0
 numberOfNetworks = 0
 
 
-def defineTrainingParametersANN(dataset):
+def defineTrainingParameters(dataset):
 	learningRate = 0.001
 	batchSize = 100
 	numEpochs = 10	#100 #10
@@ -53,7 +53,7 @@ def defineTrainingParametersANN(dataset):
 	
 
 
-def defineNetworkParametersANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
 
 	global n_h
 	global numberOfLayers
@@ -116,7 +116,7 @@ def defineNetworkParametersANNlegacy(num_input_neurons, num_output_neurons, data
 	return numberOfLayers
 	
 
-def defineNeuralNetworkParametersANN():
+def defineNeuralNetworkParameters():
 
 	print("numberOfNetworks", numberOfNetworks)
 	
@@ -131,6 +131,8 @@ def defineNeuralNetworkParametersANN():
 
 			#print("Wlayer = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
 
+def neuralNetworkPropagation(x, networkIndex=1):
+	return neuralNetworkPropagationANN(x, networkIndex)
 	
 def neuralNetworkPropagationANN(x, networkIndex=1):
 			

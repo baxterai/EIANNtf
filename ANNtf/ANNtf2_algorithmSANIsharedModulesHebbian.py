@@ -101,7 +101,7 @@ def defineTrainingParametersSANIwrapper(dataset, trainMultipleFiles):
 	return ANNtf2_algorithmSANIoperations.defineTrainingParametersSANI(dataset, trainMultipleFiles)
 	
 
-def defineNeuralNetworkParametersSANI():
+def defineNeuralNetworkParameters():
 	global n_h_cumulative
 	ANNtf2_algorithmSANIoperations.defineNeuralNetworkParametersSANI(n_h, numberOfLayers, Cseq, CseqLayer, n_h_cumulative, WRseq, WR, BR, Wseq, Bseq, W, B)
 			
@@ -121,9 +121,15 @@ if(algorithmSANI == "sharedModulesHebbian"):
 #end common ANNtf2_algorithmSANI.py code
 
 
+def neuralNetworkPropagation(x, networkIndex=None):
+	return neuralNetworkPropagationSANI(x)
 
 def neuralNetworkPropagationSANI(x):
-		
+	
+	#print("x = ", x)
+	
+	#print("x.shape = ", x.shape)	
+	
 	#note ANNtf2_algorithmSANIsharedModulesHebbian does not use time/contiguity checks
 		
 	#definitions for reference:
@@ -174,7 +180,7 @@ def neuralNetworkPropagationSANI(x):
 					WseqDelta[generateParameterNameSeqSkipLayers(l, l2, s, "WseqDelta")] = tf.Variable(tf.zeros([n_h[l2], n_h[l]]), dtype=tf.float32)	
 					
 	if(SANIsharedModules):
-	
+			
 		#optimise feed length based on max sentence length in batch:
 		#unoptimised: numberOfFeatures = x.shape[1]
 		xIsNotPadding = tf.math.less(x, paddingTagIndex) #tf.math.less(tf.dtypes.cast(x, tf.int32), paddingTagIndex)
@@ -212,10 +218,12 @@ def neuralNetworkPropagationSANI(x):
 
 			AfirstLayerShifted = tf.dtypes.cast(AfirstLayerShifted, tf.float32)	#added 01 Sept 2021 #convert input from int to float
 			A[generateParameterName(0, "A")] = AfirstLayerShifted
+			
 			neuralNetworkPropagationSANIfeed(AfirstLayerShifted)
 			
 			#exit()
 	else:
+
 		AfirstLayer = x
 		
 		AfirstLayer = tf.dtypes.cast(AfirstLayer, tf.float32)	#added 01 Sept 2021 #convert input from int to float
@@ -261,10 +269,9 @@ def neuralNetworkPropagationSANIfeed(AfirstLayer):
 					
 					AseqInput = A[generateParameterName(l2, "A")]
 					WseqCurrent = Wseq[generateParameterNameSeqSkipLayers(l, l2, s, "Wseq")]
-					ZseqHypotheticalAddition = tf.matmul(AseqInput, Wseq[generateParameterNameSeqSkipLayers(l, l2, s, "Wseq")])
-					
-					print("AseqInput = ", AseqInput)
-					print("WseqCurrent = ", WseqCurrent)					
+					#print("AseqInput = ", AseqInput)
+					#print("WseqCurrent = ", WseqCurrent)	
+					ZseqHypotheticalAddition = tf.matmul(AseqInput, Wseq[generateParameterNameSeqSkipLayers(l, l2, s, "Wseq")])	
 					#print("ZseqHypotheticalAddition = ", ZseqHypotheticalAddition)
 					
 					ZseqHypothetical = tf.add(ZseqHypothetical, ZseqHypotheticalAddition)

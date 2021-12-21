@@ -73,12 +73,11 @@ def defineTrainingParametersSANI(dataset, trainMultipleFiles):
 def defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, useSmallSentenceLengths, numberOfFeaturesPerWord):
 	
 	if(algorithmSANI == "sharedModulesHebbian"):
-
 		if(inputNumberFeaturesForCurrentWordOnly):
 			inputLength = numberOfFeaturesPerWord
 		else:
 			inputLength = numberOfFeaturesPerWord*numberOfWordsInConvolutionalWindowSeen
-
+		
 		n_x = inputLength #datasetNumFeatures
 		n_y = 1  #sharedModulesHebbian output layer requirement is currently undefined	//SANIshared uses a single output neuron (either 1 or 0)	#if multiple output classes: n_y = num_output_neurons-1 or datasetNumClasses-1	
 		n_h_0 = n_x
@@ -104,7 +103,6 @@ def defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNu
 		else:
 			print("sequential input data is required")
 			exit()	
-	
 	elif(algorithmSANI == "sharedModulesBinary"):
 		if(inputNumberFeaturesForCurrentWordOnly):
 			inputLength = numberOfFeaturesPerWord
@@ -251,7 +249,7 @@ def defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNu
 	numberOfLayers = len(n_h)-1
 	
 	for l1 in range(0, numberOfLayers+1):
-		print("h_h[", l1, "] = ", n_h[l1]) 
+		print("n_h[", l1, "] = ", n_h[l1]) 
 		
 	
 	return n_h, numberOfLayers

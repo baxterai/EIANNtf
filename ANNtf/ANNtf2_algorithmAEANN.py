@@ -30,7 +30,7 @@ debugFastTrain = False
 debugSmallBatchSize = False	#small batch size for debugging matrix output
 
 largeBatchSize = True	#train each layer using entire training set
-generateLargeNetwork = True	#CHECKTHIS: network requires bottleneck 
+generateLargeNetwork = False	#CHECKTHIS: network requires bottleneck 
 generateNetworkStatic = False
 
 	
@@ -46,7 +46,7 @@ numberOfNetworks = 0
 
 
 #note high batchSize is required for learningAlgorithmStochastic algorithm objective functions (>= 100)
-def defineTrainingParametersAEANN(dataset):
+def defineTrainingParameters(dataset):
 	global learningRate
 	global weightDecayRate	
 	
@@ -70,7 +70,7 @@ def defineTrainingParametersAEANN(dataset):
 	
 
 
-def defineNetworkParametersAEANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
 
 	global n_h
 	global numberOfLayers
@@ -81,7 +81,7 @@ def defineNetworkParametersAEANN(num_input_neurons, num_output_neurons, datasetN
 	return numberOfLayers
 	
 
-def defineNeuralNetworkParametersAEANN():
+def defineNeuralNetworkParameters():
 
 	print("numberOfNetworks", numberOfNetworks)
 	
@@ -97,6 +97,9 @@ def defineNeuralNetworkParametersAEANN():
 			Wb[generateParameterNameNetwork(networkIndex, l, "Wb")] = tf.Variable(WlayerB)
 			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(Blayer)
 
+
+def neuralNetworkPropagation(x, networkIndex=1):
+	return neuralNetworkPropagationAEANNtest(x, networkIndex=1)
 
 def neuralNetworkPropagationAEANNautoencoderLayer(x, layer, networkIndex=1):
 	return neuralNetworkPropagationAEANN(x, trainAutoencoder=True, layer=layer, networkIndex=networkIndex)
@@ -145,6 +148,8 @@ def neuralNetworkPropagationAEANN(x, trainAutoencoder, layer, networkIndex=1):
 				output = tf.nn.softmax(Z)
 			else:
 				output = A
+				
+		A = tf.stop_gradient(A)	#only train weights for layer l
 
 		AprevLayer = A
 

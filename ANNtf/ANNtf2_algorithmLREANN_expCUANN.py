@@ -95,7 +95,7 @@ datasetNumClasses = 0
 def getNoisySampleGenerationNumSamples():
 	return noisySampleGeneration, noisySampleGenerationNumSamples, noiseStandardDeviation
 	
-def defineTrainingParametersLREANN(dataset):
+def defineTrainingParameters(dataset):
 	
 	if(debugFastTrain):
 		trainingSteps = batchSize
@@ -111,7 +111,7 @@ def defineTrainingParametersLREANN(dataset):
 	return learningRate, trainingSteps, batchSize, displayStep, numEpochs
 	
 
-def defineNetworkParametersLREANN(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
 
 	global n_h
 	global numberOfLayers
@@ -122,7 +122,7 @@ def defineNetworkParametersLREANN(num_input_neurons, num_output_neurons, dataset
 
 	return numberOfLayers
 
-def defineNeuralNetworkParametersLREANN():
+def defineNeuralNetworkParameters():
 	
 	tf.random.set_seed(5);
 	if(useBinaryWeights):
@@ -150,7 +150,9 @@ def defineNeuralNetworkParametersLREANN():
 			#Atrace[generateParameterNameNetwork(networkIndex, l, "Atrace")] = tf.Variable(tf.zeros(n_h[l], dtype=tf.dtypes.float32))
 
 	
-	
+def neuralNetworkPropagation(x, networkIndex=1, recordAtrace=False):
+	return neuralNetworkPropagationLREANN(x, networkIndex, recordAtrace)
+
 def neuralNetworkPropagationLREANN(x, networkIndex=1, recordAtrace=False):
 	
 	global averageTotalInput

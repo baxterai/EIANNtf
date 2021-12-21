@@ -95,7 +95,7 @@ def defineTrainingParametersSANIwrapper(dataset, trainMultipleFiles):
 	return ANNtf2_algorithmSANIoperations.defineTrainingParametersSANI(dataset, trainMultipleFiles)
 	
 
-def defineNeuralNetworkParametersSANI():
+def defineNeuralNetworkParameters():
 	global n_h_cumulative
 	ANNtf2_algorithmSANIoperations.defineNeuralNetworkParametersSANI(n_h, numberOfLayers, Cseq, CseqLayer, n_h_cumulative, WRseq, WR, BR, Wseq, Bseq, W, B)
 			
@@ -119,7 +119,8 @@ if(algorithmSANI == "sharedModulesBinary"):
 #end common ANNtf2_algorithmSANI.py code
 
 
-					
+def neuralNetworkPropagation(x, networkIndex=None):
+	return neuralNetworkPropagationSANI(x)				
 							
 def neuralNetworkPropagationSANI(x):
 		
@@ -207,6 +208,8 @@ def neuralNetworkPropagationSANI(x):
 			paddings = tf.constant([[0, 0], [w*numberOfFeaturesPerWord, 0]])	#shift input to the right by x words (such that a different input window will be presented to the network)
 			#AfirstLayerShifted = x[:, w*numberOfFeaturesPerWord:min(w*numberOfFeaturesPerWord+inputLength, numberOfFeaturesCropped)]
 			AfirstLayerShifted = tf.dtypes.cast(x[:, w*numberOfFeaturesPerWord:w*numberOfFeaturesPerWord+inputLength], tf.bool)
+			#print("AfirstLayerShifted = ", AfirstLayerShifted)
+			#print("paddings = ", paddings)
 			tf.pad(AfirstLayerShifted, paddings, "CONSTANT")
 		
 		#printShape(AfirstLayerShifted, "AfirstLayerShifted")	

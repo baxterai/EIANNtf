@@ -36,7 +36,7 @@ onlyTrainFinalLayer = True
 
 numberLayers = 6
 
-def defineTrainingParametersBAANN(dataset):
+def defineTrainingParameters(dataset):
 	learningRate = 0.001
 	batchSize = 100
 	numEpochs = 10	#100 #10

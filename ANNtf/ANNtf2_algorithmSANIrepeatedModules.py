@@ -95,7 +95,7 @@ def defineTrainingParametersSANIwrapper(dataset, trainMultipleFiles):
 	return ANNtf2_algorithmSANIoperations.defineTrainingParametersSANI(dataset, trainMultipleFiles)
 	
 
-def defineNeuralNetworkParametersSANI():
+def defineNeuralNetworkParameters():
 	global n_h_cumulative
 	ANNtf2_algorithmSANIoperations.defineNeuralNetworkParametersSANI(n_h, numberOfLayers, Cseq, CseqLayer, n_h_cumulative, WRseq, WR, BR, Wseq, Bseq, W, B)
 			
@@ -107,7 +107,9 @@ if(algorithmSANI == "repeatedModules"):
 #end common ANNtf2_algorithmSANI.py code
 
 
-
+def neuralNetworkPropagation(x, networkIndex=None):
+	return neuralNetworkPropagationSANI(x)
+	
 def neuralNetworkPropagationSANI(x):
 		
 	batchSize = x.shape[0]
