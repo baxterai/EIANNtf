@@ -246,11 +246,11 @@ def defineTrainingParameters(dataset, numberOfFeaturesPerWord=None, paddingTagIn
 	else:
 		return ANNtf2_algorithm.defineTrainingParameters(dataset)
 
-def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks, useSmallSentenceLengths=None, numberOfFeaturesPerWord=None):
+def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks, useSmallSentenceLengths=None, numberOfFeaturesPerWord=None):
 	if(algorithm == "SANI"):
-		return ANNtf2_algorithm.defineNetworkParametersSANIwrapper(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, useSmallSentenceLengths, numberOfFeaturesPerWord)
+		return ANNtf2_algorithm.defineNetworkParametersSANIwrapper(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, useSmallSentenceLengths, numberOfFeaturesPerWord)
 	else:
-		return ANNtf2_algorithm.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)	
+		return ANNtf2_algorithm.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks)	
 
 def defineNeuralNetworkParameters():
 	return ANNtf2_algorithm.defineNeuralNetworkParameters()
@@ -599,7 +599,7 @@ def trainMinimal():
 	num_output_neurons = datasetNumClasses
 
 	learningRate, trainingSteps, batchSize, displayStep, numEpochs = defineTrainingParameters(dataset, numberOfFeaturesPerWord, paddingTagIndex)
-	numberOfLayers = defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks, useSmallSentenceLengths, numberOfFeaturesPerWord)
+	numberOfLayers = defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks, useSmallSentenceLengths, numberOfFeaturesPerWord)
 	defineNeuralNetworkParameters()
 														
 	#stochastic gradient descent optimizer
@@ -649,7 +649,7 @@ def train(trainMultipleNetworks=False, trainMultipleFiles=False, greedy=False):
 	num_output_neurons = datasetNumClasses
 
 	learningRate, trainingSteps, batchSize, displayStep, numEpochs = defineTrainingParameters(dataset, numberOfFeaturesPerWord, paddingTagIndex)
-	numberOfLayers = defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks, useSmallSentenceLengths, numberOfFeaturesPerWord)
+	numberOfLayers = defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks, useSmallSentenceLengths, numberOfFeaturesPerWord)
 	defineNeuralNetworkParameters()
 
 	#configure optional parameters;
@@ -760,7 +760,7 @@ def trainLRE():
 			num_output_neurons = ANNtf2_algorithm.calculateOutputNeuronsLREANN_expAUANN(datasetNumClasses)
 
 	learningRate, trainingSteps, batchSize, displayStep, numEpochs = defineTrainingParameters(dataset, numberOfFeaturesPerWord, paddingTagIndex)
-	numberOfLayers = defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks, useSmallSentenceLengths, numberOfFeaturesPerWord)
+	numberOfLayers = defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks, useSmallSentenceLengths, numberOfFeaturesPerWord)
 	defineNeuralNetworkParameters()
 									
 	noisySampleGeneration = False

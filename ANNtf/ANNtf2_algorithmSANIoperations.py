@@ -70,7 +70,7 @@ def defineTrainingParametersSANI(dataset, trainMultipleFiles):
 	return learningRate, trainingSteps, batchSize, displayStep, numEpochs
 			
 			
-def defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, useSmallSentenceLengths, numberOfFeaturesPerWord):
+def defineNetworkParametersSANI(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, useSmallSentenceLengths, numberOfFeaturesPerWord):
 	
 	if(algorithmSANI == "sharedModulesHebbian"):
 		if(inputNumberFeaturesForCurrentWordOnly):

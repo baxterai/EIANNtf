@@ -36,8 +36,9 @@ debugSmallBatchSize = False	#not supported #small batch size for debugging matri
 largeBatchSize = False	#not supported	#else train each layer using entire training set
 generateLargeNetwork = True	#required #CHECKTHIS: autoencoder does not require bottleneck
 generateNetworkStatic = False	#optional
-generateDeepNetwork = False	#not supported
-
+generateDeepNetwork = True	#optional
+if(generateDeepNetwork):
+	generateNetworkStatic = True	#True: autoencoder requires significant number of neurons to retain performance?
 	
 #forward excitatory connections;
 Wf = {}
@@ -65,7 +66,10 @@ def defineTrainingParameters(dataset):
 		else:
 			batchSize = 100	#3	#100
 			learningRate = 0.005
-	numEpochs = 10	#100 #10
+	if(generateDeepNetwork):
+		numEpochs = 100	#higher num epochs required for convergence
+	else:
+		numEpochs = 10	#100 #10
 	if(debugFastTrain):
 		trainingSteps = batchSize
 	else:
@@ -77,13 +81,22 @@ def defineTrainingParameters(dataset):
 	
 
 
-def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworksSet):
 
 	global n_h
 	global numberOfLayers
 	global numberOfNetworks
 
-	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork=generateLargeNetwork, generateNetworkStatic=generateNetworkStatic, generateDeepNetwork=generateDeepNetwork)
+	if(generateLargeNetwork):
+		firstHiddenLayerNumberNeurons = num_input_neurons*3
+	else:
+		firstHiddenLayerNumberNeurons = num_input_neurons
+	if(generateDeepNetwork):
+		numberOfLayers = 3
+	else:
+		numberOfLayers = 2
+			
+	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworksSet, numberOfLayers, firstHiddenLayerNumberNeurons, generateNetworkStatic)
 			
 	return numberOfLayers
 	

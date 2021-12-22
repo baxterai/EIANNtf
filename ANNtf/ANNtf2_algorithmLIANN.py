@@ -261,7 +261,7 @@ def defineTrainingParameters(dataset):
 	
 
 
-def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
+def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworksSet):
 
 	global n_h
 	global numberOfLayers
@@ -269,7 +269,7 @@ def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFea
 	if(not inhibitionAlgorithmArtificial):
 		global In_h
 	
-	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork=generateLargeNetwork, generateNetworkStatic=generateNetworkStatic)
+	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworksSet, generateLargeNetwork=generateLargeNetwork, generateNetworkStatic=generateNetworkStatic)
 	
 	if(not inhibitionAlgorithmArtificial):
 		if(singleInhibitoryNeuronPerLayer):
