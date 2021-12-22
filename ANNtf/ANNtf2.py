@@ -328,11 +328,11 @@ def trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, op
 	pred = None
 	if(algorithm != "SANI"):
 		if(display):
-			pred = neuralNetworkPropagationTest(batchX, networkIndex)	#skip autoencoders
-			#print("pred.shape = ", pred.shape)
-			loss = calculateLossCrossEntropy(pred, batchY, datasetNumClasses, costCrossEntropyWithLogits)
-			acc = calculateAccuracy(pred, batchY)
-			print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
+			loss, acc = calculatePropagationLoss(batchX, batchY, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex, l)
+			if(algorithm == "AEANN"):
+				print("l: %i, networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (l, networkIndex, batchIndex, loss, acc))			
+			else:
+				print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
 			
 	return pred
 			
@@ -347,22 +347,33 @@ def executeLearningLIANN(x, y, networkIndex):
 #	pred = ANNtf2_algorithm.neuralNetworkPropagationAEANNtrain(x, networkIndex)
 
 
-			
+def calculatePropagationLoss(x, y, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex=1, l=None):
+	acc = 0	#only valid for softmax class targets 
+	if(algorithm == "AEANN"):
+		if(l == numberOfLayers):
+			pred = ANNtf2_algorithm.neuralNetworkPropagationAEANNfinalLayer(x, networkIndex)
+			target = y 
+			loss = calculateLossCrossEntropy(pred, target, datasetNumClasses, costCrossEntropyWithLogits)
+			acc = calculateAccuracy(pred, target)	#only valid for softmax class targets 
+			#print("2 loss = ", loss)
+		else:
+			pred = ANNtf2_algorithm.neuralNetworkPropagationAEANNautoencoderLayer(x, l, networkIndex)
+			target = ANNtf2_algorithm.neuralNetworkPropagationAEANNtestLayer(x, l-1, autoencoder=False, networkIndex=networkIndex)
+			loss = calculateLossMeanSquaredError(pred, target)
+			#print("target = ", target)
+			#print("pred = ", pred)
+			#print("1 loss = ", loss)
+	else:
+		pred = neuralNetworkPropagation(x, networkIndex, l)
+		target = y
+		loss = calculateLossCrossEntropy(pred, target, datasetNumClasses, costCrossEntropyWithLogits)	
+		acc = calculateAccuracy(pred, target)	#only valid for softmax class targets 
+
+	return loss, acc
+		
 def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, networkIndex=1, l=None):
 	with tf.GradientTape() as gt:
-		if(algorithm == "AEANN"):
-			if(l == numberOfLayers):
-				pred = ANNtf2_algorithm.neuralNetworkPropagationAEANNfinalLayer(x, networkIndex)
-				target = y 
-				loss = calculateLossCrossEntropy(pred, target, datasetNumClasses, costCrossEntropyWithLogits)
-			else:
-				pred = ANNtf2_algorithm.neuralNetworkPropagationAEANNautoencoderLayer(x, l, networkIndex)
-				target = ANNtf2_algorithm.neuralNetworkPropagationAEANNtestLayer(x, l-1, networkIndex)
-				loss = calculateLossMeanSquaredError(pred, target)
-		else:
-			pred = neuralNetworkPropagation(x, networkIndex, l)
-			target = y
-			loss = calculateLossCrossEntropy(pred, target, datasetNumClasses, costCrossEntropyWithLogits)
+		loss, acc = calculatePropagationLoss(x, y, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex, l)
 		
 	if(algorithm == "ANN"):
 		Wlist = []
@@ -678,7 +689,7 @@ def train(trainMultipleNetworks=False, trainMultipleFiles=False, greedy=False):
 
 			#greedy code;
 			for l in range(1, maxLayer+1):
-
+				print("l = ", l)
 				trainData = generateTFtrainDataFromNParrays(train_x, train_y, shuffleSize, batchSize)
 				trainDataList = []
 				trainDataList.append(trainData)
@@ -695,9 +706,9 @@ def train(trainMultipleNetworks=False, trainMultipleFiles=False, greedy=False):
 					for networkIndex in range(1, maxNetwork+1):
 
 						display = False
-						if(l == maxLayer):	#only print accuracy after training final layer
-							if(batchIndex % displayStep == 0):
-								display = True	
+						#if(l == maxLayer):	#only print accuracy after training final layer
+						if(batchIndex % displayStep == 0):
+							display = True	
 						pred = trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex, costCrossEntropyWithLogits, display, l)
 						if(pred is not None):
 							predNetworkAverage = predNetworkAverage + pred
@@ -723,7 +734,10 @@ def train(trainMultipleNetworks=False, trainMultipleFiles=False, greedy=False):
 					print("Test Accuracy: %f" % (acc))
 				else:
 					pred = neuralNetworkPropagationTest(test_x, networkIndex)
-					print("Test Accuracy: %f" % (calculateAccuracy(pred, test_y)))
+					if(greedy):
+						print("Test Accuracy: l: %i, %f" % (l, calculateAccuracy(pred, test_y)))
+					else:
+						print("Test Accuracy: %f" % (calculateAccuracy(pred, test_y)))
 
 							
 def trainLRE():

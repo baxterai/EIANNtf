@@ -50,7 +50,7 @@ def defineTrainingParameters(dataset):
 	global learningRate
 	global weightDecayRate	
 	
-	learningRate = 0.001
+	learningRate = 0.005
 	if(debugSmallBatchSize):
 		batchSize = 10
 	else:
@@ -98,27 +98,28 @@ def defineNeuralNetworkParameters():
 			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(Blayer)
 
 
-def neuralNetworkPropagation(x, networkIndex=1):
-	return neuralNetworkPropagationAEANNtest(x, networkIndex=1)
+def neuralNetworkPropagation(x, networkIndex=1):	#this general function is not used (specific functions called by ANNtf2)
+	return neuralNetworkPropagationAEANNfinalLayer(x, networkIndex=networkIndex)
+	#return neuralNetworkPropagationAEANNtest(x, networkIndex=1)
 
 def neuralNetworkPropagationAEANNautoencoderLayer(x, layer, networkIndex=1):
-	return neuralNetworkPropagationAEANN(x, trainAutoencoder=True, layer=layer, networkIndex=networkIndex)
+	return neuralNetworkPropagationAEANN(x, autoencoder=True, layer=layer, networkIndex=networkIndex)
 
 def neuralNetworkPropagationAEANNfinalLayer(x, networkIndex=1):
-	return neuralNetworkPropagationAEANN(x, trainAutoencoder=False, layer=numberOfLayers, networkIndex=networkIndex)
+	return neuralNetworkPropagationAEANN(x, autoencoder=False, layer=numberOfLayers, networkIndex=networkIndex)
 	
 def neuralNetworkPropagationAEANNtest(x, networkIndex=1):
-	return neuralNetworkPropagationAEANN(x, trainAutoencoder=False, layer=None, networkIndex=networkIndex)
+	return neuralNetworkPropagationAEANN(x, autoencoder=False, layer=None, networkIndex=networkIndex)
 
-def neuralNetworkPropagationAEANNtestLayer(x, l, networkIndex=1):
-	return neuralNetworkPropagationAEANN(x, trainAutoencoder=False, layer=l, networkIndex=networkIndex)
+def neuralNetworkPropagationAEANNtestLayer(x, l, autoencoder=False, networkIndex=1):
+	return neuralNetworkPropagationAEANN(x, autoencoder, layer=l, networkIndex=networkIndex)
 
 
-def neuralNetworkPropagationAEANN(x, trainAutoencoder, layer, networkIndex=1):
+def neuralNetworkPropagationAEANN(x, autoencoder, layer, networkIndex=1):
 
 	AprevLayer = x
 	
-	if(trainAutoencoder):
+	if(autoencoder):
 		maxLayer = layer
 	else:
 		if(layer is None):
@@ -134,7 +135,7 @@ def neuralNetworkPropagationAEANN(x, trainAutoencoder, layer, networkIndex=1):
 		Z = tf.add(tf.matmul(AprevLayer, WlayerF), B[generateParameterNameNetwork(networkIndex, l, "B")])
 		A = activationFunction(Z)
 
-		if(trainAutoencoder):
+		if(autoencoder):
 			if(l == numberOfLayers):
 				output = tf.nn.softmax(Z)
 			else:
@@ -142,7 +143,7 @@ def neuralNetworkPropagationAEANN(x, trainAutoencoder, layer, networkIndex=1):
 					#go backwards
 					WlayerB = Wb[generateParameterNameNetwork(networkIndex, l, "Wb")]
 					Z = tf.matmul(A, WlayerB)
-					output = tf.nn.sigmoid(Z)	
+					output = tf.nn.sigmoid(Z)
 		else:
 			if(l == numberOfLayers):
 				output = tf.nn.softmax(Z)
