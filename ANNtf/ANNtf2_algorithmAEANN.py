@@ -15,7 +15,9 @@ see ANNtf2.py
 # Description:
 ANNtf algorithm AEANN - define autoencoder artificial neural network
 
-Greedy layer construction using autoencoder nonlinear dimensionality reduction
+Greedy layer construction using autoencoders
+
+(intermediate layer dimensionality reduction via autoencoder bottleneck requires redundancy in input data, e.g. image)
 
 """
 
@@ -26,12 +28,15 @@ import ANNtf2_operations
 import ANNtf2_globalDefs
 import copy
 
-debugFastTrain = False
-debugSmallBatchSize = False	#small batch size for debugging matrix output
+#supportSkipLayers = True #fully connected skip layer network	#TODO: add support for skip layers	#see ANNtf2_algorithmFBANN for template
 
-largeBatchSize = True	#train each layer using entire training set
-generateLargeNetwork = False	#CHECKTHIS: network requires bottleneck 
-generateNetworkStatic = False
+debugFastTrain = False	#not supported
+debugSmallBatchSize = False	#not supported #small batch size for debugging matrix output
+
+largeBatchSize = False	#not supported	#else train each layer using entire training set
+generateLargeNetwork = True	#required #CHECKTHIS: autoencoder does not require bottleneck
+generateNetworkStatic = False	#optional
+generateDeepNetwork = False	#not supported
 
 	
 #forward excitatory connections;
@@ -50,14 +55,16 @@ def defineTrainingParameters(dataset):
 	global learningRate
 	global weightDecayRate	
 	
-	learningRate = 0.005
 	if(debugSmallBatchSize):
 		batchSize = 10
+		learningRate = 0.001
 	else:
 		if(largeBatchSize):
 			batchSize = 1000	#current implementation: batch size should contain all examples in training set
+			learningRate = 0.05
 		else:
 			batchSize = 100	#3	#100
+			learningRate = 0.005
 	numEpochs = 10	#100 #10
 	if(debugFastTrain):
 		trainingSteps = batchSize
@@ -76,7 +83,7 @@ def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFea
 	global numberOfLayers
 	global numberOfNetworks
 
-	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork=generateLargeNetwork, generateNetworkStatic=generateNetworkStatic)
+	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork=generateLargeNetwork, generateNetworkStatic=generateNetworkStatic, generateDeepNetwork=generateDeepNetwork)
 			
 	return numberOfLayers
 	

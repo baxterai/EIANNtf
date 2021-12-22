@@ -46,7 +46,7 @@ from ANNtf2_algorithmSANIglobalDefs import algorithmSANI
 #algorithm = "EIANN"	#excitatory/inhibitory artificial neural network	#incomplete+non-convergent
 #algorithm = "BAANN"	#breakaway artificial neural network
 #algorithm = "LIANN"	#local inhibition artificial neural network	#incomplete+non-convergent
-algorithm = "AEANN"	#autoencoder artificial neural network	#incomplete+non-convergent
+algorithm = "AEANN"	#autoencoder artificial neural network
 
 suppressGradientDoNotExistForVariablesWarnings = True
 
@@ -329,7 +329,7 @@ def trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, op
 	if(algorithm != "SANI"):
 		if(display):
 			loss, acc = calculatePropagationLoss(batchX, batchY, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex, l)
-			if(algorithm == "AEANN"):
+			if(l is not None):
 				print("l: %i, networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (l, networkIndex, batchIndex, loss, acc))			
 			else:
 				print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
@@ -346,30 +346,6 @@ def executeLearningLIANN(x, y, networkIndex):
 #	#first learning algorithm: perform neuron independence training
 #	pred = ANNtf2_algorithm.neuralNetworkPropagationAEANNtrain(x, networkIndex)
 
-
-def calculatePropagationLoss(x, y, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex=1, l=None):
-	acc = 0	#only valid for softmax class targets 
-	if(algorithm == "AEANN"):
-		if(l == numberOfLayers):
-			pred = ANNtf2_algorithm.neuralNetworkPropagationAEANNfinalLayer(x, networkIndex)
-			target = y 
-			loss = calculateLossCrossEntropy(pred, target, datasetNumClasses, costCrossEntropyWithLogits)
-			acc = calculateAccuracy(pred, target)	#only valid for softmax class targets 
-			#print("2 loss = ", loss)
-		else:
-			pred = ANNtf2_algorithm.neuralNetworkPropagationAEANNautoencoderLayer(x, l, networkIndex)
-			target = ANNtf2_algorithm.neuralNetworkPropagationAEANNtestLayer(x, l-1, autoencoder=False, networkIndex=networkIndex)
-			loss = calculateLossMeanSquaredError(pred, target)
-			#print("target = ", target)
-			#print("pred = ", pred)
-			#print("1 loss = ", loss)
-	else:
-		pred = neuralNetworkPropagation(x, networkIndex, l)
-		target = y
-		loss = calculateLossCrossEntropy(pred, target, datasetNumClasses, costCrossEntropyWithLogits)	
-		acc = calculateAccuracy(pred, target)	#only valid for softmax class targets 
-
-	return loss, acc
 		
 def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, networkIndex=1, l=None):
 	with tf.GradientTape() as gt:
@@ -546,6 +522,33 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 			   print("Blayer = ", Blayer)
 						
 
+def calculatePropagationLoss(x, y, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex=1, l=None):
+	acc = 0	#only valid for softmax class targets 
+	if(algorithm == "AEANN"):
+		if(l == numberOfLayers):
+			pred = ANNtf2_algorithm.neuralNetworkPropagationAEANNfinalLayer(x, networkIndex)
+			target = y 
+			loss = calculateLossCrossEntropy(pred, target, datasetNumClasses, costCrossEntropyWithLogits)
+			acc = calculateAccuracy(pred, target)	#only valid for softmax class targets 
+			#print("target = ", target)
+			#print("pred = ", pred)
+			#print("2 loss = ", loss)
+		else:
+			pred = ANNtf2_algorithm.neuralNetworkPropagationAEANNautoencoderLayer(x, l, networkIndex)
+			target = ANNtf2_algorithm.neuralNetworkPropagationAEANNtestLayer(x, l-1, autoencoder=False, networkIndex=networkIndex)
+			loss = calculateLossMeanSquaredError(pred, target)
+			#print("target = ", target)
+			#print("pred = ", pred)
+			#print("1 loss = ", loss)
+	else:
+		pred = neuralNetworkPropagation(x, networkIndex, l)
+		target = y
+		loss = calculateLossCrossEntropy(pred, target, datasetNumClasses, costCrossEntropyWithLogits)	
+		acc = calculateAccuracy(pred, target)	#only valid for softmax class targets 
+
+	return loss, acc
+	
+	
 def loadDataset(fileIndex):
 
 	global numberOfFeaturesPerWord

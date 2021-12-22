@@ -124,11 +124,11 @@ def generateTFtrainDataFromTrainDataUnbatched(trainDataUnbatched, shuffleSize, b
 	return trainData
 
 
-def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork=True, generateNetworkStatic=False):
+def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork=False, generateNetworkStatic=False, generateDeepNetwork=False):
 	if(debugSingleLayerNetwork):
 		n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = defineNetworkParametersANNsingleLayer(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet)
 	else:
-		n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork, generateNetworkStatic)
+		n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork, generateNetworkStatic, generateDeepNetwork)
 	return n_h, numberOfLayers, numberOfNetworks, datasetNumClasses
 
 def defineNetworkParametersANNsingleLayer(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet):
@@ -151,7 +151,7 @@ def defineNetworkParametersANNsingleLayer(num_input_neurons, num_output_neurons,
 	return 	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses
 	
 	
-def defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork, generateNetworkStatic):
+def defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworksSet, generateLargeNetwork, generateNetworkStatic, generateDeepNetwork):
 
 	#configuration:
 	if(generateLargeNetwork):
@@ -175,8 +175,11 @@ def defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datase
 		#if(applyNeuronThresholdBias):
 		#	#this will affect the optimimum convergence angle
 		#	networkOptimumConvergenceAngle = 0.5+applyNeuronThresholdBiasValue
-
-		networkOptimumConvergenceAngle = 0.5	#if angle > 0.5, then more obtuse triange, if < 0.5 then more acute triangle	#fractional angle between 0 and 90 degrees
+		
+		if(generateDeepNetwork):
+			networkOptimumConvergenceAngle = 0.5
+		else:
+			networkOptimumConvergenceAngle = 0.7	#if angle > 0.5, then more obtuse triange, if < 0.5 then more acute triangle	#fractional angle between 0 and 90 degrees
 		networkDivergence = 1.0-networkOptimumConvergenceAngle 
 		#required for Logarithms with a Fraction as Base:
 		networkDivergenceNumerator = int(networkDivergence*10)
@@ -198,7 +201,10 @@ def defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datase
 	firstHiddenLayerNumberNeurons = int(num_input_neurons*maximumNetworkHiddenLayerNeuronsAsFractionOfInputNeurons)
 	
 	if(networkDivergenceType == "linearStatic"):
-		numberOfLayers = 6
+		if(generateDeepNetwork):
+			numberOfLayers = 6		
+		else:
+			numberOfLayers = 2
 	else:
 		if(generateNetworkNonlinearConvergence):
 			#(networkDivergenceType == "nonLinearConverging")
@@ -216,12 +222,12 @@ def defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datase
 
 		else:
 			if(dataset == "POStagSequence"):
-				if(trainMultipleFiles):
+				if(generateDeepNetwork):
 					numberOfLayers = 6
 				else:
 					numberOfLayers = 3
 			elif(dataset == "SmallDataset"):
-				if(trainMultipleFiles):
+				if(generateDeepNetwork):
 					numberOfLayers = 6	#trainMultipleFiles should affect number of neurons/parameters in network
 				else:
 					numberOfLayers = 3
