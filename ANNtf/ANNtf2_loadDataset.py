@@ -23,10 +23,10 @@ ANNtf2 load dataset
 	
 ## Dataset type 1:
 
-	XtrainBatchXXXX.bat: 
+	XtrainBatchXXXX.dat: 
 	*   x input features (cols) per experience (row) [space delimited]
 
-	YtrainBatchXXXX.bat:
+	YtrainBatchXXXX.dat:
 	*   x output classes (cols) per experience (row) [space delimited]
 	*   One-hot encoded with a 1 corresponding to the class, and 0 otherwise
 	
@@ -38,8 +38,14 @@ ANNtf2 load dataset
 
 ## Dataset type 3:
 
-	XtrainBatchXXXX.bat: 
+	XtrainBatchXXXX.dat: 
 	*   x input features (cols) per experience (row) [space delimited]
+
+## Dataset type 4:
+
+	XtrainBatchXXXX.dat: 
+	*   x input features (cols) per experience (row) [space delimited]
+
 
 	
 	
@@ -51,18 +57,18 @@ ANNtf2 load dataset
 		POStagSequence: where the centre word has a non-ambigious POS tag.
 	~53 POS tags identifiable per word.
 
-	XtrainBatchXXXX.bat: 
+	XtrainBatchXXXX.dat: 
 	*   530 features (cols) per word sequence (row).
 	*       POStagSequence: 10 words per sequence (missing centre word). 
 	*   POStagSequence: includes POS_INDEX_OUT_OF_SENTENCE_BOUNDS if !GIA_PREPROCESSOR_POS_TAGGER_DATABASE_DO_NOT_TRAIN_POS_INDEX_OUT_OF_SENTENCE_BOUNDS
         *   supports ambiguous contextual POS data (ie more than valid POS index per word in the sequence)
 	*   a 1 is assigned to each possible POS tag index, 0 otherwise
 	
-	YtrainBatchXXXX.bat:
+	YtrainBatchXXXX.dat:
 	*   52 possible classes. 
 	*   One-hot encoded with a 1 corresponding to its generated POS tag index.
 
-	To generate the POS dataset with GIA (XtrainBatchXXXX.bat/YtrainBatchXXXX.bat):
+	To generate the POS dataset with GIA (XtrainBatchXXXX.dat/YtrainBatchXXXX.dat):
 	```
 	download wikipedia archive (e.g. enwiki-20171201-pages-articles.xml.bz2)
 	download wikiextractor tool (https://github.com/attardi/wikiextractor)
@@ -89,13 +95,13 @@ ANNtf2 load dataset
 		POStagSentence: where all words can have ambiguous POS tags
 	~53 POS tags identifiable per word.
 
-	XtrainBatchXXXX.bat: 
+	XtrainBatchXXXX.dat: 
 	*   53*numWordsPerSequence features (cols) per word sequence (row). 
 	*	POStagSentence: arbitrary number of words per sentence
 	*       53 features per word in sequence: ie 53*numWordsPerSequence - x53 features [word #1] x53 features [word #2] etc 
 	*   a 1 is assigned to each possible POS tag index, 0 otherwise
 	
-	To generate the POS dataset with GIA (XtrainBatchXXXX.bat):
+	To generate the POS dataset with GIA (XtrainBatchXXXX.dat):
 	```
 	download wikipedia archive (e.g. enwiki-20171201-pages-articles.xml.bz2)
 	download wikiextractor tool (https://github.com/attardi/wikiextractor)
@@ -109,6 +115,19 @@ ANNtf2 load dataset
 	./GIAgeneratePOStaggerDatabase.exe -dbpostaggerfolder "/home/rich/source/GIAPOStaggerDatabase" -lrp -lrpfolder "/home/rich/source/source/LRPdata" -wikiDumpFolder "/home/rich/soft/wiki/output" (-wikiDumpFileBatchIndex X)
 	this creates XtrainBatchXXXX.dat
 	```
+## Dataset type 4 example - free text (XtrainBatchXXXX.dat)
+
+	This example dataset is generated from wikidump. 
+
+	XtrainBatchXXXX.xml: 
+	Free text (e.g. wiki_0000.xml)
+
+	To generate the free text dataset (XtrainBatchXXXX.xml):
+	```
+	download wikipedia archive (e.g. enwiki-20171201-pages-articles.xml.bz2)
+	download wikiextractor tool (https://github.com/attardi/wikiextractor)
+	execute WikiExtractor.py on wikipedia archive
+	
 	
 """
 
@@ -118,6 +137,8 @@ import tensorflow as tf
 import numpy as np
 from numpy import genfromtxt
 import ANNtf2_globalDefs
+from nltk import tokenize
+import re
 
 datasetFolderRelative = "datasets"
 
@@ -713,4 +734,65 @@ def generatePOSambiguityInfoUnambiguousPermutationArray(POSambiguityInfoUnambigu
 			#special POS type (e.g. punctuation; GIA_PREPROCESSOR_POS_TAGGER_DATABASE_POS_INDEX_OUT_OF_SENTENCE_BOUNDS)
 			POSambiguityInfoUnambiguousPermutationLocal[wordIndex] = POSambiguityInfo
 			generatePOSambiguityInfoUnambiguousPermutationArray(POSambiguityInfoUnambiguousPermutationArray, POSambiguityInfoPermutation, POSambiguityInfoUnambiguousPermutationLocal, wordIndex+1)
+
+
+#useSmallSentenceLengths: eliminate smaller sentences from dataset (do not crop them)
+def loadDatasetType4(datasetFileNameX, AEANNsequentialInputTypesMaxLength, useSmallSentenceLengths, AEANNsequentialInputTypeTrainWordVectors):
+	
+	splitTextDatasetByWikiTags = True
+	
+	absFilePath = createFileAbsPath(datasetFileNameX)
+	f = open(absFilePath)
+	text = f.read()	#f.readlines()
+	
+	articles = []
+	if(splitTextDatasetByWikiTags):
+		articleDelimiter = "ARTICLEDELIMITER"
+		text = text.replace("</doc>\n","")
+		text = re.sub('\<doc id(.*)', articleDelimiter, text)	#nedit re: \<doc id(.*)
+		#print("text = ", text)
+		articlesText = text.split(articleDelimiter)
+		#print("articlesText = ", articlesText)
+	else:
+		articlesText = []
+		articlesText.append(text)
+		
+	for articleIndex, article in enumerate(articlesText):
+		#print("\tarticleIndex = ", articleIndex)
+		paragraphsText = article.split('\n\n')
+		paragraphs = []
+		for paragraphIndex, paragraph in enumerate(paragraphsText):
+			#print("\t\tparagraphIndex = ", paragraphIndex)
+			sentencesText = tokenize.sent_tokenize(paragraph)
+			sentences = []
+			for sentenceIndex, sentence in enumerate(sentencesText):
+				#print("\t\t\tsentenceIndex = ", sentenceIndex)
+				wordsText = tokenize.word_tokenize(sentence)
+				sentenceLengthCheck = True
+				if(useSmallSentenceLengths):
+					if(len(wordsText) > AEANNsequentialInputTypesMaxLength[1]):
+						sentenceLengthCheck = False				
+				if(sentenceLengthCheck):
+					if(AEANNsequentialInputTypeTrainWordVectors):
+						words = []
+						for wordIndex, word in enumerate(wordsText):
+							#print("\t\t\t\twordIndex = ", wordIndex)
+							charactersText = list(word)
+							characters = []
+							for characterIndex, character in enumerate(charactersText):
+								#print("\t\t\t\t\tcharacterIndex = ", characterIndex)
+								characters.append(character)	
+							words.append(characters)
+						sentence = words
+						sentences.append(sentence)
+					else:
+						sentences.append(wordsText)
+			paragraphs.append(sentences)
+		articles.append(paragraphs)
+		
+	#print("articles = ", articles)
+		
+	return articles
+
+
 

@@ -13,7 +13,7 @@ see ANNtf2.py
 see ANNtf2.py
 
 # Description:
-ANNtf algorithm AEANN - define autoencoder artificial neural network
+ANNtf algorithm AEANN - define autoencoder generated artificial neural network
 
 Greedy layer construction using autoencoders
 

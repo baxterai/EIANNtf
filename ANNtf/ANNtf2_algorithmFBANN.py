@@ -107,13 +107,13 @@ def defineNeuralNetworkParameters():
 			if(supportSkipLayers):
 				for l2 in range(0, l1):
 					if(l2 < l1):
-						Wf[generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, "Wf")] = tf.Variable(randomNormal([n_h[l2], n_h[l1]]))
-						#print("Wf[generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, \"Wf\")].shape = ", Wf[generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, "Wf")].shape)
+						Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")] = tf.Variable(randomNormal([n_h[l2], n_h[l1]]))
+						#print("Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, \"Wf\")].shape = ", Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")].shape)
 				if(feedbackConnections):
 					if((l1 <= highestLayerWithIncomingBackwardsConnections) and (l1 >= lowestLayerWithIncomingBackwardsConnections)):
 						for l2 in range(l1+1, highestLayer+1):
 							if(l2 > l1):
-								Wb[generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, "Wb")] = tf.Variable(randomNormal([n_h[l2], n_h[l1]]))
+								Wb[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wb")] = tf.Variable(randomNormal([n_h[l2], n_h[l1]]))
 			else:
 				Wf[generateParameterNameNetwork(networkIndex, l1, "Wf")] = tf.Variable(randomNormal([n_h[l1-1], n_h[l1]]))
 				if(feedbackConnections):
@@ -171,9 +171,9 @@ def neuralNetworkPropagationANNfeedForward(x, networkIndex=1):
 			for l2 in range(0, l1):
 				#print("l2 = " + str(l2))
 				#print("Atrace[generateParameterNameNetwork(networkIndex, l2, \"Atrace\")] = ", Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")].shape)
-				#print("Wf[generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, \"Wf\")] = ", Wf[generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, "Wf")].shape)
+				#print("Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, \"Wf\")] = ", Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")].shape)
 				#print("B[generateParameterNameNetwork(networkIndex, l1, \"B\")] = ", B[generateParameterNameNetwork(networkIndex, l1, "B")].shape)
-				Z = tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wf[generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, "Wf")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
+				Z = tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
 		else:
 			Z = tf.add(tf.matmul(AprevLayer, Wf[generateParameterNameNetwork(networkIndex, l1, "Wf")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])		
 		A = activationFunction(Z)
@@ -231,7 +231,7 @@ def neuralNetworkPropagationFBANNfeedForward(x, additiveZ=False, networkIndex=1)
 			
 		if(supportSkipLayers):
 			for l2 in range(0, l1):
-				Zmod = tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wf[generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, "Wf")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
+				Zmod = tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
 		else:
 			Zmod = tf.add(tf.matmul(AprevLayer, Wf[generateParameterNameNetwork(networkIndex, l1, "Wf")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
 		
@@ -270,7 +270,7 @@ def neuralNetworkPropagationFBANNfeedBackward(AhighestLayer, additiveZ=True, net
 		if(supportSkipLayers):
 			for l2 in range(l1+1, highestLayer+1):
 				#print("l2 = ", l2)
-				Zmod = tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wb[generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, "Wb")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
+				Zmod = tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wb[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wb")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
 		else:
 			Zmod = tf.add(tf.matmul(AprevLayer, Wb[generateParameterNameNetwork(networkIndex, l1, "Wb")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
 		

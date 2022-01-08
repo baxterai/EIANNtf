@@ -18,7 +18,7 @@ conda install scikit-learn (ANNtf2_algorithmLIANN_PCAsimulation only)
 python3 ANNtf2.py
 
 # Description:
-ANNtf - train an experimental artificial neural network (ANN/SANI/LREANN/FBANN/EIANN/BAANN/LIANN/AEANN)
+ANNtf - train an experimental artificial neural network (ANN/LREANN/FBANN/EIANN/BAANN/LIANN/AEANN)
 
 """
 
@@ -36,35 +36,21 @@ from ANNtf2_operations import *
 import ANNtf2_globalDefs
 from numpy import random
 import ANNtf2_loadDataset
-from ANNtf2_algorithmSANIglobalDefs import algorithmSANI
 
 #select algorithm:
 #algorithm = "ANN"	#standard artificial neural network (backprop)
-#algorithm = "SANI"	#sequentially activated neuronal input artificial neural network	#incomplete+non-convergent
 #algorithm = "LREANN"	#learning rule experiment artificial neural network
 #algorithm = "FBANN"	#feedback artificial neural network (reverse connectivity)	#incomplete
 #algorithm = "EIANN"	#excitatory/inhibitory artificial neural network	#incomplete+non-convergent
 #algorithm = "BAANN"	#breakaway artificial neural network
 #algorithm = "LIANN"	#local inhibition artificial neural network	#incomplete+non-convergent
-algorithm = "AEANN"	#autoencoder artificial neural network
+algorithm = "AEANN"	#autoencoder generated artificial neural network
 
 suppressGradientDoNotExistForVariablesWarnings = True
 
 costCrossEntropyWithLogits = False
 if(algorithm == "ANN"):
 	import ANNtf2_algorithmANN as ANNtf2_algorithm
-elif(algorithm == "SANI"):
-	#set algorithmSANI in ANNtf2_algorithmSANIoperations
-	if(algorithmSANI == "sharedModulesHebbian"):
-		import ANNtf2_algorithmSANIsharedModulesHebbian as ANNtf2_algorithm
-		#no cost function used
-	elif(algorithmSANI == "sharedModulesBinary"):
-		import ANNtf2_algorithmSANIsharedModulesBinary as ANNtf2_algorithm
-	elif(algorithmSANI == "sharedModules"):
-		import ANNtf2_algorithmSANIsharedModules as ANNtf2_algorithm
-		costCrossEntropyWithLogits = True
-	elif(algorithmSANI == "repeatedModules"):
-		import ANNtf2_algorithmSANIrepeatedModules as ANNtf2_algorithm
 elif(algorithm == "LREANN"):
 	#select algorithmLREANN:
 	#algorithmLREANN = "LREANN_expHUANN"	#incomplete+non-convergent
@@ -119,11 +105,14 @@ if(algorithm == "ANN"):
 		numberOfNetworks = 1
 
 if(trainMultipleFiles):
+	randomiseFileIndexParse = True
 	fileIndexFirst = 0
 	if(useSmallSentenceLengths):
 		fileIndexLast = 11
 	else:
-		fileIndexLast = 1202
+		fileIndexLast = 1202	#defined by wiki database extraction size
+else:
+	randomiseFileIndexParse = False
 				
 #loadDatasetType3 parameters:
 #if generatePOSunambiguousInput=True, generate POS unambiguous permutations for every POS ambiguous data example/experience
@@ -133,49 +122,7 @@ if(trainMultipleFiles):
 if(algorithm == "ANN"):
 	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
-	#numberOfNetworks = 3	#default: 1
-elif(algorithm == "SANI"):
-	if(ANNtf2_algorithm.algorithmSANI == "sharedModulesHebbian"):
-		if(ANNtf2_algorithm.SANIsharedModules):	#optional
-			dataset = "POStagSentence"
-			numberOfFeaturesPerWord = -1
-			paddingTagIndex = -1
-			generatePOSunambiguousInput = False
-			onlyAddPOSunambiguousInputToTrain = False	#True
-		else:
-			print("!ANNtf2_algorithm.SANIsharedModules")
-			dataset = "POStagSequence"
-	elif(ANNtf2_algorithm.algorithmSANI == "sharedModulesBinary"):
-		if(ANNtf2_algorithm.SANIsharedModules):	#only implementation
-			print("sharedModulesBinary")
-			dataset = "POStagSentence"
-			numberOfFeaturesPerWord = -1
-			paddingTagIndex = -1	
-			generatePOSunambiguousInput = False
-			onlyAddPOSunambiguousInputToTrain = False	#True
-		else:
-			print("ANNtf2 error: (ANNtf2_algorithm.algorithmSANI == sharedModulesBinary) && !(ANNtf2_algorithm.SANIsharedModules)")
-			exit()
-	elif(ANNtf2_algorithm.algorithmSANI == "sharedModules"):
-		if(ANNtf2_algorithm.SANIsharedModules):	#only implementation
-			dataset = "POStagSentence"
-			numberOfFeaturesPerWord = -1
-			paddingTagIndex = -1
-			if(ANNtf2_algorithm.allowMultipleContributingSubinputsPerSequentialInput):
-				generatePOSunambiguousInput = False
-				onlyAddPOSunambiguousInputToTrain = False
-			else:
-				generatePOSunambiguousInput = False
-				onlyAddPOSunambiguousInputToTrain = True
-		else:
-			print("ANNtf2 error: (ANNtf2_algorithm.algorithmSANI == sharedModules) && !(ANNtf2_algorithm.SANIsharedModules)")
-			exit()
-	elif(ANNtf2_algorithm.algorithmSANI == "repeatedModules"):
-		if(not ANNtf2_algorithm.SANIsharedModules):	#only implementation
-			dataset = "POStagSequence"
-		else:
-			print("ANNtf2 error: (ANNtf2_algorithm.algorithmSANI == repeatedModules) && (ANNtf2_algorithm.SANIsharedModules)")	
-			exit()		
+	#numberOfNetworks = 3	#default: 1	
 elif(algorithm == "LREANN"):
 	dataset = "SmallDataset"
 	#trainMultipleNetworks = True	#default: False
@@ -228,29 +175,24 @@ if(debugUseSmallPOStagSequenceDataset):
 	dataset1FileNameXstart = "Xdataset1PartSmall"
 	dataset1FileNameYstart = "Ydataset1PartSmall"
 	dataset3FileNameXstart = "Xdataset3PartSmall"
+	dataset4FileNameStart = "Xdataset4PartSmall"
 else:
 	dataset1FileNameXstart = "Xdataset1Part"
 	dataset1FileNameYstart = "Ydataset1Part"
 	dataset3FileNameXstart = "Xdataset3Part"
+	dataset4FileNameStart = "Xdataset4Part"
 datasetFileNameXend = ".dat"
 datasetFileNameYend = ".dat"
 datasetFileNameStart = "datasetPart"
 datasetFileNameEnd = ".dat"
-
+xmlDatasetFileNameEnd = ".xml"
 
 
 def defineTrainingParameters(dataset, numberOfFeaturesPerWord=None, paddingTagIndex=None):
-	if(algorithm == "SANI"):
-		ANNtf2_algorithm.defineTrainingParametersSANIsharedModules(numberOfFeaturesPerWord, paddingTagIndex)
-		return ANNtf2_algorithm.defineTrainingParametersSANIwrapper(dataset, trainMultipleFiles)
-	else:
-		return ANNtf2_algorithm.defineTrainingParameters(dataset)
+	return ANNtf2_algorithm.defineTrainingParameters(dataset)
 
 def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks, useSmallSentenceLengths=None, numberOfFeaturesPerWord=None):
-	if(algorithm == "SANI"):
-		return ANNtf2_algorithm.defineNetworkParametersSANIwrapper(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, useSmallSentenceLengths, numberOfFeaturesPerWord)
-	else:
-		return ANNtf2_algorithm.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks)	
+	return ANNtf2_algorithm.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks)	
 
 def defineNeuralNetworkParameters():
 	return ANNtf2_algorithm.defineNeuralNetworkParameters()
@@ -297,11 +239,6 @@ def trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, op
 	
 	if(algorithm == "ANN"):
 		executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)
-	elif(algorithm == "SANI"):
-		#learning algorithm not yet implemented:
-		#if(batchSize > 1):
-		pred = neuralNetworkPropagation(batchX)	
-		print("pred = ", pred)		
 	elif(algorithm == "LREANN"):
 		print("trainBatch error: does not support algorithm == LREANN; use trainLRE instead")
 	elif(algorithm == "FBANN"):
@@ -326,14 +263,13 @@ def trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, op
 		executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex, l=l)
 
 	pred = None
-	if(algorithm != "SANI"):
-		if(display):
-			loss, acc = calculatePropagationLoss(batchX, batchY, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex, l)
-			if(l is not None):
-				print("l: %i, networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (l, networkIndex, batchIndex, loss, acc))			
-			else:
-				print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
-			
+	if(display):
+		loss, acc = calculatePropagationLoss(batchX, batchY, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex, l)
+		if(l is not None):
+			print("l: %i, networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (l, networkIndex, batchIndex, loss, acc))			
+		else:
+			print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
+
 	return pred
 			
 def executeLearningEIANN(x, y, networkIndex):
@@ -365,9 +301,6 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 		trainableVariables = Wlist + Blist
 		WlistLength = len(Wlist)
 		BlistLength = len(Blist)
-	elif(algorithm == "SANI"):
-		print("executeOptimisation error: algorithm SANI not supported, use neuralNetworkPropagation() instead")
-		exit()
 	elif(algorithm == "FBANN"):
 		Wflist = []
 		Wblist = []
@@ -553,9 +486,6 @@ def loadDataset(fileIndex):
 
 	global numberOfFeaturesPerWord
 	global paddingTagIndex
-	global numberOfFeaturesPerWord
-	global numberOfFeaturesPerWord
-	global numberOfFeaturesPerWord
 	
 	datasetNumFeatures = 0
 	datasetNumClasses = 0
@@ -571,7 +501,9 @@ def loadDataset(fileIndex):
 			datasetType2FileName = dataset2FileNameStart + fileIndexStr + datasetFileNameEnd
 		else:
 			datasetType2FileName = dataset2FileName
-
+	elif(dataset == "wikiXmlDataset"):
+		datasetType4FileName = dataset4FileNameStart + fileIndexStr + xmlDatasetFileNameEnd
+			
 	numberOfLayers = 0
 	if(dataset == "POStagSequence"):
 		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
@@ -581,8 +513,14 @@ def loadDataset(fileIndex):
 		datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType2(datasetType2FileName, datasetClassColumnFirst)
 		numberOfFeaturesPerWord = None
 		paddingTagIndex = None
-	
-	return numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_xTemp, train_yTemp, test_xTemp, test_yTemp
+	elif(dataset == "wikiXmlDataset"):
+		paragraphs = ANNtf2_loadDataset.loadDatasetType4(datasetType4FileName, AEANNsequentialInputTypesMaxLength, useSmallSentenceLengths, AEANNsequentialInputTypeMinWordVectors)
+
+	if(dataset == "wikiXmlDataset"):
+		return paragraphs
+	else:
+		return numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_xTemp, train_yTemp, test_xTemp, test_yTemp
+		
 
 
 #trainMinimal is minimal template code extracted from train based on trainMultipleNetworks=False, trainMultipleFiles=False, greedy=False;
@@ -677,14 +615,14 @@ def train(trainMultipleNetworks=False, trainMultipleFiles=False, greedy=False):
 	
 		#fileIndex = 0
 		#trainMultipleFiles code;
-		if(trainMultipleFiles):
-			fileIndexArray = np.arange(fileIndexFirst, fileIndexLast+1, 1)
-			#print("fileIndexArray = " + str(fileIndexArray))
-			np.random.shuffle(fileIndexArray)
-			fileIndexShuffledArray = fileIndexArray
-			#print("fileIndexShuffledArray = " + str(fileIndexShuffledArray))
-		for fileIndex in range(minFileIndex, maxFileIndex+1):
-
+		if(randomiseFileIndexParse):
+			fileIndexShuffledArray = generateRandomisedIndexArray(fileIndexFirst, fileIndexLast)
+		for f in range(minFileIndex, maxFileIndex+1):
+			if(randomiseFileIndexParse):
+				fileIndex = fileIndexShuffledArray[f]
+			else:
+				fileIndex = f
+				
 			numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = loadDataset(fileIndex)
 
 			shuffleSize = datasetNumExamples	#heuristic: 10*batchSize
@@ -927,17 +865,23 @@ def trainLRE():
 		pred = neuralNetworkPropagationTest(test_x, networkIndex)	#test_x batch may be too large to propagate simultaneously and require subdivision
 		print("Test Accuracy: networkIndex: %i, %f" % (networkIndex, calculateAccuracy(pred, test_y)))
 
-
+def generateRandomisedIndexArray(indexFirst, indexLast, arraySize=None):
+	fileIndexArray = np.arange(indexFirst, indexLast+1, 1)
+	#print("fileIndexArray = " + str(fileIndexArray))
+	if(arraySize is None):
+		np.random.shuffle(fileIndexArray)
+		fileIndexRandomArray = fileIndexArray
+	else:
+		fileIndexRandomArray = random.sample(fileIndexArray.tolist(), arraySize)
+	
+	print("fileIndexRandomArray = " + str(fileIndexRandomArray))
+	return fileIndexRandomArray
+	
 				
 if __name__ == "__main__":
 	if(algorithm == "ANN"):
 		if(trainMultipleNetworks):
 			train(trainMultipleNetworks=trainMultipleNetworks)
-		else:
-			trainMinimal()
-	elif(algorithm == "SANI"):
-		if(trainMultipleFiles):
-			train(trainMultipleFiles=trainMultipleFiles)
 		else:
 			trainMinimal()
 	elif(algorithm == "LREANN"):

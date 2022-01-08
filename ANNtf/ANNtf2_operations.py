@@ -27,34 +27,39 @@ debugSingleLayerNetwork = False
 
 #if(useBinaryWeights) or if(generateFirstLayerSDR)
 	
-		
-def generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, arrayName):
-	parameterName = "n" + str(networkIndex) + "l1" + str(l1) + "l2" + str(l2) + arrayName
-	return parameterName
-	
-def generateParameterNameNetwork(networkIndex, l, arrayName):
-	parameterName = "n" + str(networkIndex) + "l" + str(l) + arrayName
-	return parameterName
 
-	
-def generateParameterNameSeqSkipLayers(l1, l2, s, arrayName):
-	parameterName = "l1" + str(l1) + "l2" + str(l2) + arrayName + "s" + str(s)
-	return parameterName
-	
-def generateParameterNameSeq(l, s, arrayName):
-	parameterName = "l" + str(l) + arrayName + "s" + str(s)
-	return parameterName
-	
-	
-def generateParameterNameSkipLayers(l1, l2, arrayName):
-	parameterName = "l1" + str(l1) + "l2" + str(l2) + arrayName
-	return parameterName
-	
 def generateParameterName(l, arrayName):
 	parameterName = "l" + str(l) + arrayName
 	return parameterName
-	
-	
+def generateParameterNameSkipLayers(lprior, l, arrayName):	#support skip layers
+	parameterName = "lprior" + str(lprior) + "l" + str(l) + arrayName
+	return parameterName
+#support multiple networks:			
+def generateParameterNameNetwork(networkIndex, l, arrayName):
+	parameterName = "n" + str(networkIndex) + "l" + str(l) + arrayName
+	return parameterName
+def generateParameterNameNetworkSkipLayers(networkIndex, lprior, l, arrayName):	#support skip layers
+	parameterName = "n" + str(networkIndex) + "lprior" + str(lprior) + "l" + str(l) + arrayName
+	return parameterName
+
+#support sequential inputs:		
+#used by SANI:
+def generateParameterNameSeq(l, s, arrayName):
+	parameterName = "l" + str(l) + "s" + str(s) + arrayName
+	return parameterName
+def generateParameterNameSeqSkipLayers(lprior, l, s, arrayName):	#support skip layers
+	parameterName = "lprior" + str(lprior) + "l" + str(l) + "s" + str(s) + arrayName
+	return parameterName
+#used by AEANN:
+#support multiple networks:	
+def generateParameterNameNetworkSeq(networkIndex, l, s, arrayName):
+	parameterName = "n" + str(networkIndex) + "l" + str(l) + "s" + str(s) + arrayName
+	return parameterName	
+def generateParameterNameNetworkSeqSkipLayers(networkIndex, lprior, l, s, arrayName):
+	parameterName = "n" + str(networkIndex) + "lprior" + str(lprior) + "l" + str(l) + "s" + str(s) + arrayName
+	return parameterName
+
+		
 def printShape(tensor, tensorName):
 	print(tensorName + ".shape = ")
 	print(tensor.shape)
