@@ -38,13 +38,13 @@ from numpy import random
 import ANNtf2_loadDataset
 
 #select algorithm:
-#algorithm = "ANN"	#standard artificial neural network (backprop)
+algorithm = "ANN"	#standard artificial neural network (backprop)
 #algorithm = "LREANN"	#learning rule experiment artificial neural network
 #algorithm = "FBANN"	#feedback artificial neural network (reverse connectivity)	#incomplete
 #algorithm = "EIANN"	#excitatory/inhibitory artificial neural network	#incomplete+non-convergent
 #algorithm = "BAANN"	#breakaway artificial neural network
 #algorithm = "LIANN"	#local inhibition artificial neural network	#incomplete+non-convergent
-algorithm = "AEANN"	#autoencoder generated artificial neural network
+#algorithm = "AEANN"	#autoencoder generated artificial neural network
 
 suppressGradientDoNotExistForVariablesWarnings = True
 
@@ -290,14 +290,20 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 	if(algorithm == "ANN"):
 		Wlist = []
 		Blist = []
-		for l in range(1, numberOfLayers+1):
-			if(ANNtf2_algorithm.debugOnlyTrainFinalLayer):
-				if(l == numberOfLayers):
-					Wlist.append(ANNtf2_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")])
-					Blist.append(ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")])				
-			else:	
-				Wlist.append(ANNtf2_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")])
-				Blist.append(ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")])
+		for l1 in range(1, numberOfLayers+1):
+			if(ANNtf2_algorithm.supportSkipLayers):
+				for l2 in range(0, l1):
+					if(l2 < l1):
+						Wlist.append(ANNtf2_algorithm.W[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "W")])
+				Blist.append(ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l1, "B")])			
+			else:
+				if(ANNtf2_algorithm.debugOnlyTrainFinalLayer):
+					if(l1 == numberOfLayers):
+						Wlist.append(ANNtf2_algorithm.W[generateParameterNameNetwork(networkIndex, l1, "W")])
+						Blist.append(ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l1, "B")])				
+				else:	
+					Wlist.append(ANNtf2_algorithm.W[generateParameterNameNetwork(networkIndex, l1, "W")])
+					Blist.append(ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l1, "B")])
 		trainableVariables = Wlist + Blist
 		WlistLength = len(Wlist)
 		BlistLength = len(Blist)
@@ -309,12 +315,12 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 			if(ANNtf2_algorithm.supportSkipLayers):
 				for l2 in range(0, l1):
 					if(l2 < l1):
-						Wflist.append(ANNtf2_algorithm.Wf[generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, "Wf")])
+						Wflist.append(ANNtf2_algorithm.Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")])
 				if(ANNtf2_algorithm.feedbackConnections):
 					if((l1 <= ANNtf2_algorithm.highestLayerWithIncomingBackwardsConnections) and (l1 >= ANNtf2_algorithm.lowestLayerWithIncomingBackwardsConnections)):
 						for l2 in range(l1+1, ANNtf2_algorithm.highestLayer+1):
 							if(l2 > l1):
-								Wblist.append(ANNtf2_algorithm.Wb[generateParameterNameNetworkSkipLayers(networkIndex, l1, l2, "Wb")])
+								Wblist.append(ANNtf2_algorithm.Wb[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wb")])
 			else:
 				Wflist.append(ANNtf2_algorithm.Wf[generateParameterNameNetwork(networkIndex, l1, "Wf")])
 				if(ANNtf2_algorithm.feedbackConnections):
@@ -514,10 +520,10 @@ def loadDataset(fileIndex):
 		numberOfFeaturesPerWord = None
 		paddingTagIndex = None
 	elif(dataset == "wikiXmlDataset"):
-		paragraphs = ANNtf2_loadDataset.loadDatasetType4(datasetType4FileName, AEANNsequentialInputTypesMaxLength, useSmallSentenceLengths, AEANNsequentialInputTypeMinWordVectors)
+		articles = ANNtf2_loadDataset.loadDatasetType4(datasetType4FileName, AEANNsequentialInputTypesMaxLength, useSmallSentenceLengths, AEANNsequentialInputTypeMinWordVectors)
 
 	if(dataset == "wikiXmlDataset"):
-		return paragraphs
+		return articles
 	else:
 		return numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_xTemp, train_yTemp, test_xTemp, test_yTemp
 		
@@ -559,7 +565,8 @@ def trainMinimal():
 		trainDataListIterators = []
 		for trainData in trainDataList:
 			trainDataListIterators.append(iter(trainData))
-
+		testBatchX, testBatchY = generateTFbatch(test_x, test_y, batchSize)
+		
 		for batchIndex in range(int(trainingSteps)):
 			(batchX, batchY) = trainDataListIterators[trainDataIndex].get_next()	#next(trainDataListIterators[trainDataIndex])
 			batchYactual = batchY
@@ -569,8 +576,8 @@ def trainMinimal():
 				display = True	
 			trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex, costCrossEntropyWithLogits, display)
 
-		pred = neuralNetworkPropagationTest(test_x, networkIndex)
-		print("Test Accuracy: %f" % (calculateAccuracy(pred, test_y)))
+		pred = neuralNetworkPropagationTest(testBatchX, networkIndex)
+		print("Test Accuracy: %f" % (calculateAccuracy(pred, testBatchY)))
 
 			
 #this function can be used to extract a minimal template (does not support algorithm==LREANN);
@@ -637,6 +644,8 @@ def train(trainMultipleNetworks=False, trainMultipleFiles=False, greedy=False):
 				trainDataListIterators = []
 				for trainData in trainDataList:
 					trainDataListIterators.append(iter(trainData))
+				testBatchX, testBatchY = generateTFbatch(test_x, test_y, batchSize)
+				#testBatchX, testBatchY = (test_x, test_y)
 
 				for batchIndex in range(int(trainingSteps)):
 					(batchX, batchY) = trainDataListIterators[trainDataIndex].get_next()	#next(trainDataListIterators[trainDataIndex])
@@ -664,21 +673,21 @@ def train(trainMultipleNetworks=False, trainMultipleFiles=False, greedy=False):
 
 				#trainMultipleNetworks code;
 				if(trainMultipleNetworks):
-					predNetworkAverageAll = tf.Variable(tf.zeros([test_y.shape[0], datasetNumClasses]))
+					predNetworkAverageAll = tf.Variable(tf.zeros([testBatchY.shape[0], datasetNumClasses]))
 					for networkIndex in range(1, numberOfNetworks+1):
-						pred = neuralNetworkPropagationTest(test_x, networkIndex)	#test_x batch may be too large to propagate simultaneously and require subdivision
-						print("Test Accuracy: networkIndex: %i, %f" % (networkIndex, calculateAccuracy(pred, test_y)))
+						pred = neuralNetworkPropagationTest(testBatchX, networkIndex)
+						print("Test Accuracy: networkIndex: %i, %f" % (networkIndex, calculateAccuracy(pred, testBatchY)))
 						predNetworkAverageAll = predNetworkAverageAll + pred
 					predNetworkAverageAll = predNetworkAverageAll / numberOfNetworks
 					#print("predNetworkAverageAll", predNetworkAverageAll)
-					acc = calculateAccuracy(predNetworkAverageAll, test_y)
+					acc = calculateAccuracy(predNetworkAverageAll, testBatchY)
 					print("Test Accuracy: %f" % (acc))
 				else:
-					pred = neuralNetworkPropagationTest(test_x, networkIndex)
+					pred = neuralNetworkPropagationTest(testBatchX, networkIndex)
 					if(greedy):
-						print("Test Accuracy: l: %i, %f" % (l, calculateAccuracy(pred, test_y)))
+						print("Test Accuracy: l: %i, %f" % (l, calculateAccuracy(pred, testBatchY)))
 					else:
-						print("Test Accuracy: %f" % (calculateAccuracy(pred, test_y)))
+						print("Test Accuracy: %f" % (calculateAccuracy(pred, testBatchY)))
 
 							
 def trainLRE():
@@ -862,7 +871,7 @@ def trainLRE():
 						currentClassTarget = 0
 					trainDataIndex = currentClassTarget
 
-		pred = neuralNetworkPropagationTest(test_x, networkIndex)	#test_x batch may be too large to propagate simultaneously and require subdivision
+		pred = neuralNetworkPropagationTest(testBatchX, networkIndex)
 		print("Test Accuracy: networkIndex: %i, %f" % (networkIndex, calculateAccuracy(pred, test_y)))
 
 def generateRandomisedIndexArray(indexFirst, indexLast, arraySize=None):

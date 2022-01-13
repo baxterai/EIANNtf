@@ -123,8 +123,9 @@ def defineNeuralNetworkParameters():
 			B[generateParameterNameNetwork(networkIndex, l1, "B")] = tf.Variable(tf.zeros(n_h[l1]))
 			#print("B[generateParameterNameNetwork(networkIndex, l1, \"B\")].shape = ", B[generateParameterNameNetwork(networkIndex, l1, "B")].shape)
 
-			Ztrace[generateParameterNameNetwork(networkIndex, l1, "Ztrace")] = tf.Variable(tf.zeros(n_h[l1], dtype=tf.dtypes.float32))
-			Atrace[generateParameterNameNetwork(networkIndex, l1, "Atrace")] = tf.Variable(tf.zeros(n_h[l1], dtype=tf.dtypes.float32))
+			Ztrace[generateParameterNameNetwork(networkIndex, l1, "Ztrace")] = tf.Variable(tf.zeros([batchSize, n_h[l1]], dtype=tf.dtypes.float32))
+			Atrace[generateParameterNameNetwork(networkIndex, l1, "Atrace")] = tf.Variable(tf.zeros([batchSize, n_h[l1]], dtype=tf.dtypes.float32))
+			
 			if(additiveZmethodRecordBackwardFeedDelta):
 				ZtraceBackwardFeedDelta[generateParameterNameNetwork(networkIndex, l1, "ZtraceBackwardFeedDelta")] = tf.Variable(tf.zeros(n_h[l1], dtype=tf.dtypes.float32))
 
@@ -133,8 +134,8 @@ def resetTraceNeuralNetworkParametersFBANN():
 	
 	for networkIndex in range(1, numberOfNetworks+1):
 		for l1 in range(1, highestLayer+1):
-			Ztrace[generateParameterNameNetwork(networkIndex, l1, "Ztrace")] = tf.Variable(tf.zeros(n_h[l1], dtype=tf.dtypes.float32))
-			Atrace[generateParameterNameNetwork(networkIndex, l1, "Atrace")] = tf.Variable(tf.zeros(n_h[l1], dtype=tf.dtypes.float32))
+			Ztrace[generateParameterNameNetwork(networkIndex, l1, "Ztrace")] = tf.Variable(tf.zeros([batchSize, n_h[l1]], dtype=tf.dtypes.float32))
+			Atrace[generateParameterNameNetwork(networkIndex, l1, "Atrace")] = tf.Variable(tf.zeros([batchSize, n_h[l1]], dtype=tf.dtypes.float32))
 			if(additiveZmethodRecordBackwardFeedDelta):
 				ZtraceBackwardFeedDelta[generateParameterNameNetwork(networkIndex, l1, "ZtraceBackwardFeedDelta")] = tf.Variable(tf.zeros(n_h[l1], dtype=tf.dtypes.float32))
 
@@ -173,7 +174,7 @@ def neuralNetworkPropagationANNfeedForward(x, networkIndex=1):
 				#print("Atrace[generateParameterNameNetwork(networkIndex, l2, \"Atrace\")] = ", Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")].shape)
 				#print("Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, \"Wf\")] = ", Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")].shape)
 				#print("B[generateParameterNameNetwork(networkIndex, l1, \"B\")] = ", B[generateParameterNameNetwork(networkIndex, l1, "B")].shape)
-				Z = tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
+				Z = tf.add(Z, tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")]), B[generateParameterNameNetwork(networkIndex, l1, "B")]))
 		else:
 			Z = tf.add(tf.matmul(AprevLayer, Wf[generateParameterNameNetwork(networkIndex, l1, "Wf")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])		
 		A = activationFunction(Z)
@@ -230,8 +231,9 @@ def neuralNetworkPropagationFBANNfeedForward(x, additiveZ=False, networkIndex=1)
 		#print("Z = ", Z)
 			
 		if(supportSkipLayers):
+			Zmod = tf.zeros(Ztrace[generateParameterNameNetwork(networkIndex, l1, "Ztrace")].shape)
 			for l2 in range(0, l1):
-				Zmod = tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
+				Zmod = tf.add(Zmod, tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")]), B[generateParameterNameNetwork(networkIndex, l1, "B")]))
 		else:
 			Zmod = tf.add(tf.matmul(AprevLayer, Wf[generateParameterNameNetwork(networkIndex, l1, "Wf")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
 		
@@ -268,9 +270,10 @@ def neuralNetworkPropagationFBANNfeedBackward(AhighestLayer, additiveZ=True, net
 			Z = tf.zeros(Ztrace[generateParameterNameNetwork(networkIndex, l1, "Ztrace")].shape)
 			
 		if(supportSkipLayers):
+			Zmod = tf.zeros(Ztrace[generateParameterNameNetwork(networkIndex, l1, "Ztrace")].shape)
 			for l2 in range(l1+1, highestLayer+1):
 				#print("l2 = ", l2)
-				Zmod = tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wb[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wb")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
+				Zmod = tf.add(Zmod, tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wb[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wb")]), B[generateParameterNameNetwork(networkIndex, l1, "B")]))
 		else:
 			Zmod = tf.add(tf.matmul(AprevLayer, Wb[generateParameterNameNetwork(networkIndex, l1, "Wb")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
 		

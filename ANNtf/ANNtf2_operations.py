@@ -124,6 +124,25 @@ def generateTFtrainDataUnbatchedFromNParrays(train_x, train_y):
 	trainDataUnbatched = tf.data.Dataset.from_tensor_slices((train_x, train_y))
 	return trainDataUnbatched
 
+#generate a single batch;
+def generateTFbatch(test_x, test_y, batchSize):
+	xShape = list(test_x.shape)
+	yShape = list(test_y.shape)
+	xShape[0] = batchSize
+	yShape[0] = batchSize
+	xShape = tuple(xShape)
+	yShape = tuple(yShape)
+	#print("test_x.shape = ", test_x.shape)
+	#print("test_y.shape = ", test_y.shape)
+	testBatchX = np.resize(test_x, xShape)
+	testBatchY = np.resize(test_y, yShape)
+	#print("testBatchX.shape = ", testBatchX.shape)
+	#print("testBatchY.shape = ", testBatchY.shape)
+	#print("testBatchX = ", testBatchX)
+	#print("testBatchY = ", testBatchY)
+	return testBatchX, testBatchY
+
+
 def generateTFtrainDataFromTrainDataUnbatched(trainDataUnbatched, shuffleSize, batchSize):
 	trainData = trainDataUnbatched.repeat().shuffle(shuffleSize).batch(batchSize).prefetch(1)	#do not repeat
 	return trainData

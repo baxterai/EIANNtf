@@ -23,6 +23,8 @@ from ANNtf2_operations import *	#generateParameterNameSeq, generateParameterName
 import ANNtf2_operations
 import ANNtf2_globalDefs
 
+supportSkipLayers = True
+
 debugOnlyTrainFinalLayer = False
 debugSingleLayerNetwork = False
 
@@ -30,15 +32,20 @@ debugFastTrain = False
 
 W = {}
 B = {}
-
+if(supportSkipLayers):
+	Ztrace = {}
+	Atrace = {}
 
 #Network parameters
 n_h = []
 numberOfLayers = 0
 numberOfNetworks = 0
 
+batchSize = 0
 
 def defineTrainingParameters(dataset):
+	global batchSize
+	
 	learningRate = 0.001
 	batchSize = 100
 	numEpochs = 10	#100 #10
@@ -124,12 +131,23 @@ def defineNeuralNetworkParameters():
 	
 	for networkIndex in range(1, numberOfNetworks+1):
 			
-		for l in range(1, numberOfLayers+1):
-			
-			W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
-			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
+		for l1 in range(1, numberOfLayers+1):
+		
+			if(supportSkipLayers):
+				for l2 in range(0, l1):
+					if(l2 < l1):
+						Wlayer = randomNormal([n_h[l2], n_h[l1]]) 
+						W[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "W")] = tf.Variable(Wlayer)
+			else:	
+				Wlayer = tf.Variable(randomNormal([n_h[l1-1], n_h[l1]]))
+				W[generateParameterNameNetwork(networkIndex, l1, "W")] = Wlayer
+			B[generateParameterNameNetwork(networkIndex, l1, "B")] = tf.Variable(tf.zeros(n_h[l1]))
 
-			#print("Wlayer = ", W[generateParameterNameNetwork(networkIndex, l, "W")])
+			if(supportSkipLayers):
+				Ztrace[generateParameterNameNetwork(networkIndex, l1, "Ztrace")] = tf.Variable(tf.zeros([batchSize, n_h[l1]], dtype=tf.dtypes.float32))
+				Atrace[generateParameterNameNetwork(networkIndex, l1, "Atrace")] = tf.Variable(tf.zeros([batchSize, n_h[l1]], dtype=tf.dtypes.float32))
+
+			#print("Wlayer = ", W[generateParameterNameNetwork(networkIndex, l1, "W")])
 
 def neuralNetworkPropagation(x, networkIndex=1):
 	return neuralNetworkPropagationANN(x, networkIndex)
@@ -139,17 +157,31 @@ def neuralNetworkPropagationANN(x, networkIndex=1):
 	#print("numberOfLayers", numberOfLayers)
 	
 	AprevLayer = x
-	for l in range(1, numberOfLayers+1):
-		Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
+	if(supportSkipLayers):
+		Atrace[generateParameterNameNetwork(networkIndex, 0, "Atrace")] = AprevLayer
+	
+	for l1 in range(1, numberOfLayers+1):
+		if(supportSkipLayers):
+			Z = tf.zeros(Ztrace[generateParameterNameNetwork(networkIndex, l1, "Ztrace")].shape)
+			for l2 in range(0, l1):
+				Wlayer = W[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "W")]
+				at = Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")]
+				Z = tf.add(Z, tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wlayer), B[generateParameterNameNetwork(networkIndex, l1, "B")]))		
+		else:
+			Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l1, "W")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
+		
 		A = activationFunction(Z)
 
-		#print("l = " + str(l))		
-		#print("W = ", W[generateParameterNameNetwork(networkIndex, l, "W")] )
+		#print("l1 = " + str(l1))		
+		#print("W = ", W[generateParameterNameNetwork(networkIndex, l1, "W")] )
 		
 		if(debugOnlyTrainFinalLayer):
-			if(l < numberOfLayers):
+			if(l1 < numberOfLayers):
 				A = tf.stop_gradient(A)
-				
+
+		Ztrace[generateParameterNameNetwork(networkIndex, l1, "Ztrace")] = Z
+		Atrace[generateParameterNameNetwork(networkIndex, l1, "Atrace")] = A
+						
 		AprevLayer = A
 	
 	return tf.nn.softmax(Z)
