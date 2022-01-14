@@ -1,7 +1,7 @@
 """ANNtf2_algorithmLIANN.py
 
 # Author:
-Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
+Richard Bruce Baxter - Copyright (c) 2020-2022 Baxter AI (baxterai.com)
 
 # License:
 MIT License
@@ -24,7 +24,7 @@ import numpy as np
 from ANNtf2_operations import *	#generateParameterNameSeq, generateParameterName, defineNetworkParameters
 import ANNtf2_operations
 import ANNtf2_globalDefs
-import ANNtf2_algorithmLIANN_PCAsimulation
+import ANNtf2_algorithmLIANN_math
 import copy
 
 debugFastTrain = False
@@ -429,9 +429,9 @@ def neuralNetworkPropagationLIANN(x, networkIndex=1, trainWeights=False, layerTo
 				#	correlation, Aerror = forwardIterationInhibitionMeasureCorrelation(networkIndex, AprevLayer, l)
 				if(learningAlgorithmPCAsimulation):
 					#Afinal, Zfinal, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)	#batched
-					SVDinputMatrix = ANNtf2_algorithmLIANN_PCAsimulation.generateSVDinputMatrix(l, n_h, AprevLayer)
-					U, Sigma, VT = ANNtf2_algorithmLIANN_PCAsimulation.calculateSVD(M=SVDinputMatrix, k=n_h[l])
-					AW = ANNtf2_algorithmLIANN_PCAsimulation.calculateWeights(l, n_h, SVDinputMatrix, U, Sigma, VT)
+					SVDinputMatrix = ANNtf2_algorithmLIANN_math.generateSVDinputMatrix(l, n_h, AprevLayer)
+					U, Sigma, VT = ANNtf2_algorithmLIANN_math.calculateSVD(M=SVDinputMatrix, k=n_h[l])
+					AW = ANNtf2_algorithmLIANN_math.calculateWeights(l, n_h, SVDinputMatrix, U, Sigma, VT)
 					W[generateParameterNameNetwork(networkIndex, l, "W")] = AW
 					
 					#weights = U -> Sigma -> VT	[linear]
@@ -770,99 +770,14 @@ def learningAlgorithmStochasticCalculateMetric(networkIndex, AprevLayer, ZprevLa
 	if(learningAlgorithmStochasticCorrelation):
 		enableInhibition = False
 		A, Z, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
-		metric = learningAlgorithmStochasticCalculateMetricCorrelation(A)
+		metric = ANNtf2_algorithmLIANN_math.learningAlgorithmStochasticCalculateMetricCorrelation(A)
 	elif(learningAlgorithmStochasticMaximiseAndEvenSignal):
 		enableInhibition = True
 		Afinal, Zfinal, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
-		metric = learningAlgorithmStochasticCalculateMetricMaximiseAndEvenSignal(Afinal)
+		metric = ANNtf2_algorithmLIANN_math.learningAlgorithmStochasticCalculateMetricMaximiseAndEvenSignal(Afinal, metric1Weighting, metric2Weighting)
 	return metric
 
-def learningAlgorithmStochasticCalculateMetricCorrelation(A):
-	#print("A = ", A)	
-	meanCorrelation = calculateCorrelationMean(A)
-	print("meanCorrelation = ", meanCorrelation)
-	metric = 1 - meanCorrelation
-	#print("metric = ", metric)
-	return metric
 	
-def calculateCorrelationMean(A):
-	Anumpy = A.numpy()
-	correlationMatrixX = np.transpose(Anumpy)	#2-D array containing multiple variables and observations. Each row of x represents a variable, and each column a single observation of all those variables. Also see rowvar below.	#https://numpy.org/doc/stable/reference/generated/numpy.corrcoef.html
-	correlationMatrix = np.corrcoef(correlationMatrixX)	#create correlation matrix across all k neuron dimensions (for every sample instance in the batch)
-
-	#print("correlationMatrixX = ", correlationMatrixX)
-	#print("correlationMatrix = ", correlationMatrix)
-	#correlationMatrix values will be nan if a column (neuron k) of A has the same value (e.g. 0.0) in every cell
-	
-	offdiagonalIndices = np.triu_indices_from(correlationMatrix,1)	#get off diagonal correlations	#https://stackoverflow.com/questions/14129979/mean-of-a-correlation-matrix-pandas-data-fram
-	#print("offdiagonalIndices = ", offdiagonalIndices)
-	#offdiagonalIndicesList = offdiagonalIndices.tolist()
-	#print("offdiagonalIndicesList = ", offdiagonalIndicesList)
-	correlationMatrix[np.isnan(correlationMatrix)] = 1.0	#set all correlationMatrix nan entries as 1.0 (high correlation), to disincentivise all values of a neuron k being the same value across the batch
-	print("correlationMatrix = ", correlationMatrix)
-	correlations = correlationMatrix[offdiagonalIndices[0], offdiagonalIndices[1]]	
-	#print("correlations = ", correlations)
-	meanCorrelation = calculateCorrelationMatrixOffDiagonalsMean(correlations)
-	#print("meanCorrelation = ", meanCorrelation)
-	
-	return meanCorrelation
-	
-	#alternate methods;
-	#normalisedStddev = tf.math.reduce_std(A, axis=1)/tf.math.reduce_mean(A, axis=1)	#batched	similarity(A) = stddev(A)/avg(A)
-	#mean = tf.math.reduce_mean(A, axis=1)	#batched
-	#mean = tf.expand_dims(mean, axis=1)
-	#differenceFromMean(tf.subtract(A, mean))
-	
-def calculateCorrelationMatrixOffDiagonalsMean(correlations):
-	#alternate methods:
-	correlations = np.abs(correlations)	#account for negative correlations
-	meanCorrelation = np.mean(correlations)
-
-	#this method assumes bivariate normality - CHECKTHIS assumption is not violated
-	#https://www.researchgate.net/post/average_of_Pearson_correlation_coefficient_values
-		#https://stats.stackexchange.com/questions/109028/fishers-z-transform-in-python
-	#fishersZ = np.arctanh(correlations)
-	#fishersZaverage = np.mean(fishersZ)
-	#inverseFishersZ = np.tanh(fishersZaverage)
-	#meanCorrelation = inverseFishersZ
-	return meanCorrelation
-	
-	
-def learningAlgorithmStochasticCalculateMetricMaximiseAndEvenSignal(Afinal):	
-	#learning objective functions:
-	#1: maximise the signal (ie successfully uninhibited) across multiple batches (entire dataset)
-	#2: ensure that all layer neurons receive even activation across multiple batches (entire dataset)		
-	
-	#print("Afinal = ", Afinal) 
-
-	AfinalThresholded = tf.greater(Afinal, 0.0)	#threshold signal such that higher average weights are not preferenced
-	AfinalThresholded = tf.dtypes.cast(AfinalThresholded, dtype=tf.dtypes.float32)	
-	#print("Afinal = ", Afinal)
-	#print("AfinalThresholded = ", AfinalThresholded)
-	
-	metric1 = tf.reduce_mean(AfinalThresholded)	#average output across batch, across layer
-	
-	#stdDevAcrossLayer = tf.math.reduce_std(Afinal, axis=1)	#stddev calculated across layer [1 result per batch index]
-	#metric2 = tf.reduce_mean(stdDevAcrossLayer)	#average output across batch
-	
-	stdDevAcrossBatches = tf.math.reduce_mean(Afinal, axis=0)	 #for each dimension (k neuron in layer); calculate the mean across all batch indices
-	metric2 = tf.math.reduce_std(stdDevAcrossBatches)	#then calculate the std dev across these values
-	
-	metric1 = metric1.numpy()
-	metric2 = metric2.numpy()
-	#print("metric1 = ", metric1)
-	#print("metric2 = ", metric2)
-				
-	metric1 = metric1*metric1Weighting
-	metric2 = metric2*metric2Weighting
-	#print("metric1 = ", metric1)
-	#print("metric2 = ", metric2)
-	if(metric2 != 0):
-		metric = metric1/metric2
-	else:
-		metric = 0.0
-	
-	return metric
 
 def getRandomNetworkParameter(networkIndex, currentSubsetOfParameters):
 	

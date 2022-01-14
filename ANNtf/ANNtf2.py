@@ -1,7 +1,7 @@
 """ANNtf2.py
 
 # Author:
-Richard Bruce Baxter - Copyright (c) 2020-2021 Baxter AI (baxterai.com)
+Richard Bruce Baxter - Copyright (c) 2020-2022 Baxter AI (baxterai.com)
 
 # License:
 MIT License
@@ -12,7 +12,7 @@ Python 3 and Tensorflow 2.1+
 conda create -n anntf2 python=3.7
 source activate anntf2
 conda install -c tensorflow tensorflow=2.3
-conda install scikit-learn (ANNtf2_algorithmLIANN_PCAsimulation only)
+conda install scikit-learn (ANNtf2_algorithmLIANN_math only)
 	
 # Usage:
 python3 ANNtf2.py
