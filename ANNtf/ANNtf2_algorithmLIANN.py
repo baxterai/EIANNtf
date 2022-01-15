@@ -284,6 +284,7 @@ def defineNeuralNetworkParameters():
 
 	print("numberOfNetworks", numberOfNetworks)
 	
+	global randomNormal
 	randomNormal = tf.initializers.RandomNormal(mean=Wmean, stddev=WstdDev)
 	randomNormalFinalLayer = tf.initializers.RandomNormal()
 	
@@ -365,8 +366,6 @@ def neuralNetworkPropagationLIANNminimal(x, networkIndex=1):
 	
 def neuralNetworkPropagationLIANN(x, networkIndex=1, trainWeights=False, layerToTrain=None):
 
-	randomNormal = tf.initializers.RandomNormal(mean=Wmean, stddev=WstdDev)
-
 	if(normaliseInput):
 		#TODO: verify that the normalisation operation will not disort the code's capacity to process a new data batch the same as an old data batch
 		averageTotalInput = tf.math.reduce_mean(x)
@@ -381,12 +380,6 @@ def neuralNetworkPropagationLIANN(x, networkIndex=1, trainWeights=False, layerTo
 			maxLayer = numberOfLayers
 	else:
 		maxLayer = numberOfLayers
-
-	if(learningAlgorithmStochastic):
-		if(useBinaryWeights):
-			variationDirections = 1
-		else:
-			variationDirections = 2
 			
 	AprevLayer = x
 	ZprevLayer = x
@@ -421,240 +414,22 @@ def neuralNetworkPropagationLIANN(x, networkIndex=1, trainWeights=False, layerTo
 		
 		if(finalLayerHebbian):
 			A, Z, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
-		else:			
+		else:
 			if(trainLayer):
 				#CHECKTHIS: verify learning algorithm (how to modify weights to maximise independence between neurons on each layer)
 
 				#if(learningAlgorithmCorrelation):
 				#	correlation, Aerror = forwardIterationInhibitionMeasureCorrelation(networkIndex, AprevLayer, l)
 				if(learningAlgorithmPCAsimulation):
-					#Afinal, Zfinal, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)	#batched
-					SVDinputMatrix = ANNtf2_algorithmLIANN_math.generateSVDinputMatrix(l, n_h, AprevLayer)
-					U, Sigma, VT = ANNtf2_algorithmLIANN_math.calculateSVD(M=SVDinputMatrix, k=n_h[l])
-					AW = ANNtf2_algorithmLIANN_math.calculateWeights(l, n_h, SVDinputMatrix, U, Sigma, VT)
-					W[generateParameterNameNetwork(networkIndex, l, "W")] = AW
-					
-					#weights = U -> Sigma -> VT	[linear]
-					#M_reduced = reduce_to_k_dim(M=spikeCoincidenceMatrix, k=n_h[l])
+					neuralNetworkPropagationLIANNlearningAlgorithmPCAsimulation(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
 				elif(learningAlgorithmShuffle):
-					layerHasDependentNeurons = True
-					Bind = Bindependent[generateParameterNameNetwork(networkIndex, l, "Bindependent")]
-					if(count_zero(Bind) > 0):	#more than 1 dependent neuron on layer
-						layerHasDependentNeurons = True
-					else:
-						layerHasDependentNeurons = False
-						
-					while(layerHasDependentNeurons):
-						Afinal, Zfinal, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)	#batched
-						
-						AnumActive = tf.math.count_nonzero(Afinal, axis=1)	#batched
-						Aindependent = tf.equal(AnumActive, 1)	#batched
-						Aindependent = tf.dtypes.cast(Aindependent, dtype=tf.dtypes.float32)	#batched
-						Aindependent = tf.expand_dims(Aindependent, 1)	#batched
-						#print("Afinal = ", Afinal)
-						#print("AnumActive = ", AnumActive)
-						#print("Aindependent = ", Aindependent)
-						
-						Aactive = tf.greater(Afinal, 0)	#2D: batched, for every k neuron
-						Aactive = tf.dtypes.cast(Aactive, dtype=tf.dtypes.float32) 	#2D: batched, for every k neuron
-						#print("Aactive = ", Aactive)
-						#ex
-						
-						AactiveAndIndependent = tf.multiply(Aactive, Aindependent)	#2D: batched, for every k neuron	
-						AactiveAndIndependent = tf.reduce_sum(AactiveAndIndependent, axis=0) #for every k neuron
-						
-						AactiveAndIndependentPass = tf.greater(AactiveAndIndependent, fractionIndependentInstancesAcrossBatchRequired*n_h[l])	 #for every k neuron
-						#print("AactiveAndIndependentPass = ", AactiveAndIndependentPass)
-						
-						BindBool = tf.dtypes.cast(Bind, dtype=tf.dtypes.bool)
-						AactiveAndIndependentPassRequiresSolidifying = tf.logical_and(AactiveAndIndependentPass, tf.logical_not(BindBool))
-						#print("AactiveAndIndependentPass = ", AactiveAndIndependentPass)
-						#print("BindBool = ", BindBool)
-						print("AactiveAndIndependentPassRequiresSolidifying = ", AactiveAndIndependentPassRequiresSolidifying)
-						BindNew = tf.logical_or(BindBool, AactiveAndIndependentPassRequiresSolidifying)
-						BdepNew = tf.logical_not(BindNew)
-						
-						#update layer weights (reinitialise weights for all dependent neurons);
-						BindNew = tf.dtypes.cast(BindNew, dtype=tf.dtypes.float32)
-						BdepNew = tf.dtypes.cast(BdepNew, dtype=tf.dtypes.float32)
-						EWlayerDep = randomNormal([n_h[l-1], n_h[l]]) 
-						if(positiveExcitatoryWeights):
-							EWlayerDep = tf.abs(EWlayerDep)	#ensure randomNormal generated weights are positive
-						EBlayerDep = tf.zeros(n_h[l])
-						EWlayerDep = tf.multiply(EWlayerDep, BdepNew)	#requires broadcasting
-						EBlayerDep = tf.multiply(EBlayerDep, BdepNew)				
-						EWlayerInd = W[generateParameterNameNetwork(networkIndex, l, "W")] 
-						EBlayerInd = B[generateParameterNameNetwork(networkIndex, l, "B")]
-						EWlayerInd = tf.multiply(EWlayerInd, BindNew)	#requires broadcasting
-						EBlayerInd = tf.multiply(EBlayerInd, BindNew)
-						EWlayerNew = tf.add(EWlayerDep, EWlayerInd)
-						EBlayerNew = tf.add(EBlayerDep, EBlayerInd)					
-						W[generateParameterNameNetwork(networkIndex, l, "W")] = EWlayerNew
-						B[generateParameterNameNetwork(networkIndex, l, "B")] = EBlayerNew	
-						#print("EWlayerNew = ", EWlayerNew)				
-	
-						#print("BdepNew = ", BdepNew)
-						#print("BindNew = ", BindNew)
-						
-						Bindependent[generateParameterNameNetwork(networkIndex, l, "Bindependent")] = BindNew	#update independence record
-						Bind = BindNew
-						if(count_zero(Bind) > 0):	#more than 1 dependent neuron on layer
-							layerHasDependentNeurons = True
-							#print("layerHasDependentNeurons: count_zero(Bind) = ", count_zero(Bind))
-						else:
-							layerHasDependentNeurons = False	
-							#print("!layerHasDependentNeurons")
+					neuralNetworkPropagationLIANNlearningAlgorithmShuffle(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
 				elif(learningAlgorithmStochastic):
-					#code from ANNtf2_algorithmLREANN_expSUANN;
-					for s in range(numberStochasticIterations):
-						for hIndexCurrentLayer in range(0, n_h[l]):
-							for hIndexPreviousLayer in range(0, n_h[l-1]+1):
-								if(hIndexPreviousLayer == n_h[l-1]):	#ensure that B parameter updates occur/tested less frequently than W parameter updates
-									parameterTypeWorB = 0
-								else:
-									parameterTypeWorB = 1
-								for variationDirectionInt in range(variationDirections):
-
-									networkParameterIndexBase = (parameterTypeWorB, l, hIndexCurrentLayer, hIndexPreviousLayer, variationDirectionInt)
-									
-									metricBase = learningAlgorithmStochasticCalculateMetric(networkIndex, AprevLayer, ZprevLayer, l)
-									
-									for subsetTrialIndex in range(0, numberOfSubsetsTrialledPerBaseParameter):
-
-										accuracyImprovementDetected = False
-
-										currentSubsetOfParameters = []
-										currentSubsetOfParameters.append(networkParameterIndexBase)
-
-										for s in range(1, parameterUpdateSubsetSize):
-											networkParameterIndex = getRandomNetworkParameter(networkIndex, currentSubsetOfParameters)
-											currentSubsetOfParameters.append(networkParameterIndex)
-
-										for s in range(0, parameterUpdateSubsetSize):
-											networkParameterIndex = currentSubsetOfParameters[s]
-
-											if(not useBinaryWeights):
-												if(networkParameterIndex[NETWORK_PARAM_INDEX_VARIATION_DIRECTION] == 1):
-													variationDiff = learningRate
-												else:
-													variationDiff = -learningRate		
-							
-											if(networkParameterIndex[NETWORK_PARAM_INDEX_TYPE] == 1):
-												#Wnp = W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")].numpy()
-												#currentVal = Wnp[networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]]
-												currentVal = W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")][networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].numpy()
-
-												#print("currentVal = ", currentVal)
-												#print("W1 = ", W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")])
-												if(useBinaryWeights):
-													if(useBinaryWeightsReduceMemoryWithBool):
-														newVal = not currentVal
-													else:
-														newVal = float(not bool(currentVal))
-														#print("newVal = ", newVal)
-												else:
-													newVal = currentVal + variationDiff
-							
-												if(positiveExcitatoryWeights):
-													newVal = max(newVal, 0)	#do not allow weights fall below zero [CHECKTHIS]	
-																	
-												W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")][networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
-
-												#print("W2 = ", W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")])
-											else:
-												#Bnp = B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")].numpy()
-												#currentVal = Bnp[networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]]
-												currentVal = B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].numpy()
-
-												if(useBinaryWeights):
-													if(useBinaryWeightsReduceMemoryWithBool):
-														newVal = not currentVal
-													else:
-														newVal = float(not bool(currentVal))
-												else:
-													newVal = currentVal + variationDiff
-													
-												if(positiveExcitatoryWeights):
-													newVal = max(newVal, 0)	#do not allow weights fall below zero [CHECKTHIS]	
-													
-												B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
-
-										metricAfterStochasticUpdate = learningAlgorithmStochasticCalculateMetric(networkIndex, AprevLayer, ZprevLayer, l)
-										#print("metricBase = ", metricBase)
-										#print("metricAfterStochasticUpdate = ", metricAfterStochasticUpdate)
-						
-										if(metricAfterStochasticUpdate > metricBase):
-											#print("(metricAfterStochasticUpdate > metricBase)")
-											accuracyImprovementDetected = True
-											metricBase = metricAfterStochasticUpdate
-										#else:
-											#print("(metricAfterStochasticUpdate < metricBase)")
-
-										if(accuracyImprovementDetected):
-											#retain weight update
-											Wbackup[generateParameterNameNetwork(networkIndex, l, "W")].assign(W[generateParameterNameNetwork(networkIndex, l, "W")])
-											Bbackup[generateParameterNameNetwork(networkIndex, l, "B")].assign(B[generateParameterNameNetwork(networkIndex, l, "B")])	
-										else:
-											#restore weights
-											W[generateParameterNameNetwork(networkIndex, l, "W")].assign(Wbackup[generateParameterNameNetwork(networkIndex, l, "W")])
-											B[generateParameterNameNetwork(networkIndex, l, "B")].assign(Bbackup[generateParameterNameNetwork(networkIndex, l, "B")])								
+					neuralNetworkPropagationLIANNlearningAlgorithmStochastic(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
 				elif(learningAlgorithmShufflePermanence):
-					Afinal, Zfinal, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
-
-					#update W/B permanence;
-					Afinal2D = tf.reduce_mean(Afinal, axis=0)	#average across batch
-					Afinal2D = tf.expand_dims(Afinal2D, axis=0)	#make compatible shape to W
-					WpermanenceUpdate = tf.multiply(Afinal2D, WpermanenceUpdateRate)	#verify that broadcasting works
-					WpermanenceNew = tf.add(Wpermanence[generateParameterNameNetwork(networkIndex, l, "Wpermanence")], WpermanenceUpdate)	#increase the permanence of neuron weights that successfully fired
-					Wpermanence[generateParameterNameNetwork(networkIndex, l, "Wpermanence")] = WpermanenceNew
-					print("WpermanenceUpdate = ", WpermanenceUpdate)
-
-					#stochastically modify weights based on permanence values:
-					Wupdate = randomNormal([n_h[l-1], n_h[l]])
-					Wupdate = tf.divide(Wupdate, Wpermanence[generateParameterNameNetwork(networkIndex, l, "Wpermanence")])
-					Wupdate = tf.divide(Wupdate, permanenceNumberBatches)
-					Wnew = tf.add(W[generateParameterNameNetwork(networkIndex, l, "W")], Wupdate)
-					if(positiveExcitatoryWeights):
-						Wnew = tf.maximum(Wnew, 0)	#do not allow weights fall below zero [CHECKTHIS]
-					W[generateParameterNameNetwork(networkIndex, l, "W")] = Wnew
-					#print("Wupdate = ", Wupdate)
+					neuralNetworkPropagationLIANNlearningAlgorithmShufflePermanence(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
 				elif(learningAlgorithmHebbian):
-					AW = W[generateParameterNameNetwork(networkIndex, l, "W")] 
-					Afinal, Zfinal, EWactive = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
-					#print("Zfinal = ", Zfinal)
-					
-					if(useZAcoincidenceMatrix):
-						AWcontribution = tf.matmul(tf.transpose(ZprevLayer), Afinal)	#increase excitatory weights that contributed to the output signal	#hebbian
-					else:
-						AWcontribution = tf.matmul(tf.transpose(AprevLayer), Afinal)	#increase excitatory weights that contributed to the output signal	#hebbian
-
-					if(randomlyActivateWeights):
-						#do not apply weight updates to temporarily suppressed weights [CHECKTHIS];
-						AWcontribution = tf.multiply(AWcontribution, EWactive)		
-
-					if(normaliseWeightUpdates):
-						print("ANNtf2_algorithmLIANN:neuralNetworkPropagationLIANN error - normaliseWeightUpdates: normaliseWeightUpdatesReduceConnectionWeightsForUnassociatedNeurons unimplemented")
-					else:
-						if(maxWeightUpdateThreshold):
-							AWcontribution = tf.minimum(AWcontribution, 1.0)
-
-					AWupdate = tf.multiply(AWcontribution, learningRate)
-					#print("AWupdate = ", AWupdate)
-
-					AW = tf.add(AW, AWupdate)	#apply weight updates
-
-					if(weightDecay):
-						#apply decay to all weights;
-						AWdecay = -weightDecayRate
-						#print("AWdecay = ", AWdecay)
-						AW = tf.add(AW, AWdecay)
-						#print("AWdecay = ", AWdecay)
-					
-					if(positiveExcitatoryWeightsThresholds):
-						AW = tf.minimum(AW, 1.0)	#do not allow weights to exceed 1.0 [CHECKTHIS]
-						AW = tf.maximum(AW, 0)	#do not allow weights fall below zero [CHECKTHIS]
-								
-					W[generateParameterNameNetwork(networkIndex, l, "W")] = AW
+					neuralNetworkPropagationLIANNlearningAlgorithmHebbian(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
 
 				A, Z, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition=(not enableInhibitionTrainSpecificLayerOnly), randomlyActivateWeights=False)	#in case !learningAlgorithmFinalLayerBackpropHebbian
 			else:
@@ -667,6 +442,250 @@ def neuralNetworkPropagationLIANN(x, networkIndex=1, trainWeights=False, layerTo
 			ZprevLayer = Z
 
 	return tf.nn.softmax(Z)
+
+def neuralNetworkPropagationLIANNlearningAlgorithmPCAsimulation(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights):
+	#Afinal, Zfinal, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)	#batched
+	SVDinputMatrix = ANNtf2_algorithmLIANN_math.generateSVDinputMatrix(l, n_h, AprevLayer)
+	U, Sigma, VT = ANNtf2_algorithmLIANN_math.calculateSVD(M=SVDinputMatrix, k=n_h[l])
+	AW = ANNtf2_algorithmLIANN_math.calculateWeights(l, n_h, SVDinputMatrix, U, Sigma, VT)
+	W[generateParameterNameNetwork(networkIndex, l, "W")] = AW
+
+	#weights = U -> Sigma -> VT	[linear]
+	#M_reduced = reduce_to_k_dim(M=spikeCoincidenceMatrix, k=n_h[l])
+	
+def neuralNetworkPropagationLIANNlearningAlgorithmShuffle(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights):
+	layerHasDependentNeurons = True
+	Bind = Bindependent[generateParameterNameNetwork(networkIndex, l, "Bindependent")]
+	if(count_zero(Bind) > 0):	#more than 1 dependent neuron on layer
+		layerHasDependentNeurons = True
+	else:
+		layerHasDependentNeurons = False
+
+	while(layerHasDependentNeurons):
+		Afinal, Zfinal, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)	#batched
+
+		AnumActive = tf.math.count_nonzero(Afinal, axis=1)	#batched
+		Aindependent = tf.equal(AnumActive, 1)	#batched
+		Aindependent = tf.dtypes.cast(Aindependent, dtype=tf.dtypes.float32)	#batched
+		Aindependent = tf.expand_dims(Aindependent, 1)	#batched
+		#print("Afinal = ", Afinal)
+		#print("AnumActive = ", AnumActive)
+		#print("Aindependent = ", Aindependent)
+
+		Aactive = tf.greater(Afinal, 0)	#2D: batched, for every k neuron
+		Aactive = tf.dtypes.cast(Aactive, dtype=tf.dtypes.float32) 	#2D: batched, for every k neuron
+		#print("Aactive = ", Aactive)
+		#ex
+
+		AactiveAndIndependent = tf.multiply(Aactive, Aindependent)	#2D: batched, for every k neuron	
+		AactiveAndIndependent = tf.reduce_sum(AactiveAndIndependent, axis=0) #for every k neuron
+
+		AactiveAndIndependentPass = tf.greater(AactiveAndIndependent, fractionIndependentInstancesAcrossBatchRequired*n_h[l])	 #for every k neuron
+		#print("AactiveAndIndependentPass = ", AactiveAndIndependentPass)
+
+		BindBool = tf.dtypes.cast(Bind, dtype=tf.dtypes.bool)
+		AactiveAndIndependentPassRequiresSolidifying = tf.logical_and(AactiveAndIndependentPass, tf.logical_not(BindBool))
+		#print("AactiveAndIndependentPass = ", AactiveAndIndependentPass)
+		#print("BindBool = ", BindBool)
+		print("AactiveAndIndependentPassRequiresSolidifying = ", AactiveAndIndependentPassRequiresSolidifying)
+		BindNew = tf.logical_or(BindBool, AactiveAndIndependentPassRequiresSolidifying)
+		BdepNew = tf.logical_not(BindNew)
+
+		#update layer weights (reinitialise weights for all dependent neurons);
+		BindNew = tf.dtypes.cast(BindNew, dtype=tf.dtypes.float32)
+		BdepNew = tf.dtypes.cast(BdepNew, dtype=tf.dtypes.float32)
+		EWlayerDep = randomNormal([n_h[l-1], n_h[l]]) 
+		if(positiveExcitatoryWeights):
+			EWlayerDep = tf.abs(EWlayerDep)	#ensure randomNormal generated weights are positive
+		EBlayerDep = tf.zeros(n_h[l])
+		EWlayerDep = tf.multiply(EWlayerDep, BdepNew)	#requires broadcasting
+		EBlayerDep = tf.multiply(EBlayerDep, BdepNew)				
+		EWlayerInd = W[generateParameterNameNetwork(networkIndex, l, "W")] 
+		EBlayerInd = B[generateParameterNameNetwork(networkIndex, l, "B")]
+		EWlayerInd = tf.multiply(EWlayerInd, BindNew)	#requires broadcasting
+		EBlayerInd = tf.multiply(EBlayerInd, BindNew)
+		EWlayerNew = tf.add(EWlayerDep, EWlayerInd)
+		EBlayerNew = tf.add(EBlayerDep, EBlayerInd)					
+		W[generateParameterNameNetwork(networkIndex, l, "W")] = EWlayerNew
+		B[generateParameterNameNetwork(networkIndex, l, "B")] = EBlayerNew	
+		#print("EWlayerNew = ", EWlayerNew)				
+
+		#print("BdepNew = ", BdepNew)
+		#print("BindNew = ", BindNew)
+
+		Bindependent[generateParameterNameNetwork(networkIndex, l, "Bindependent")] = BindNew	#update independence record
+		Bind = BindNew
+		if(count_zero(Bind) > 0):	#more than 1 dependent neuron on layer
+			layerHasDependentNeurons = True
+			#print("layerHasDependentNeurons: count_zero(Bind) = ", count_zero(Bind))
+		else:
+			layerHasDependentNeurons = False	
+			#print("!layerHasDependentNeurons")
+							
+def neuralNetworkPropagationLIANNlearningAlgorithmStochastic(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights):
+
+	if(learningAlgorithmStochastic):
+		if(useBinaryWeights):
+			variationDirections = 1
+		else:
+			variationDirections = 2
+			
+	#code from ANNtf2_algorithmLREANN_expSUANN;
+	for s in range(numberStochasticIterations):
+		for hIndexCurrentLayer in range(0, n_h[l]):
+			for hIndexPreviousLayer in range(0, n_h[l-1]+1):
+				if(hIndexPreviousLayer == n_h[l-1]):	#ensure that B parameter updates occur/tested less frequently than W parameter updates
+					parameterTypeWorB = 0
+				else:
+					parameterTypeWorB = 1
+				for variationDirectionInt in range(variationDirections):
+
+					networkParameterIndexBase = (parameterTypeWorB, l, hIndexCurrentLayer, hIndexPreviousLayer, variationDirectionInt)
+
+					metricBase = learningAlgorithmStochasticCalculateMetric(networkIndex, AprevLayer, ZprevLayer, l)
+
+					for subsetTrialIndex in range(0, numberOfSubsetsTrialledPerBaseParameter):
+
+						accuracyImprovementDetected = False
+
+						currentSubsetOfParameters = []
+						currentSubsetOfParameters.append(networkParameterIndexBase)
+
+						for s in range(1, parameterUpdateSubsetSize):
+							networkParameterIndex = getRandomNetworkParameter(networkIndex, currentSubsetOfParameters)
+							currentSubsetOfParameters.append(networkParameterIndex)
+
+						for s in range(0, parameterUpdateSubsetSize):
+							networkParameterIndex = currentSubsetOfParameters[s]
+
+							if(not useBinaryWeights):
+								if(networkParameterIndex[NETWORK_PARAM_INDEX_VARIATION_DIRECTION] == 1):
+									variationDiff = learningRate
+								else:
+									variationDiff = -learningRate		
+
+							if(networkParameterIndex[NETWORK_PARAM_INDEX_TYPE] == 1):
+								#Wnp = W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")].numpy()
+								#currentVal = Wnp[networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]]
+								currentVal = W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")][networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].numpy()
+
+								#print("currentVal = ", currentVal)
+								#print("W1 = ", W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")])
+								if(useBinaryWeights):
+									if(useBinaryWeightsReduceMemoryWithBool):
+										newVal = not currentVal
+									else:
+										newVal = float(not bool(currentVal))
+										#print("newVal = ", newVal)
+								else:
+									newVal = currentVal + variationDiff
+
+								if(positiveExcitatoryWeights):
+									newVal = max(newVal, 0)	#do not allow weights fall below zero [CHECKTHIS]	
+
+								W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")][networkParameterIndex[NETWORK_PARAM_INDEX_H_PREVIOUS_LAYER], networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
+
+								#print("W2 = ", W[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "W")])
+							else:
+								#Bnp = B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")].numpy()
+								#currentVal = Bnp[networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]]
+								currentVal = B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].numpy()
+
+								if(useBinaryWeights):
+									if(useBinaryWeightsReduceMemoryWithBool):
+										newVal = not currentVal
+									else:
+										newVal = float(not bool(currentVal))
+								else:
+									newVal = currentVal + variationDiff
+
+								if(positiveExcitatoryWeights):
+									newVal = max(newVal, 0)	#do not allow weights fall below zero [CHECKTHIS]	
+
+								B[generateParameterNameNetwork(networkIndex, networkParameterIndex[NETWORK_PARAM_INDEX_LAYER], "B")][networkParameterIndex[NETWORK_PARAM_INDEX_H_CURRENT_LAYER]].assign(newVal)
+
+						metricAfterStochasticUpdate = learningAlgorithmStochasticCalculateMetric(networkIndex, AprevLayer, ZprevLayer, l)
+						#print("metricBase = ", metricBase)
+						#print("metricAfterStochasticUpdate = ", metricAfterStochasticUpdate)
+
+						if(metricAfterStochasticUpdate > metricBase):
+							#print("(metricAfterStochasticUpdate > metricBase)")
+							accuracyImprovementDetected = True
+							metricBase = metricAfterStochasticUpdate
+						#else:
+							#print("(metricAfterStochasticUpdate < metricBase)")
+
+						if(accuracyImprovementDetected):
+							#retain weight update
+							Wbackup[generateParameterNameNetwork(networkIndex, l, "W")].assign(W[generateParameterNameNetwork(networkIndex, l, "W")])
+							Bbackup[generateParameterNameNetwork(networkIndex, l, "B")].assign(B[generateParameterNameNetwork(networkIndex, l, "B")])	
+						else:
+							#restore weights
+							W[generateParameterNameNetwork(networkIndex, l, "W")].assign(Wbackup[generateParameterNameNetwork(networkIndex, l, "W")])
+							B[generateParameterNameNetwork(networkIndex, l, "B")].assign(Bbackup[generateParameterNameNetwork(networkIndex, l, "B")])	
+
+def neuralNetworkPropagationLIANNlearningAlgorithmShufflePermanence(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights):
+	Afinal, Zfinal, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
+
+	#update W/B permanence;
+	Afinal2D = tf.reduce_mean(Afinal, axis=0)	#average across batch
+	Afinal2D = tf.expand_dims(Afinal2D, axis=0)	#make compatible shape to W
+	WpermanenceUpdate = tf.multiply(Afinal2D, WpermanenceUpdateRate)	#verify that broadcasting works
+	WpermanenceNew = tf.add(Wpermanence[generateParameterNameNetwork(networkIndex, l, "Wpermanence")], WpermanenceUpdate)	#increase the permanence of neuron weights that successfully fired
+	Wpermanence[generateParameterNameNetwork(networkIndex, l, "Wpermanence")] = WpermanenceNew
+	print("WpermanenceUpdate = ", WpermanenceUpdate)
+
+	#stochastically modify weights based on permanence values:
+	Wupdate = randomNormal([n_h[l-1], n_h[l]])
+	Wupdate = tf.divide(Wupdate, Wpermanence[generateParameterNameNetwork(networkIndex, l, "Wpermanence")])
+	Wupdate = tf.divide(Wupdate, permanenceNumberBatches)
+	Wnew = tf.add(W[generateParameterNameNetwork(networkIndex, l, "W")], Wupdate)
+	if(positiveExcitatoryWeights):
+		Wnew = tf.maximum(Wnew, 0)	#do not allow weights fall below zero [CHECKTHIS]
+	W[generateParameterNameNetwork(networkIndex, l, "W")] = Wnew
+	#print("Wupdate = ", Wupdate)
+
+def neuralNetworkPropagationLIANNlearningAlgorithmHebbian(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights):
+	AW = W[generateParameterNameNetwork(networkIndex, l, "W")] 
+	Afinal, Zfinal, EWactive = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
+	#print("Zfinal = ", Zfinal)
+
+	if(useZAcoincidenceMatrix):
+		AWcontribution = tf.matmul(tf.transpose(ZprevLayer), Afinal)	#increase excitatory weights that contributed to the output signal	#hebbian
+	else:
+		AWcontribution = tf.matmul(tf.transpose(AprevLayer), Afinal)	#increase excitatory weights that contributed to the output signal	#hebbian
+
+	if(randomlyActivateWeights):
+		#do not apply weight updates to temporarily suppressed weights [CHECKTHIS];
+		AWcontribution = tf.multiply(AWcontribution, EWactive)		
+
+	if(normaliseWeightUpdates):
+		print("ANNtf2_algorithmLIANN:neuralNetworkPropagationLIANN error - normaliseWeightUpdates: normaliseWeightUpdatesReduceConnectionWeightsForUnassociatedNeurons unimplemented")
+	else:
+		if(maxWeightUpdateThreshold):
+			AWcontribution = tf.minimum(AWcontribution, 1.0)
+
+	AWupdate = tf.multiply(AWcontribution, learningRate)
+	#print("AWupdate = ", AWupdate)
+
+	AW = tf.add(AW, AWupdate)	#apply weight updates
+
+	if(weightDecay):
+		#apply decay to all weights;
+		AWdecay = -weightDecayRate
+		#print("AWdecay = ", AWdecay)
+		AW = tf.add(AW, AWdecay)
+		#print("AWdecay = ", AWdecay)
+
+	if(positiveExcitatoryWeightsThresholds):
+		AW = tf.minimum(AW, 1.0)	#do not allow weights to exceed 1.0 [CHECKTHIS]
+		AW = tf.maximum(AW, 0)	#do not allow weights fall below zero [CHECKTHIS]
+
+	W[generateParameterNameNetwork(networkIndex, l, "W")] = AW
+
+
+
+
 
 def forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition=False, randomlyActivateWeights=False):
 	#forward excitatory connections;
