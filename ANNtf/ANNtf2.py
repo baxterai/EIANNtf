@@ -12,7 +12,7 @@ Python 3 and Tensorflow 2.1+
 conda create -n anntf2 python=3.7
 source activate anntf2
 conda install -c tensorflow tensorflow=2.3
-conda install scikit-learn (ANNtf2_algorithmLIANN_math only)
+conda install scikit-learn (ANNtf2_algorithmLIANN_math:SVD/PCA only)
 	
 # Usage:
 python3 ANNtf2.py

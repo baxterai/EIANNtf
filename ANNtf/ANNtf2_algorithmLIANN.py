@@ -35,9 +35,9 @@ generateLargeNetwork = False	#large number of layer neurons is required for lear
 generateNetworkStatic = False
 
 #select learningAlgorithm (unsupervised learning algorithm for intermediate layers):
+learningAlgorithmCorrelation = True	#minimise correlation between layer neurons
 learningAlgorithmPCAsimulation = False	#note layer construction is nonlinear (use ANNtf2_algorithmAEANN/autoencoder for nonlinear dimensionality reduction simulation)	#incomplete
-learningAlgorithmStochasticCorrelation = True	#stochastic optimise weights based on objective function; minimise the correlation between layer neurons
-learningAlgorithmCorrelation = False	#minimise correlation between layer neurons	#INCOMPLETE
+learningAlgorithmStochasticCorrelation = False	#stochastic optimise weights based on objective function; minimise the correlation between layer neurons
 learningAlgorithmShuffle = False	#randomly shuffle neuron weights until independence is detected
 learningAlgorithmStochasticMaximiseAndEvenSignal = False	#stochastic optimise weights based on objective functions; #1: maximise the signal (ie successfully uninhibited) across multiple batches (entire dataset), #2: ensure that all layer neurons receive even activation across multiple batches (entire dataset)	
 learningAlgorithmShufflePermanence = False	#increase the permanence of uninhibited neuron weights, and stocastically modify weights based on their impermanence
@@ -52,7 +52,7 @@ if(learningAlgorithmStochasticCorrelation):
 elif(learningAlgorithmStochasticMaximiseAndEvenSignal):
 	learningAlgorithmStochastic = True
 	
-#supportSkipLayers = True #fully connected skip layer network	#TODO: add support for skip layers	#see ANNtf2_algorithmFBANN for template
+supportSkipLayers = False #fully connected skip layer network	#TODO: add support for skip layers	#see ANNtf2_algorithmFBANN for template
 
 #forward excitatory connections;
 W = {}
@@ -61,6 +61,7 @@ if(learningAlgorithmStochastic):
 	Wbackup = {}
 	Bbackup = {}
 useBinaryWeights = False
+
 
 positiveExcitatoryWeights = True	#required for biological plausibility of most learningAlgorithms
 if(positiveExcitatoryWeights):
@@ -90,15 +91,26 @@ AthresholdValue = 1.0	#do not allow output signal to exceed 1.0
 
 learningRate = 0.0	#defined by defineTrainingParametersLIANN
 
-if(learningAlgorithmPCAsimulation):
+generateDeepNetwork = False
+generateVeryLargeNetwork = False
+
+if(learningAlgorithmCorrelation):
+	#note learningAlgorithmCorrelation requires supportSkipLayers - see LIANNtf_algorithmIndependentInput/AEANNtf_algorithmIndependentInput:learningAlgorithmLIANN for similar implementation
+	#positiveExcitatoryWeights optional	
+	enableInhibitionTrainSpecificLayerOnly = True	#optional?
+	applyInhibitoryNetworkDuringTest = False
+	randomlyActivateWeightsDuringTrain = False
+	supportDimensionalityReductionRandomise = True
+	maxCorrelation = 0.95
+	generateDeepNetwork = True	#optional	#used for algorithm testing
+	generateVeryLargeNetwork = True
+	generateNetworkStatic = True
+elif(learningAlgorithmPCAsimulation):
 	#positiveExcitatoryWeights optional
 	enableInhibitionTrainSpecificLayerOnly = True	#optional?
 	applyInhibitoryNetworkDuringTest = False
 	randomlyActivateWeightsDuringTrain = False
 	largeBatchSize = True	#1 PCA is performed across entire dataset [per layer]
-#elif(learningAlgorithmCorrelation):
-	#positiveExcitatoryWeights optional	
-	#INCOMPLETE
 elif(learningAlgorithmShuffle):
 	#positiveExcitatoryWeights optional
 	inhibitionAlgorithmArtificialMoreThanXLateralNeuronActive = True	#mandatory
@@ -249,7 +261,10 @@ def defineTrainingParameters(dataset):
 			batchSize = 1000	#current implementation: batch size should contain all examples in training set
 		else:
 			batchSize = 100	#3	#100
-	numEpochs = 10	#100 #10
+	if(generateDeepNetwork):
+		numEpochs = 100	#higher num epochs required for convergence
+	else:
+		numEpochs = 10	#100 #10
 	if(debugFastTrain):
 		trainingSteps = batchSize
 	else:
@@ -268,8 +283,20 @@ def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFea
 	global numberOfNetworks
 	if(not inhibitionAlgorithmArtificial):
 		global In_h
-	
-	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworksSet, generateLargeNetwork=generateLargeNetwork, generateNetworkStatic=generateNetworkStatic)
+
+	if(generateVeryLargeNetwork):
+		firstHiddenLayerNumberNeurons = num_input_neurons*10
+	else:
+		if(generateLargeNetwork):
+			firstHiddenLayerNumberNeurons = num_input_neurons*3
+		else:
+			firstHiddenLayerNumberNeurons = num_input_neurons
+	if(generateDeepNetwork):
+		numberOfLayers = 3
+	else:
+		numberOfLayers = 2
+	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworksSet, numberOfLayers, firstHiddenLayerNumberNeurons, generateNetworkStatic)		
+	#n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = ANNtf2_operations.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworksSet, generateLargeNetwork=generateLargeNetwork, generateNetworkStatic=generateNetworkStatic)
 	
 	if(not inhibitionAlgorithmArtificial):
 		if(singleInhibitoryNeuronPerLayer):
@@ -418,9 +445,9 @@ def neuralNetworkPropagationLIANN(x, networkIndex=1, trainWeights=False, layerTo
 			if(trainLayer):
 				#CHECKTHIS: verify learning algorithm (how to modify weights to maximise independence between neurons on each layer)
 
-				#if(learningAlgorithmCorrelation):
-				#	correlation, Aerror = forwardIterationInhibitionMeasureCorrelation(networkIndex, AprevLayer, l)
-				if(learningAlgorithmPCAsimulation):
+				if(learningAlgorithmCorrelation):
+					neuralNetworkPropagationLIANNlearningAlgorithmCorrelation(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
+				elif(learningAlgorithmPCAsimulation):
 					neuralNetworkPropagationLIANNlearningAlgorithmPCAsimulation(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
 				elif(learningAlgorithmShuffle):
 					neuralNetworkPropagationLIANNlearningAlgorithmShuffle(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
@@ -442,6 +469,14 @@ def neuralNetworkPropagationLIANN(x, networkIndex=1, trainWeights=False, layerTo
 			ZprevLayer = Z
 
 	return tf.nn.softmax(Z)
+
+def neuralNetworkPropagationLIANNlearningAlgorithmCorrelation(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights):
+
+	A, Z, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l)
+	
+	#measure and minimise correlation between layer neurons;
+	ANNtf2_algorithmLIANN_math.neuronActivationCorrelationMinimisation(networkIndex, n_h, l, A, randomNormal, Wf=W, Wfname="W", Wb=None, Wbname=None, updateAutoencoderBackwardsWeights=False, supportSkipLayers=supportSkipLayers, supportDimensionalityReductionRandomise=supportDimensionalityReductionRandomise, maxCorrelation=maxCorrelation)
+
 
 def neuralNetworkPropagationLIANNlearningAlgorithmPCAsimulation(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights):
 	#Afinal, Zfinal, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)	#batched
@@ -767,18 +802,6 @@ def forwardIterationInhibition(networkIndex, AprevLayer, ZprevLayer, l, A, Z):
 		
 	return Afinal, Zfinal
 
-#def forwardIterationDetectIndependentNeurons(networkIndex, AprevLayer, l):
-#def forwardIterationInhibitionMeasureCorrelation(networkIndex, AprevLayer, l):
-#	#INCOMPLETE
-#	
-#	A, Z, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l)
-#	
-#	#measure correlation between layer neurons
-#	meanCorrelation = calculateCorrelationMean(A)
-#	#want to adjust the weights to minimise the correlations
-#	Aerror = None
-#	
-#	return meanCorrelation, Aerror
 
 									
 def learningAlgorithmStochasticCalculateMetric(networkIndex, AprevLayer, ZprevLayer, l):
