@@ -23,15 +23,20 @@ from ANNtf2_operations import *	#generateParameterNameSeq, generateParameterName
 import ANNtf2_operations
 import ANNtf2_globalDefs
 
-supportSkipLayers = True
-
 debugOnlyTrainFinalLayer = False
 debugSingleLayerNetwork = False
-
 debugFastTrain = False
+
+supportMultipleNetworks = True
+
+supportSkipLayers = True
+
 
 W = {}
 B = {}
+if(supportMultipleNetworks):
+	WallNetworksFinalLayer = None
+	BallNetworksFinalLayer = None
 if(supportSkipLayers):
 	Ztrace = {}
 	Atrace = {}
@@ -149,18 +154,42 @@ def defineNeuralNetworkParameters():
 
 			#print("Wlayer = ", W[generateParameterNameNetwork(networkIndex, l1, "W")])
 
+	if(supportMultipleNetworks):
+		if(numberOfNetworks > 1):
+			global WallNetworksFinalLayer
+			global BallNetworksFinalLayer
+			WlayerF = randomNormal([n_h[numberOfLayers-1]*numberOfNetworks, n_h[numberOfLayers]])
+			WallNetworksFinalLayer = tf.Variable(WlayerF)
+			BlayerF = tf.zeros(n_h[numberOfLayers])
+			BallNetworksFinalLayer= tf.Variable(BlayerF)	#not currently used
+					
 def neuralNetworkPropagation(x, networkIndex=1):
 	return neuralNetworkPropagationANN(x, networkIndex)
-	
-def neuralNetworkPropagationANN(x, networkIndex=1):
+
+def neuralNetworkPropagationLayer(x, networkIndex=1, l=None):
+	return neuralNetworkPropagationANN(x, networkIndex, l)
+
+#if(supportMultipleNetworks):
+def neuralNetworkPropagationAllNetworksFinalLayer(AprevLayer):
+	Z = tf.add(tf.matmul(AprevLayer, WallNetworksFinalLayer), BallNetworksFinalLayer)	
+	#Z = tf.matmul(AprevLayer, WallNetworksFinalLayer)	
+	pred = tf.nn.softmax(Z)	
+	return pred
+		
+def neuralNetworkPropagationANN(x, networkIndex=1, l=None):
 			
 	#print("numberOfLayers", numberOfLayers)
-	
+
+	if(l == None):
+		maxLayer = numberOfLayers
+	else:
+		maxLayer = l
+			
 	AprevLayer = x
 	if(supportSkipLayers):
 		Atrace[generateParameterNameNetwork(networkIndex, 0, "Atrace")] = AprevLayer
 	
-	for l1 in range(1, numberOfLayers+1):
+	for l1 in range(1, maxLayer+1):
 		if(supportSkipLayers):
 			Z = tf.zeros(Ztrace[generateParameterNameNetwork(networkIndex, l1, "Ztrace")].shape)
 			for l2 in range(0, l1):
@@ -183,9 +212,11 @@ def neuralNetworkPropagationANN(x, networkIndex=1):
 		Atrace[generateParameterNameNetwork(networkIndex, l1, "Atrace")] = A
 						
 		AprevLayer = A
-	
-	return tf.nn.softmax(Z)
 
+	if(maxLayer == numberOfLayers):
+		return tf.nn.softmax(Z)
+	else:
+		return A
 
 def activationFunction(Z):
 	A = tf.nn.relu(Z)

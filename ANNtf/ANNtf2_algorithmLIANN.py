@@ -30,6 +30,8 @@ import copy
 debugFastTrain = False
 debugSmallBatchSize = False	#small batch size for debugging matrix output
 
+supportMultipleNetworks = True
+
 largeBatchSize = False
 generateLargeNetwork = False	#large number of layer neurons is required for learningAlgorithmHebbian:useZAcoincidenceMatrix
 generateNetworkStatic = False
@@ -57,6 +59,9 @@ supportSkipLayers = False #fully connected skip layer network	#TODO: add support
 #forward excitatory connections;
 W = {}
 B = {}
+if(supportMultipleNetworks):
+	WallNetworksFinalLayer = None
+	BallNetworksFinalLayer = None
 if(learningAlgorithmStochastic):
 	Wbackup = {}
 	Bbackup = {}
@@ -355,11 +360,23 @@ def defineNeuralNetworkParameters():
 				IBi[generateParameterNameNetwork(networkIndex, l, "IBi")] = tf.Variable(IBilayer)
 				IWo[generateParameterNameNetwork(networkIndex, l, "IWo")] = tf.Variable(IWolayer)
 
+	if(supportMultipleNetworks):
+		if(numberOfNetworks > 1):
+			global WallNetworksFinalLayer
+			global BallNetworksFinalLayer
+			WlayerF = randomNormal([n_h[numberOfLayers-1]*numberOfNetworks, n_h[numberOfLayers]])
+			WallNetworksFinalLayer =  tf.Variable(WlayerF)
+			Blayer = tf.zeros(n_h[numberOfLayers])
+			BallNetworksFinalLayer	= tf.Variable(Blayer)	#not currently used
+					
 def neuralNetworkPropagation(x, networkIndex=1):
 	return neuralNetworkPropagationLIANNtest(x, networkIndex)
-	
-def neuralNetworkPropagationLIANNtest(x, networkIndex=1):
-	return neuralNetworkPropagationLIANNminimal(x, networkIndex)
+
+def neuralNetworkPropagationLIANNtest(x, networkIndex=1, l=None):
+	return neuralNetworkPropagationLIANNminimal(x, networkIndex, l)
+
+def neuralNetworkPropagationLayer(x, networkIndex=1, l=None):
+	return neuralNetworkPropagationLIANNminimal(x, networkIndex, l)
 	#return neuralNetworkPropagationLIANN(x, None, networkIndex, trainWeights=False)
 
 def neuralNetworkPropagationLIANNtrain(x, networkIndex=1):
@@ -369,17 +386,29 @@ def neuralNetworkPropagationLIANNtrain(x, networkIndex=1):
 				return neuralNetworkPropagationLIANN(x, networkIndex, trainWeights=True, layerToTrain=l)
 	else:
 		return neuralNetworkPropagationLIANN(x, networkIndex, trainWeights=True, layerToTrain=None)	
-	
 
+#if(supportMultipleNetworks):
+def neuralNetworkPropagationAllNetworksFinalLayer(AprevLayer):
+	Z = tf.add(tf.matmul(AprevLayer, WallNetworksFinalLayer), BallNetworksFinalLayer)	
+	#Z = tf.matmul(AprevLayer, WallNetworksFinalLayer)	
+	pred = tf.nn.softmax(Z)	
+	return pred
+	
+	
 #minimal code extracted from neuralNetworkPropagationLIANN;
-def neuralNetworkPropagationLIANNminimal(x, networkIndex=1):
+def neuralNetworkPropagationLIANNminimal(x, networkIndex=1, l=None):
 
 	enableInhibition = False
 	randomlyActivateWeights = False
-	
+
+	if(l == None):
+		maxLayer = numberOfLayers
+	else:
+		maxLayer = l
+		
 	AprevLayer = x
 	ZprevLayer = x
-	for l in range(1, numberOfLayers+1):
+	for l in range(1, maxLayer+1):
 					
 		A, Z, _ = forwardIteration(networkIndex, AprevLayer, ZprevLayer, l, enableInhibition, randomlyActivateWeights)
 
@@ -389,7 +418,10 @@ def neuralNetworkPropagationLIANNminimal(x, networkIndex=1):
 		AprevLayer = A
 		ZprevLayer = Z
 
-	return tf.nn.softmax(Z)
+	if(maxLayer == numberOfLayers):
+		return tf.nn.softmax(Z)
+	else:
+		return A
 	
 def neuralNetworkPropagationLIANN(x, networkIndex=1, trainWeights=False, layerToTrain=None):
 

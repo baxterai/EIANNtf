@@ -96,13 +96,6 @@ debugUseSmallPOStagSequenceDataset = True	#def:False	#switch increases performan
 useSmallSentenceLengths = True	#def:False	#switch increases performance during development	#eg data-simple-POStagSentence-smallBackup
 trainMultipleFiles = False	#def:True	#switch increases performance during development	#eg data-POStagSentence
 trainMultipleNetworks = False	#trial improve classification accuracy by averaging over multiple independently trained networks (test)
-numberOfNetworks = 1
-if(algorithm == "ANN"):
-	#trainMultipleNetworks = True	#optional
-	if(trainMultipleNetworks):
-		numberOfNetworks = 5
-	else:
-		numberOfNetworks = 1
 
 if(trainMultipleFiles):
 	randomiseFileIndexParse = True
@@ -121,34 +114,33 @@ else:
 
 if(algorithm == "ANN"):
 	dataset = "SmallDataset"
-	#trainMultipleNetworks = True	#default: False
-	#numberOfNetworks = 3	#default: 1	
+	trainMultipleNetworks = False	#default: False		#optional
 elif(algorithm == "LREANN"):
 	dataset = "SmallDataset"
-	#trainMultipleNetworks = True	#default: False
-	#numberOfNetworks = 5	#default: 1
+	#trainMultipleNetworks = False	#not currently supported
 	trainHebbianBackprop = False	#default: False
 elif(algorithm == "FBANN"):
 	dataset = "SmallDataset"
-	#trainMultipleNetworks = True	#default: False
-	#numberOfNetworks = 5	#default: 1
+	#trainMultipleNetworks = False	#not currently supported
 elif(algorithm == "EIANN"):
 	dataset = "SmallDataset"
-	#trainMultipleNetworks = True	#default: False
-	#numberOfNetworks = 3	#default: 1		
+	#trainMultipleNetworks = False	#not currently supported
 elif(algorithm == "BAANN"):
 	dataset = "SmallDataset"
-	#trainMultipleNetworks = True	#default: False
-	#numberOfNetworks = 3	#default: 1		
+	#trainMultipleNetworks = False	#not currently supported
 elif(algorithm == "LIANN"):
 	dataset = "SmallDataset"
-	#trainMultipleNetworks = True	#default: False
-	#numberOfNetworks = 3	#default: 1		
+	trainMultipleNetworks = False	#default: False	#optional
 elif(algorithm == "AEANN"):
 	dataset = "SmallDataset"
-	#trainMultipleNetworks = True	#default: False
-	#numberOfNetworks = 3	#default: 1				
-		
+	#trainMultipleNetworks = False	#not currently supported
+
+numberOfNetworks = 1
+if(trainMultipleNetworks):
+	numberOfNetworks = 5
+else:
+	numberOfNetworks = 1
+				
 if(dataset == "SmallDataset"):
 	smallDatasetIndex = 0 #default: 0 (New Thyroid)
 	#trainMultipleFiles = False	#required
@@ -197,13 +189,19 @@ def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFea
 def defineNeuralNetworkParameters():
 	return ANNtf2_algorithm.defineNeuralNetworkParameters()
 
+#define default forward prop function for backprop weights optimisation;
+def neuralNetworkPropagation(x, networkIndex=1):
+	return ANNtf2_algorithm.neuralNetworkPropagation(x, networkIndex)
+	
 #define default forward prop function for test (identical to below);
 def neuralNetworkPropagationTest(test_x, networkIndex=1):
 	return ANNtf2_algorithm.neuralNetworkPropagation(test_x, networkIndex)
 
-#define default forward prop function for backprop weights optimisation;
-def neuralNetworkPropagation(x, networkIndex=1, l=None):
-	return ANNtf2_algorithm.neuralNetworkPropagation(x, networkIndex)
+#if(ANNtf2_algorithm.supportMultipleNetworks):
+def neuralNetworkPropagationLayer(x, networkIndex, l):
+	return ANNtf2_algorithm.neuralNetworkPropagationLayer(x, networkIndex, l)
+def neuralNetworkPropagationAllNetworksFinalLayer(x):
+	return ANNtf2_algorithm.neuralNetworkPropagationAllNetworksFinalLayer(x)
 
 
 #define specific learning algorithms (non-backprop);
@@ -235,6 +233,7 @@ def executeLearningLREANN_expXUANN(x, y, samplePositiveX, samplePositiveY, sampl
 	pred = ANNtf2_algorithm.neuralNetworkPropagationLREANN_expXUANNtrain(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex)
 
 #algorithm !LREANN:
+#parameter l is only currently used for algorithm AEANN
 def trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex, costCrossEntropyWithLogits, display, l=None):
 	
 	if(algorithm == "ANN"):
@@ -262,15 +261,12 @@ def trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, op
 		#for l in range(1, numberOfLayers+1):
 		executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex, l=l)
 
-	pred = None
 	if(display):
 		loss, acc = calculatePropagationLoss(batchX, batchY, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex, l)
-		if(l is not None):
+		if(algorithm == "AEANN"):	#if(l is not None):
 			print("l: %i, networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (l, networkIndex, batchIndex, loss, acc))			
 		else:
 			print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
-
-	return pred
 			
 def executeLearningEIANN(x, y, networkIndex):
 	#first learning algorithm: perform neuron independence training
@@ -282,7 +278,8 @@ def executeLearningLIANN(x, y, networkIndex):
 #	#first learning algorithm: perform neuron independence training
 #	pred = ANNtf2_algorithm.neuralNetworkPropagationAEANNtrain(x, networkIndex)
 
-		
+
+#parameter l is only currently used for algorithm AEANN
 def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, networkIndex=1, l=None):
 	with tf.GradientTape() as gt:
 		loss, acc = calculatePropagationLoss(x, y, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex, l)
@@ -459,8 +456,9 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 			   print("!BlayerSignCheck, l = ", l)
 			   print("neuronEI = ", neuronEI)
 			   print("Blayer = ", Blayer)
-						
 
+
+#parameter l is only currently used for algorithm AEANN
 def calculatePropagationLoss(x, y, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex=1, l=None):
 	acc = 0	#only valid for softmax class targets 
 	if(algorithm == "AEANN"):
@@ -480,14 +478,81 @@ def calculatePropagationLoss(x, y, datasetNumClasses, numberOfLayers, costCrossE
 			#print("pred = ", pred)
 			#print("1 loss = ", loss)
 	else:
-		pred = neuralNetworkPropagation(x, networkIndex, l)
+		pred = neuralNetworkPropagation(x, networkIndex)
 		target = y
 		loss = calculateLossCrossEntropy(pred, target, datasetNumClasses, costCrossEntropyWithLogits)	
 		acc = calculateAccuracy(pred, target)	#only valid for softmax class targets 
 
 	return loss, acc
+
+
+
+#if(ANNtf2_algorithm.supportMultipleNetworks):
+
+def testBatchAllNetworksFinalLayer(batchX, batchY, datasetNumClasses, numberOfLayers):
+	
+	AfinalHiddenLayerList = []
+	for networkIndex in range(1, numberOfNetworks+1):
+		AfinalHiddenLayer = neuralNetworkPropagationLayer(batchX, networkIndex, numberOfLayers-1)
+		AfinalHiddenLayerList.append(AfinalHiddenLayer)	
+	AfinalHiddenLayerTensor = tf.concat(AfinalHiddenLayerList, axis=1)
+	#print("AfinalHiddenLayerTensor = ", AfinalHiddenLayerTensor)
+	
+	pred = neuralNetworkPropagationAllNetworksFinalLayer(AfinalHiddenLayerTensor)
+	acc = calculateAccuracy(pred, batchY)
+	print("Combined network: Test Accuracy: %f" % (acc))
+	
+def trainBatchAllNetworksFinalLayer(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, costCrossEntropyWithLogits, display):
+	
+	AfinalHiddenLayerList = []
+	for networkIndex in range(1, numberOfNetworks+1):
+		AfinalHiddenLayer = neuralNetworkPropagationLayer(batchX, networkIndex, numberOfLayers-1)
+		AfinalHiddenLayerList.append(AfinalHiddenLayer)	
+	AfinalHiddenLayerTensor = tf.concat(AfinalHiddenLayerList, axis=1)
+	#print("AfinalHiddenLayerTensor = ", AfinalHiddenLayerTensor)
+	#print("AfinalHiddenLayerTensor.shape = ", AfinalHiddenLayerTensor.shape)
+	
+	executeOptimisationAllNetworksFinalLayer(AfinalHiddenLayerTensor, batchY, datasetNumClasses, optimizer)
+
+	pred = None
+	if(display):
+		loss, acc = calculatePropagationLossAllNetworksFinalLayer(AfinalHiddenLayerTensor, batchY, datasetNumClasses, costCrossEntropyWithLogits)
+		print("Combined network: batchIndex: %i, loss: %f, accuracy: %f" % (batchIndex, loss, acc))
+						
+def executeOptimisationAllNetworksFinalLayer(x, y, datasetNumClasses, optimizer):
+	with tf.GradientTape() as gt:
+		loss, acc = calculatePropagationLossAllNetworksFinalLayer(x, y, datasetNumClasses, costCrossEntropyWithLogits)
+		
+	Wlist = []
+	Blist = []
+	Wlist.append(ANNtf2_algorithm.WallNetworksFinalLayer)
+	Blist.append(ANNtf2_algorithm.BallNetworksFinalLayer)
+	trainableVariables = Wlist + Blist
+
+	gradients = gt.gradient(loss, trainableVariables)
+						
+	if(suppressGradientDoNotExistForVariablesWarnings):
+		optimizer.apply_gradients([
+    		(grad, var) 
+    		for (grad, var) in zip(gradients, trainableVariables) 
+    		if grad is not None
+			])
+	else:
+		optimizer.apply_gradients(zip(gradients, trainableVariables))
+			
+def calculatePropagationLossAllNetworksFinalLayer(x, y, datasetNumClasses, costCrossEntropyWithLogits):
+	acc = 0	#only valid for softmax class targets 
+	#print("x = ", x)
+	pred = neuralNetworkPropagationAllNetworksFinalLayer(x)
+	#print("calculatePropagationLossAllNetworksFinalLayer: pred.shape = ", pred.shape)
+	target = y
+	loss = calculateLossCrossEntropy(pred, target, datasetNumClasses, costCrossEntropyWithLogits)	
+	acc = calculateAccuracy(pred, target)	#only valid for softmax class targets 
+
+	return loss, acc
 	
 	
+		
 def loadDataset(fileIndex):
 
 	global numberOfFeaturesPerWord
@@ -651,37 +716,21 @@ def train(trainMultipleNetworks=False, trainMultipleFiles=False, greedy=False):
 					(batchX, batchY) = trainDataListIterators[trainDataIndex].get_next()	#next(trainDataListIterators[trainDataIndex])
 					batchYactual = batchY
 					
-					#trainMultipleNetworks code;
-					predNetworkAverage = tf.Variable(tf.zeros(datasetNumClasses))
 					for networkIndex in range(1, maxNetwork+1):
-
 						display = False
 						#if(l == maxLayer):	#only print accuracy after training final layer
 						if(batchIndex % displayStep == 0):
 							display = True	
-						pred = trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex, costCrossEntropyWithLogits, display, l)
-						if(pred is not None):
-							predNetworkAverage = predNetworkAverage + pred
+						trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex, costCrossEntropyWithLogits, display, l)
 						
 					#trainMultipleNetworks code;
 					if(trainMultipleNetworks):
-						if(display):
-							predNetworkAverage = predNetworkAverage / numberOfNetworks
-							loss = calculateLossCrossEntropy(predNetworkAverage, batchYactual, datasetNumClasses, costCrossEntropyWithLogits)
-							acc = calculateAccuracy(predNetworkAverage, batchYactual)
-							print("batchIndex: %i, loss: %f, accuracy: %f" % (batchIndex, loss, acc))	
+						#train combined network final layer
+						trainBatchAllNetworksFinalLayer(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, costCrossEntropyWithLogits, display)
 
 				#trainMultipleNetworks code;
 				if(trainMultipleNetworks):
-					predNetworkAverageAll = tf.Variable(tf.zeros([testBatchY.shape[0], datasetNumClasses]))
-					for networkIndex in range(1, numberOfNetworks+1):
-						pred = neuralNetworkPropagationTest(testBatchX, networkIndex)
-						print("Test Accuracy: networkIndex: %i, %f" % (networkIndex, calculateAccuracy(pred, testBatchY)))
-						predNetworkAverageAll = predNetworkAverageAll + pred
-					predNetworkAverageAll = predNetworkAverageAll / numberOfNetworks
-					#print("predNetworkAverageAll", predNetworkAverageAll)
-					acc = calculateAccuracy(predNetworkAverageAll, testBatchY)
-					print("Test Accuracy: %f" % (acc))
+					testBatchAllNetworksFinalLayer(testBatchX, testBatchY, datasetNumClasses, numberOfLayers)
 				else:
 					pred = neuralNetworkPropagationTest(testBatchX, networkIndex)
 					if(greedy):
@@ -906,7 +955,10 @@ if __name__ == "__main__":
 		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_x, train_y, test_x, test_y = loadDataset(fileIndexTemp)
 		ANNtf2_algorithm.BAANNmain(train_x, train_y, test_x, test_y, datasetNumFeatures, datasetNumClasses, batchSize, trainingSteps, numEpochs)
 	elif(algorithm == "LIANN"):
-		trainMinimal()
+		if(trainMultipleNetworks):
+			train(trainMultipleNetworks=trainMultipleNetworks)
+		else:
+			trainMinimal()
 	elif(algorithm == "AEANN"):
 		train(greedy=True)
 	else:
