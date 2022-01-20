@@ -112,34 +112,40 @@ else:
 #if onlyAddPOSunambiguousInputToTrain=True, do not train network with ambiguous POS possibilities
 #if generatePOSunambiguousInput=False and onlyAddPOSunambiguousInputToTrain=False, requires simultaneous propagation of different (ambiguous) POS possibilities
 
+numberOfNetworks = 1
+trainMultipleNetworks = False
+
 if(algorithm == "ANN"):
 	dataset = "SmallDataset"
 	trainMultipleNetworks = False	#default: False		#optional
+	if(trainMultipleNetworks):
+		numberOfNetworks = 5
 elif(algorithm == "LREANN"):
 	dataset = "SmallDataset"
-	#trainMultipleNetworks = False	#not currently supported
+	#trainMultipleNetworks not currently supported
 	trainHebbianBackprop = False	#default: False
 elif(algorithm == "FBANN"):
 	dataset = "SmallDataset"
-	#trainMultipleNetworks = False	#not currently supported
+	#trainMultipleNetworks not currently supported
 elif(algorithm == "EIANN"):
 	dataset = "SmallDataset"
-	#trainMultipleNetworks = False	#not currently supported
+	#trainMultipleNetworks not currently supported
 elif(algorithm == "BAANN"):
 	dataset = "SmallDataset"
-	#trainMultipleNetworks = False	#not currently supported
+	#trainMultipleNetworks not currently supported
 elif(algorithm == "LIANN"):
 	dataset = "SmallDataset"
-	trainMultipleNetworks = False	#default: False	#optional
+	if(ANNtf2_algorithm.learningAlgorithmNone):
+		trainMultipleNetworks = False	#optional
+		if(trainMultipleNetworks):
+			#numberOfNetworks = 10
+			numberOfNetworks = int(100/ANNtf2_algorithm.generateLargeNetworkRatio)	#normalise the number of networks based on the network layer size
+			if(numberOfNetworks == 1):	#train at least 2 networks (required for tensorflow code execution consistency)
+				trainMultipleNetworks = False
 elif(algorithm == "AEANN"):
 	dataset = "SmallDataset"
 	#trainMultipleNetworks = False	#not currently supported
 
-numberOfNetworks = 1
-if(trainMultipleNetworks):
-	numberOfNetworks = 5
-else:
-	numberOfNetworks = 1
 				
 if(dataset == "SmallDataset"):
 	smallDatasetIndex = 0 #default: 0 (New Thyroid)

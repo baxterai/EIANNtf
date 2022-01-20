@@ -100,6 +100,7 @@ randomlyActivateWeightsDuringTrain = False
 #learning algorithm customisation;
 supportDimensionalityReductionLimitFrequency = False
 if(learningAlgorithmNone):
+	#can pass different task datasets through a shared randomised net
 	#note learningAlgorithmCorrelation requires supportSkipLayers - see LIANNtf_algorithmIndependentInput/AEANNtf_algorithmIndependentInput:learningAlgorithmLIANN for similar implementation
 	#positiveExcitatoryWeights = True	#optional
 	generateDeepNetwork = True	#optional	#used for algorithm testing
@@ -213,6 +214,13 @@ elif(learningAlgorithmHebbian):
 	maxWeightUpdateThreshold = False	#max threshold weight updates to learningRate	
 	#TODO: ensure learning algorithm does not result in runnaway weight increases
 
+if(generateVeryLargeNetwork):
+	generateLargeNetworkRatio = 100	#100	#default: 10
+else:
+	if(generateLargeNetwork):
+		generateLargeNetworkRatio = 3
+	else:
+		generateLargeNetworkRatio = 1
 
 positiveExcitatoryWeightsActivationFunctionOffset = False
 if(positiveExcitatoryWeights):
@@ -311,13 +319,7 @@ def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFea
 	if(not inhibitionAlgorithmArtificial):
 		global In_h
 
-	if(generateVeryLargeNetwork):
-		firstHiddenLayerNumberNeurons = num_input_neurons*10
-	else:
-		if(generateLargeNetwork):
-			firstHiddenLayerNumberNeurons = num_input_neurons*3
-		else:
-			firstHiddenLayerNumberNeurons = num_input_neurons
+	firstHiddenLayerNumberNeurons = num_input_neurons*generateLargeNetworkRatio
 	if(generateDeepNetwork):
 		numberOfLayers = 3
 	else:
