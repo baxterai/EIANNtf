@@ -38,12 +38,12 @@ from numpy import random
 import ANNtf2_loadDataset
 
 #select algorithm:
-algorithm = "ANN"	#standard artificial neural network (backprop)
+#algorithm = "ANN"	#standard artificial neural network (backprop)
 #algorithm = "LREANN"	#learning rule experiment artificial neural network
 #algorithm = "FBANN"	#feedback artificial neural network (reverse connectivity)	#incomplete
 #algorithm = "EIANN"	#excitatory/inhibitory artificial neural network	#incomplete+non-convergent
 #algorithm = "BAANN"	#breakaway artificial neural network
-#algorithm = "LIANN"	#local inhibition artificial neural network	#incomplete+non-convergent
+algorithm = "LIANN"	#local inhibition artificial neural network	#incomplete+non-convergent
 #algorithm = "AEANN"	#autoencoder generated artificial neural network
 
 suppressGradientDoNotExistForVariablesWarnings = True
@@ -252,10 +252,12 @@ def trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, op
 	elif(algorithm == "LIANN"):
 		#first learning algorithm: perform neuron independence training
 		batchYoneHot = tf.one_hot(batchY, depth=datasetNumClasses)
-		executeLearningLIANN(batchX, batchYoneHot, networkIndex)
+		if(not ANNtf2_algorithm.learningAlgorithmNone):
+			executeLearningLIANN(batchIndex, batchX, batchYoneHot, networkIndex)
 		if(ANNtf2_algorithm.learningAlgorithmFinalLayerBackpropHebbian):
 			#second learning algorithm (final layer hebbian connections to output class targets):
 			executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)	
+			#print("executeOptimisation")
 	elif(algorithm == "AEANN"):
 		#print("trainMultipleFiles error: does not support greedy training for AEANN")
 		#for l in range(1, numberOfLayers+1):
@@ -271,9 +273,16 @@ def trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, op
 def executeLearningEIANN(x, y, networkIndex):
 	#first learning algorithm: perform neuron independence training
 	pred = ANNtf2_algorithm.neuralNetworkPropagationEIANNtrain(x, networkIndex)
-def executeLearningLIANN(x, y, networkIndex):
-	#first learning algorithm: perform neuron independence training
-	pred = ANNtf2_algorithm.neuralNetworkPropagationLIANNtrain(x, networkIndex)
+def executeLearningLIANN(batchIndex, x, y, networkIndex):
+	executeLIANN = False
+	if(ANNtf2_algorithm.supportDimensionalityReductionLimitFrequency):
+		if(batchIndex % ANNtf2_algorithm.supportDimensionalityReductionLimitFrequencyStep == 0):
+			executeLIANN = True
+	else:
+		executeLIANN = True
+	if(executeLIANN):
+		#first learning algorithm: perform neuron independence training
+		pred = ANNtf2_algorithm.neuralNetworkPropagationLIANNtrain(x, networkIndex)
 #def executeLearningAEANN(x, y, networkIndex):
 #	#first learning algorithm: perform neuron independence training
 #	pred = ANNtf2_algorithm.neuralNetworkPropagationAEANNtrain(x, networkIndex)
@@ -482,7 +491,11 @@ def calculatePropagationLoss(x, y, datasetNumClasses, numberOfLayers, costCrossE
 		target = y
 		loss = calculateLossCrossEntropy(pred, target, datasetNumClasses, costCrossEntropyWithLogits)	
 		acc = calculateAccuracy(pred, target)	#only valid for softmax class targets 
-
+		#print("x = ", x)
+		#print("y = ", y)
+		#print("2 loss = ", loss)
+		#print("2 acc = ", acc)
+			
 	return loss, acc
 
 
@@ -631,7 +644,7 @@ def trainMinimal():
 		for trainData in trainDataList:
 			trainDataListIterators.append(iter(trainData))
 		testBatchX, testBatchY = generateTFbatch(test_x, test_y, batchSize)
-		
+
 		for batchIndex in range(int(trainingSteps)):
 			(batchX, batchY) = trainDataListIterators[trainDataIndex].get_next()	#next(trainDataListIterators[trainDataIndex])
 			batchYactual = batchY
