@@ -18,7 +18,7 @@ conda install scikit-learn (ANNtf2_algorithmLIANN_math:SVD/PCA only)
 python3 ANNtf2.py
 
 # Description:
-ANNtf - train an experimental artificial neural network (ANN/LREANN/FBANN/EIANN/BAANN/LIANN/AEANN)
+ANNtf - train an experimental artificial neural network (ANN/FBANN/EIANN/BAANN/LIANN/AEANN)
 
 """
 
@@ -38,12 +38,11 @@ from numpy import random
 import ANNtf2_loadDataset
 
 #select algorithm:
-#algorithm = "ANN"	#standard artificial neural network (backprop)
-#algorithm = "LREANN"	#learning rule experiment artificial neural network
+algorithm = "ANN"	#standard artificial neural network (backprop)
 #algorithm = "FBANN"	#feedback artificial neural network (reverse connectivity)	#incomplete
 #algorithm = "EIANN"	#excitatory/inhibitory artificial neural network	#incomplete+non-convergent
 #algorithm = "BAANN"	#breakaway artificial neural network
-algorithm = "LIANN"	#local inhibition artificial neural network	#incomplete+non-convergent
+#algorithm = "LIANN"	#local inhibition artificial neural network	#incomplete+non-convergent
 #algorithm = "AEANN"	#autoencoder generated artificial neural network
 
 suppressGradientDoNotExistForVariablesWarnings = True
@@ -51,32 +50,6 @@ suppressGradientDoNotExistForVariablesWarnings = True
 costCrossEntropyWithLogits = False
 if(algorithm == "ANN"):
 	import ANNtf2_algorithmANN as ANNtf2_algorithm
-elif(algorithm == "LREANN"):
-	#select algorithmLREANN:
-	#algorithmLREANN = "LREANN_expHUANN"	#incomplete+non-convergent
-	#algorithmLREANN = "LREANN_expSUANN"	
-	#algorithmLREANN = "LREANN_expAUANN"	#incomplete+non-convergent
-	#algorithmLREANN = "LREANN_expCUANN"	#incomplete+non-convergent
-	#algorithmLREANN = "LREANN_expXUANN"	#incomplete
-	#algorithmLREANN = "LREANN_expMUANN"	#incomplete+non-convergent
-	algorithmLREANN = "LREANN_expRUANN"
-	if(algorithmLREANN == "LREANN_expHUANN"):
-		import ANNtf2_algorithmLREANN_expHUANN as ANNtf2_algorithm
-	elif(algorithmLREANN == "LREANN_expSUANN"):
-		import ANNtf2_algorithmLREANN_expSUANN as ANNtf2_algorithm
-	elif(algorithmLREANN == "LREANN_expAUANN"):
-		import ANNtf2_algorithmLREANN_expAUANN as ANNtf2_algorithm
-	elif(algorithmLREANN == "LREANN_expCUANN"):
-		import ANNtf2_algorithmLREANN_expCUANN as ANNtf2_algorithm
-	elif(algorithmLREANN == "LREANN_expXUANN"):
-		XUANNnegativeSamplesComplement = False	#default: True
-		XUANNnegativeSamplesAll = False	#default: False #orig implementation
-		XUANNnegativeSamplesRandom = True	#default: False 
-		import ANNtf2_algorithmLREANN_expXUANN as ANNtf2_algorithm
-	elif(algorithmLREANN == "LREANN_expMUANN"):
-		import ANNtf2_algorithmLREANN_expMUANN as ANNtf2_algorithm		
-	elif(algorithmLREANN == "LREANN_expRUANN"):
-		import ANNtf2_algorithmLREANN_expRUANN as ANNtf2_algorithm
 elif(algorithm == "FBANN"):
 	import ANNtf2_algorithmFBANN as ANNtf2_algorithm
 elif(algorithm == "EIANN"):
@@ -120,10 +93,6 @@ if(algorithm == "ANN"):
 	trainMultipleNetworks = False	#default: False		#optional
 	if(trainMultipleNetworks):
 		numberOfNetworks = 5
-elif(algorithm == "LREANN"):
-	dataset = "SmallDataset"
-	#trainMultipleNetworks not currently supported
-	trainHebbianBackprop = False	#default: False
 elif(algorithm == "FBANN"):
 	dataset = "SmallDataset"
 	#trainMultipleNetworks not currently supported
@@ -210,42 +179,11 @@ def neuralNetworkPropagationAllNetworksFinalLayer(x):
 	return ANNtf2_algorithm.neuralNetworkPropagationAllNetworksFinalLayer(x)
 
 
-#define specific learning algorithms (non-backprop);
-#algorithm LREANN:
-def executeLearningLREANN(x, y, networkIndex=1):
-	if(algorithmLREANN == "LREANN_expHUANN"):
-		#learning algorithm embedded in forward propagation
-		if(trainHebbianBackprop):
-			pred = ANNtf2_algorithm.neuralNetworkPropagationLREANN_expHUANNtrain(x, y, networkIndex, trainHebbianBackprop=True, trainHebbianLastLayerSupervision=True)
-		else:
-			pred = ANNtf2_algorithm.neuralNetworkPropagationLREANN_expHUANNtrain(x, y, networkIndex, trainHebbianForwardprop=True, trainHebbianLastLayerSupervision=True)
-	elif(algorithmLREANN == "LREANN_expSUANN"):
-		#learning algorithm embedded in multiple iterations of forward propagation
-		pred = ANNtf2_algorithm.neuralNetworkPropagationLREANN_expSUANNtrain(x, y, networkIndex)
-	elif(algorithmLREANN == "LREANN_expCUANN"):
-		#learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
-		pred = ANNtf2_algorithm.neuralNetworkPropagationLREANN_expCUANNtrain(x, y, networkIndex)
-	elif(algorithmLREANN == "LREANN_expMUANN"):
-		#learning algorithm embedded in multiple forward propagation and synaptic delta calculations
-		pred = ANNtf2_algorithm.neuralNetworkPropagationLREANN_expMUANNtrain(x, y, networkIndex)
-	elif(algorithmLREANN == "LREANN_expRUANN"):
-		#learning algorithm: in reverse order, stochastically establishing Aideal of each layer (by temporarily biasing firing rate of neurons) to better achieve Aideal of higher layer (through multiple local/single layer forward propagations), then (simultaneous/parallel layer processing) stochastically adjusting weights to fine tune towards Aideal of their higher layers
-		pred = ANNtf2_algorithm.neuralNetworkPropagationLREANN_expRUANNtrain(x, y, networkIndex)
-def executeLearningLREANN_expAUANN(x, y, exemplarsX, exemplarsY, currentClassTarget, networkIndex=1):
-	#learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
-	pred = ANNtf2_algorithm.neuralNetworkPropagationLREANN_expAUANNtrain(x, y, exemplarsX, exemplarsY, currentClassTarget, networkIndex)
-def executeLearningLREANN_expXUANN(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex):
-	#learning algorithm: perform contrast training (diff of interclass experience with current experience, and diff of extraclass experience with current experience) at each layer of network
-	pred = ANNtf2_algorithm.neuralNetworkPropagationLREANN_expXUANNtrain(x, y, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex)
-
-#algorithm !LREANN:
 #parameter l is only currently used for algorithm AEANN
 def trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex, costCrossEntropyWithLogits, display, l=None):
 	
 	if(algorithm == "ANN"):
 		executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)
-	elif(algorithm == "LREANN"):
-		print("trainBatch error: does not support algorithm == LREANN; use trainLRE instead")
 	elif(algorithm == "FBANN"):
 		executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)
 	elif(algorithm == "EIANN"):
@@ -345,9 +283,6 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 			trainableVariables = Wflist + Wblist + Blist
 		else:
 			trainableVariables = Wflist + Blist
-	elif(algorithm == "LREANN"):
-		print("executeOptimisation error: algorithm LREANN not supported, use executeLearningLREANN() instead")
-		exit()
 	elif(algorithm == "EIANN"):
 		Wlist = []
 		Blist = []
@@ -757,190 +692,6 @@ def train(trainMultipleNetworks=False, trainMultipleFiles=False, greedy=False):
 					else:
 						print("Test Accuracy: %f" % (calculateAccuracy(pred, testBatchY)))
 
-							
-def trainLRE():
-																
-	#generate network parameters based on dataset properties:
-
-	networkIndex = 1
-	
-	fileIndexTemp = 0	
-	numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = loadDataset(fileIndexTemp)
-
-	#Model constants
-	num_input_neurons = datasetNumFeatures  #train_x.shape[1]
-	num_output_neurons = datasetNumClasses
-	if(algorithm == "LREANN"):
-		if(algorithmLREANN == "LREANN_expAUANN"):
-			num_output_neurons = ANNtf2_algorithm.calculateOutputNeuronsLREANN_expAUANN(datasetNumClasses)
-
-	learningRate, trainingSteps, batchSize, displayStep, numEpochs = defineTrainingParameters(dataset, numberOfFeaturesPerWord, paddingTagIndex)
-	numberOfLayers = defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks, useSmallSentenceLengths, numberOfFeaturesPerWord)
-	defineNeuralNetworkParameters()
-									
-	noisySampleGeneration = False
-	if(algorithm == "LREANN"):
-		noisySampleGeneration, noisySampleGenerationNumSamples, noiseStandardDeviation = ANNtf2_algorithm.getNoisySampleGenerationNumSamples()
-		if(noisySampleGeneration):
-			batchXmultiples = tf.constant([noisySampleGenerationNumSamples, 1], tf.int32)
-			batchYmultiples = tf.constant([noisySampleGenerationNumSamples], tf.int32)
-			randomNormal = tf.initializers.RandomNormal()	#tf.initializers.RandomUniform(minval=-1, maxval=1)
-
-	#stochastic gradient descent optimizer
-	optimizer = tf.optimizers.SGD(learningRate)
-
-	for e in range(numEpochs):
-
-		print("epoch e = ", e)
-
-		fileIndex = 0
-
-		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = loadDataset(fileIndex)
-
-		shuffleSize = datasetNumExamples	#heuristic: 10*batchSize
-
-		#new iteration method (only required for algorithm == "LREANN_expAUANN/LREANN_expCUANN"):	
-		datasetNumClassesActual = datasetNumClasses
-		trainDataIndex = 0
-		
-		if(algorithm == "LREANN"):
-			if(algorithmLREANN == "LREANN_expAUANN"):
-				currentClassTarget = 0
-				generateClassTargetExemplars = False
-				if(e == 0):
-					generateClassTargetExemplars = True
-				networkIndex = 1 #note ANNtf2_algorithmLREANN_expAUANN doesn't currently support multiple networks
-				trainDataList = ANNtf2_algorithm.generateTFtrainDataFromNParraysLREANN_expAUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses)
-				exemplarDataList = ANNtf2_algorithm.generateTFexemplarDataFromNParraysLREANN_expAUANN(train_x, train_y, networkIndex, shuffleSize, batchSize, datasetNumClasses, generateClassTargetExemplars)
-				test_y = ANNtf2_algorithm.generateYActualfromYLREANN_expAUANN(test_y, num_output_neurons)
-				datasetNumClassTargets = datasetNumClasses
-				datasetNumClasses = ANNtf2_algorithm.generateNumClassesActualLREANN_expAUANN(datasetNumClasses, num_output_neurons)
-				exemplarDataListIterators = []
-				for exemplarData in exemplarDataList:
-					exemplarDataListIterators.append(iter(exemplarData))
-			elif(algorithmLREANN == "LREANN_expCUANN"):
-				trainDataList = ANNtf2_algorithm.generateTFtrainDataFromNParraysLREANN_expCUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses)
-			elif(algorithmLREANN == "LREANN_expXUANN"):
-				currentClassTarget = 0
-				generateClassTargetExemplars = False
-				if(e == 0):
-					generateClassTargetExemplars = True
-				trainDataList = ANNtf2_algorithm.generateTFtrainDataFromNParraysLREANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=True)
-				datasetNumClassTargets = datasetNumClasses
-				samplePositiveDataList = ANNtf2_algorithm.generateTFtrainDataFromNParraysLREANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=True)
-				if(XUANNnegativeSamplesComplement):
-					sampleNegativeDataList = ANNtf2_algorithm.generateTFtrainDataFromNParraysLREANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=False)					
-				elif(XUANNnegativeSamplesAll):
-					#implementation limitation (sample negative contains a selection of experiences from all classes, not just negative classes) - this simplification deemed valid under assumptions: calculations will be averaged over large negative batch and numberClasses >> 2
-					sampleNegativeData = generateTFtrainDataFromNParrays(train_x, train_y, shuffleSize, batchSize)	#CHECKTHIS
-					sampleNegativeDataList = []
-					sampleNegativeDataList.append(sampleNegativeData)
-				elif(XUANNnegativeSamplesRandom):
-					sampleNegativeDataList = ANNtf2_algorithm.generateTFtrainDataFromNParraysLREANN_expXUANN(train_x, train_y, shuffleSize, batchSize, datasetNumClasses, generatePositiveSamples=True)					
-				samplePositiveDataListIterators = []
-				for samplePositiveData in samplePositiveDataList:
-					samplePositiveDataListIterators.append(iter(samplePositiveData))
-				sampleNegativeDataListIterators = []
-				for sampleNegativeData in sampleNegativeDataList:
-					sampleNegativeDataListIterators.append(iter(sampleNegativeData))
-			else:
-				trainData = generateTFtrainDataFromNParrays(train_x, train_y, shuffleSize, batchSize)
-				trainDataList = []
-				trainDataList.append(trainData)		
-		else:
-			trainData = generateTFtrainDataFromNParrays(train_x, train_y, shuffleSize, batchSize)
-			trainDataList = []
-			trainDataList.append(trainData)
-		trainDataListIterators = []
-		for trainData in trainDataList:
-			trainDataListIterators.append(iter(trainData))
-
-		#original iteration method:
-		#trainData = generateTFtrainDataFromNParrays(train_x, train_y, shuffleSize, batchSize):	
-		#for batchIndex, (batchX, batchY) in enumerate(trainData.take(trainingSteps), 1):	
-
-		#new iteration method:			
-		#print("trainingSteps = ", trainingSteps)
-		#print("batchSize = ", batchSize)
-
-
-		for batchIndex in range(int(trainingSteps)):
-			(batchX, batchY) = trainDataListIterators[trainDataIndex].get_next()	#next(trainDataListIterators[trainDataIndex])
-
-			batchYactual = batchY
-			if(algorithm == "LREANN"):
-				if(algorithmLREANN == "LREANN_expAUANN"):
-					(exemplarsX, exemplarsY) = exemplarDataListIterators[trainDataIndex].get_next()
-					batchYactual = ANNtf2_algorithm.generateTFYActualfromYandExemplarYLREANN_expAUANN(batchY, exemplarsY)
-				if(algorithmLREANN == "LREANN_expXUANN"):
-					(samplePositiveX, samplePositiveY) = samplePositiveDataListIterators[trainDataIndex].get_next()
-					if(XUANNnegativeSamplesRandom):
-						foundTrainDataIndexNegative = False
-						while not foundTrainDataIndexNegative:
-							trainDataIndexNegative = np.random.randint(0, datasetNumClasses)
-							if(trainDataIndexNegative != trainDataIndex):
-								foundTrainDataIndexNegative = True
-						(sampleNegativeX, sampleNegativeY) = sampleNegativeDataListIterators[trainDataIndexNegative].get_next()
-					else:
-						(sampleNegativeX, sampleNegativeY) = sampleNegativeDataListIterators[trainDataIndex].get_next()
-
-			if(noisySampleGeneration):
-				if(batchSize != 1):	#batchX.shape[0]
-					print("error: noisySampleGeneration && batchSize != 1")
-					exit()
-				batchX = tf.tile(batchX, batchXmultiples)
-				batchY = tf.tile(batchY, batchYmultiples)
-				batchXnoise = tf.math.multiply(tf.constant(randomNormal(batchX.shape), tf.float32), noiseStandardDeviation)
-				batchX = tf.math.add(batchX, batchXnoise)
-				#print("batchX = ", batchX)
-				#print("batchY = ", batchY)
-
-			predNetworkAverage = tf.Variable(tf.zeros(datasetNumClasses))
-
-			#print("datasetNumClasses = ", datasetNumClasses)
-			#print("batchX.shape = ", batchX.shape)
-			#print("batchY.shape = ", batchY.shape)
-
-			#can move code to trainBatchLRE();
-			if(algorithm == "LREANN"):
-				if(algorithmLREANN == "LREANN_expHUANN"):
-					batchYoneHot = tf.one_hot(batchY, depth=datasetNumClasses)
-					executeLearningLREANN(batchX, batchYoneHot, networkIndex)
-				elif(algorithmLREANN == "LREANN_expSUANN"):
-					executeLearningLREANN(batchX, batchY, networkIndex)
-				elif(algorithmLREANN == "LREANN_expAUANN"):
-					#learning algorithm embedded in forward propagation of new class x experience following forward propagation of existing class x experience
-					executeLearningLREANN_expAUANN(batchX, batchY, exemplarsX, exemplarsY, currentClassTarget, networkIndex)
-				elif(algorithmLREANN == "LREANN_expCUANN"):
-					executeLearningLREANN(batchX, batchY, networkIndex)	#currentClassTarget
-				elif(algorithmLREANN == "LREANN_expXUANN"):
-					executeLearningLREANN_expXUANN(batchX, batchY, samplePositiveX, samplePositiveY, sampleNegativeX, sampleNegativeY, networkIndex)
-				elif(algorithmLREANN == "LREANN_expMUANN"):
-					executeLearningLREANN(batchX, batchY, networkIndex)
-				elif(algorithmLREANN == "LREANN_expRUANN"):
-					executeLearningLREANN(batchX, batchY, networkIndex)
-				if(batchIndex % displayStep == 0):
-					pred = neuralNetworkPropagation(batchX, networkIndex)
-					loss = calculateLossCrossEntropy(pred, batchYactual, datasetNumClasses, costCrossEntropyWithLogits)
-					acc = calculateAccuracy(pred, batchYactual)
-					print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
-					predNetworkAverage = predNetworkAverage + pred
-
-			if(algorithm == "LREANN"):
-				if(algorithmLREANN == "LREANN_expAUANN"):
-					#batchYactual = ANNtf2_algorithm.generateTFYActualfromYandExemplarYLREANN_expAUANN(batchY, exemplarsY)
-					currentClassTarget = currentClassTarget+1
-					if(currentClassTarget == datasetNumClassTargets):
-						currentClassTarget = 0
-					trainDataIndex = currentClassTarget
-				elif(algorithmLREANN == "LREANN_expXUANN"):
-					currentClassTarget = currentClassTarget+1
-					if(currentClassTarget == datasetNumClassTargets):
-						currentClassTarget = 0
-					trainDataIndex = currentClassTarget
-
-		pred = neuralNetworkPropagationTest(testBatchX, networkIndex)
-		print("Test Accuracy: networkIndex: %i, %f" % (networkIndex, calculateAccuracy(pred, test_y)))
 
 def generateRandomisedIndexArray(indexFirst, indexLast, arraySize=None):
 	fileIndexArray = np.arange(indexFirst, indexLast+1, 1)
@@ -961,8 +712,6 @@ if __name__ == "__main__":
 			train(trainMultipleNetworks=trainMultipleNetworks)
 		else:
 			trainMinimal()
-	elif(algorithm == "LREANN"):
-		trainLRE()
 	elif(algorithm == "FBANN"):
 		trainMinimal()		
 	elif(algorithm == "EIANN"):
