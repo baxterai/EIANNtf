@@ -33,7 +33,13 @@ import ANNtf2_globalDefs
 useTFdataset = True	#repeat and shuffle data
 
 onlyTrainFinalLayer = True
-
+learningAlgorithmNone = True	#create a very large network (eg x10) neurons per layer, and perform final layer backprop only
+if(learningAlgorithmNone):
+	num_hidden_neurons = 100
+	debugLearningAlgorithmNoneTrainAllLayers = False
+	if(debugLearningAlgorithmNoneTrainAllLayers):
+		onlyTrainFinalLayer = False	
+	
 numberLayers = 6
 
 def defineTrainingParameters(dataset):
@@ -90,15 +96,19 @@ def upgradeModelAddLayer(firstLayer, existingModel, num_input_neurons, num_outpu
 	currentInput = tf.keras.Input(shape=(num_input_neurons), name="currentInput")
 	if(firstLayer):
 		layerInput = currentInput
+		if(learningAlgorithmNone):
+			layerInput = tf.keras.layers.Dense(num_hidden_neurons)(layerInput)
+		if(onlyTrainFinalLayer):
+			layerInput = tf.stop_gradient(layerInput)		
 		currentOutput = tf.keras.layers.Dense(num_output_neurons)(layerInput)
 		currentOutput = tf.keras.layers.Softmax()(currentOutput)
 		skipConnectionOutput = layerInput
 		upgradedModel = tf.keras.Model(inputs=currentInput, outputs=[currentOutput, skipConnectionOutput])
 	else:
-		#skipConnectionInput = tf.keras.Input(shape=(num_tags,), name="skipConnectionInput")
-		#previousLayerOutput, previousLayerSkipConnectionOutput = existingModel([currentInput, skipConnectionInput], training=False)
 		previousLayerOutput, previousLayerSkipConnectionOutput = existingModel(currentInput, training=False)
 		layerInput = tf.keras.layers.Concatenate()([previousLayerOutput, previousLayerSkipConnectionOutput])	#add skip connections
+		if(learningAlgorithmNone):
+			layerInput = tf.keras.layers.Dense(num_hidden_neurons)(layerInput)
 		if(onlyTrainFinalLayer):
 			layerInput = tf.stop_gradient(layerInput)
 		currentOutput = tf.keras.layers.Dense(num_output_neurons)(layerInput)

@@ -38,10 +38,10 @@ from numpy import random
 import ANNtf2_loadDataset
 
 #select algorithm:
-algorithm = "ANN"	#standard artificial neural network (backprop)
+#algorithm = "ANN"	#standard artificial neural network (backprop)
 #algorithm = "FBANN"	#feedback artificial neural network (reverse connectivity)	#incomplete
 #algorithm = "EIANN"	#excitatory/inhibitory artificial neural network	#incomplete+non-convergent
-#algorithm = "BAANN"	#breakaway artificial neural network
+algorithm = "BAANN"	#breakaway artificial neural network
 #algorithm = "LIANN"	#local inhibition artificial neural network	#incomplete+non-convergent
 #algorithm = "AEANN"	#autoencoder generated artificial neural network
 
