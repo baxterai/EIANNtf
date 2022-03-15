@@ -12,13 +12,12 @@ Python 3 and Tensorflow 2.1+
 conda create -n anntf2 python=3.7
 source activate anntf2
 conda install -c tensorflow tensorflow=2.3
-conda install scikit-learn (ANNtf2_algorithmLIANN_math:SVD/PCA only)
 	
 # Usage:
 python3 ANNtf2.py
 
 # Description:
-ANNtf - train an experimental artificial neural network (ANN/FBANN/EIANN/BAANN/LIANN/AEANN)
+ANNtf - train an experimental architecture artificial neural network (ANN/FBANN/EIANN/BAANN)
 
 """
 
@@ -38,12 +37,10 @@ from numpy import random
 import ANNtf2_loadDataset
 
 #select algorithm:
-#algorithm = "ANN"	#standard artificial neural network (backprop)
+algorithm = "ANN"	#standard artificial neural network (backprop)
 #algorithm = "FBANN"	#feedback artificial neural network (reverse connectivity)	#incomplete
 #algorithm = "EIANN"	#excitatory/inhibitory artificial neural network	#incomplete+non-convergent
-algorithm = "BAANN"	#breakaway artificial neural network
-#algorithm = "LIANN"	#local inhibition artificial neural network	#incomplete+non-convergent
-#algorithm = "AEANN"	#autoencoder generated artificial neural network
+#algorithm = "BAANN"	#breakaway artificial neural network
 
 suppressGradientDoNotExistForVariablesWarnings = True
 
@@ -56,12 +53,7 @@ elif(algorithm == "EIANN"):
 	import ANNtf2_algorithmEIANN as ANNtf2_algorithm
 elif(algorithm == "BAANN"):
 	import ANNtf2_algorithmBAANN as ANNtf2_algorithm
-elif(algorithm == "LIANN"):
-	import ANNtf2_algorithmLIANN as ANNtf2_algorithm
-elif(algorithm == "AEANN"):
-	import ANNtf2_algorithmAEANN as ANNtf2_algorithm
 	
-						
 #learningRate, trainingSteps, batchSize, displayStep, numEpochs = -1
 
 #performance enhancements for development environment only: 
@@ -102,18 +94,6 @@ elif(algorithm == "EIANN"):
 elif(algorithm == "BAANN"):
 	dataset = "SmallDataset"
 	#trainMultipleNetworks not currently supported
-elif(algorithm == "LIANN"):
-	dataset = "SmallDataset"
-	if(ANNtf2_algorithm.learningAlgorithmNone):
-		trainMultipleNetworks = False	#optional
-		if(trainMultipleNetworks):
-			#numberOfNetworks = 10
-			numberOfNetworks = int(100/ANNtf2_algorithm.generateLargeNetworkRatio)	#normalise the number of networks based on the network layer size
-			if(numberOfNetworks == 1):	#train at least 2 networks (required for tensorflow code execution consistency)
-				trainMultipleNetworks = False
-elif(algorithm == "AEANN"):
-	dataset = "SmallDataset"
-	#trainMultipleNetworks = False	#not currently supported
 
 				
 if(dataset == "SmallDataset"):
@@ -179,8 +159,7 @@ def neuralNetworkPropagationAllNetworksFinalLayer(x):
 	return ANNtf2_algorithm.neuralNetworkPropagationAllNetworksFinalLayer(x)
 
 
-#parameter l is only currently used for algorithm AEANN
-def trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex, costCrossEntropyWithLogits, display, l=None):
+def trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex, costCrossEntropyWithLogits, display):
 	
 	if(algorithm == "ANN"):
 		executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)
@@ -193,49 +172,18 @@ def trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, op
 			executeLearningEIANN(batchX, batchYoneHot, networkIndex)
 			#second learning algorithm (final layer hebbian connections to output class targets):
 		executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)
-	elif(algorithm == "LIANN"):
-		#first learning algorithm: perform neuron independence training
-		batchYoneHot = tf.one_hot(batchY, depth=datasetNumClasses)
-		if(not ANNtf2_algorithm.learningAlgorithmNone):
-			executeLearningLIANN(batchIndex, batchX, batchYoneHot, networkIndex)
-		if(ANNtf2_algorithm.learningAlgorithmFinalLayerBackpropHebbian):
-			#second learning algorithm (final layer hebbian connections to output class targets):
-			executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)	
-			#print("executeOptimisation")
-	elif(algorithm == "AEANN"):
-		#print("trainMultipleFiles error: does not support greedy training for AEANN")
-		#for l in range(1, numberOfLayers+1):
-		executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex, l=l)
 
 	if(display):
-		loss, acc = calculatePropagationLoss(batchX, batchY, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex, l)
-		if(algorithm == "AEANN"):	#if(l is not None):
-			print("l: %i, networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (l, networkIndex, batchIndex, loss, acc))			
-		else:
-			print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
+		loss, acc = calculatePropagationLoss(batchX, batchY, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex)
+		print("networkIndex: %i, batchIndex: %i, loss: %f, accuracy: %f" % (networkIndex, batchIndex, loss, acc))
 			
 def executeLearningEIANN(x, y, networkIndex):
 	#first learning algorithm: perform neuron independence training
 	pred = ANNtf2_algorithm.neuralNetworkPropagationEIANNtrain(x, networkIndex)
-def executeLearningLIANN(batchIndex, x, y, networkIndex):
-	executeLIANN = False
-	if(ANNtf2_algorithm.supportDimensionalityReductionLimitFrequency):
-		if(batchIndex % ANNtf2_algorithm.supportDimensionalityReductionLimitFrequencyStep == 0):
-			executeLIANN = True
-	else:
-		executeLIANN = True
-	if(executeLIANN):
-		#first learning algorithm: perform neuron independence training
-		pred = ANNtf2_algorithm.neuralNetworkPropagationLIANNtrain(x, networkIndex)
-#def executeLearningAEANN(x, y, networkIndex):
-#	#first learning algorithm: perform neuron independence training
-#	pred = ANNtf2_algorithm.neuralNetworkPropagationAEANNtrain(x, networkIndex)
 
-
-#parameter l is only currently used for algorithm AEANN
-def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, networkIndex=1, l=None):
+def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, networkIndex=1):
 	with tf.GradientTape() as gt:
-		loss, acc = calculatePropagationLoss(x, y, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex, l)
+		loss, acc = calculatePropagationLoss(x, y, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex)
 		
 	if(algorithm == "ANN"):
 		Wlist = []
@@ -294,35 +242,6 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 			else:	
 				Wlist.append(ANNtf2_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")])
 				Blist.append(ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")])
-		trainableVariables = Wlist + Blist
-		WlistLength = len(Wlist)
-		BlistLength = len(Blist)
-	elif(algorithm == "LIANN"):
-		#second learning algorithm (final layer hebbian connections to output class targets):
-		Wlist = []
-		Blist = []
-		for l in range(1, numberOfLayers+1):
-			if(ANNtf2_algorithm.learningAlgorithmFinalLayerBackpropHebbian):
-				if(l == numberOfLayers):
-					Wlist.append(ANNtf2_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")])
-					Blist.append(ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")])				
-			else:	
-				Wlist.append(ANNtf2_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")])
-				Blist.append(ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")])
-		trainableVariables = Wlist + Blist
-		WlistLength = len(Wlist)
-		BlistLength = len(Blist)
-	elif(algorithm == "AEANN"):
-		#train specific layer weights;
-		Wlist = []
-		Blist = []
-		if(l == numberOfLayers):
-			Wlist.append(ANNtf2_algorithm.Wf[generateParameterNameNetwork(networkIndex, l, "Wf")])
-			Blist.append(ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")])		
-		else:
-			Wlist.append(ANNtf2_algorithm.Wf[generateParameterNameNetwork(networkIndex, l, "Wf")])
-			Wlist.append(ANNtf2_algorithm.Wb[generateParameterNameNetwork(networkIndex, l, "Wb")])
-			Blist.append(ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")])
 		trainableVariables = Wlist + Blist
 		WlistLength = len(Wlist)
 		BlistLength = len(Blist)
@@ -408,34 +327,17 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 			   print("Blayer = ", Blayer)
 
 
-#parameter l is only currently used for algorithm AEANN
-def calculatePropagationLoss(x, y, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex=1, l=None):
+def calculatePropagationLoss(x, y, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex=1):
 	acc = 0	#only valid for softmax class targets 
-	if(algorithm == "AEANN"):
-		if(l == numberOfLayers):
-			pred = ANNtf2_algorithm.neuralNetworkPropagationAEANNfinalLayer(x, networkIndex)
-			target = y 
-			loss = calculateLossCrossEntropy(pred, target, datasetNumClasses, costCrossEntropyWithLogits)
-			acc = calculateAccuracy(pred, target)	#only valid for softmax class targets 
-			#print("target = ", target)
-			#print("pred = ", pred)
-			#print("2 loss = ", loss)
-		else:
-			pred = ANNtf2_algorithm.neuralNetworkPropagationAEANNautoencoderLayer(x, l, networkIndex)
-			target = ANNtf2_algorithm.neuralNetworkPropagationAEANNtestLayer(x, l-1, autoencoder=False, networkIndex=networkIndex)
-			loss = calculateLossMeanSquaredError(pred, target)
-			#print("target = ", target)
-			#print("pred = ", pred)
-			#print("1 loss = ", loss)
-	else:
-		pred = neuralNetworkPropagation(x, networkIndex)
-		target = y
-		loss = calculateLossCrossEntropy(pred, target, datasetNumClasses, costCrossEntropyWithLogits)	
-		acc = calculateAccuracy(pred, target)	#only valid for softmax class targets 
-		#print("x = ", x)
-		#print("y = ", y)
-		#print("2 loss = ", loss)
-		#print("2 acc = ", acc)
+	
+	pred = neuralNetworkPropagation(x, networkIndex)
+	target = y
+	loss = calculateLossCrossEntropy(pred, target, datasetNumClasses, costCrossEntropyWithLogits)	
+	acc = calculateAccuracy(pred, target)	#only valid for softmax class targets 
+	#print("x = ", x)
+	#print("y = ", y)
+	#print("2 loss = ", loss)
+	#print("2 acc = ", acc)
 			
 	return loss, acc
 
@@ -675,7 +577,7 @@ def train(trainMultipleNetworks=False, trainMultipleFiles=False, greedy=False):
 						#if(l == maxLayer):	#only print accuracy after training final layer
 						if(batchIndex % displayStep == 0):
 							display = True	
-						trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex, costCrossEntropyWithLogits, display, l)
+						trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex, costCrossEntropyWithLogits, display)
 						
 					#trainMultipleNetworks code;
 					if(trainMultipleNetworks):
@@ -722,13 +624,6 @@ if __name__ == "__main__":
 		learningRate, trainingSteps, batchSize, displayStep, numEpochs = defineTrainingParameters(dataset)
 		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_x, train_y, test_x, test_y = loadDataset(fileIndexTemp)
 		ANNtf2_algorithm.BAANNmain(train_x, train_y, test_x, test_y, datasetNumFeatures, datasetNumClasses, batchSize, trainingSteps, numEpochs)
-	elif(algorithm == "LIANN"):
-		if(trainMultipleNetworks):
-			train(trainMultipleNetworks=trainMultipleNetworks)
-		else:
-			trainMinimal()
-	elif(algorithm == "AEANN"):
-		train(greedy=True)
 	else:
 		print("main error: algorithm == unknown")
 		
