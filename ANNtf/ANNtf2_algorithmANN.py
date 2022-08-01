@@ -195,7 +195,8 @@ def neuralNetworkPropagationANN(x, networkIndex=1, l=None):
 			for l2 in range(0, l1):
 				Wlayer = W[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "W")]
 				at = Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")]
-				Z = tf.add(Z, tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wlayer), B[generateParameterNameNetwork(networkIndex, l1, "B")]))		
+				Z = tf.add(Z, tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wlayer))
+			Z = tf.add(Z, B[generateParameterNameNetwork(networkIndex, l1, "B")])
 		else:
 			Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l1, "W")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])
 		

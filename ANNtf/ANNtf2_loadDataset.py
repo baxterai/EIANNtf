@@ -13,7 +13,7 @@ see ANNtf2.py
 see ANNtf2.py
 
 # Description:
-ANNtf2 load dataset
+ANNtf load dataset
 
 # Datasets:
 
@@ -335,6 +335,7 @@ def loadDatasetType1(datasetFileNameX, datasetFileNameY, addOnlyPriorUnidirectio
 
 	if(addOnlyPriorUnidirectionalPOSinputToTrain):
 		all_X = all_X[:, 0:datasetNumFeatures//2]
+		datasetNumFeatures = datasetNumFeatures//2
 
 	datasetNumExamplesTrain = int(float(datasetNumExamples)*percentageDatasetTrain/100.0)
 	datasetNumExamplesTest = int(float(datasetNumExamples)*(100.0-percentageDatasetTrain)/100.0)
@@ -367,7 +368,7 @@ def loadDatasetType1(datasetFileNameX, datasetFileNameY, addOnlyPriorUnidirectio
 	train_y, test_y = np.array(train_y, np.uint8), np.array(test_y, np.uint8) 
 	#https://www.tensorflow.org/api_docs/python/tf/keras/datasets/mnist/load_data?version=stable
 	#https://medium.com/@HojjatA/could-not-find-valid-device-for-node-while-eagerly-executing-8f2ff588d1e
-
+	
 	paddingTagIndexNA = paddingTagIndex
 	return numberOfFeaturesPerWord, paddingTagIndexNA, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y
 

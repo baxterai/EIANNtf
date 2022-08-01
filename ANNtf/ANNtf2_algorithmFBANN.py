@@ -174,7 +174,8 @@ def neuralNetworkPropagationANNfeedForward(x, networkIndex=1):
 				#print("Atrace[generateParameterNameNetwork(networkIndex, l2, \"Atrace\")] = ", Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")].shape)
 				#print("Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, \"Wf\")] = ", Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")].shape)
 				#print("B[generateParameterNameNetwork(networkIndex, l1, \"B\")] = ", B[generateParameterNameNetwork(networkIndex, l1, "B")].shape)
-				Z = tf.add(Z, tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")]), B[generateParameterNameNetwork(networkIndex, l1, "B")]))
+				Z = tf.add(tf.matmul(Atrace[generateParameterNameNetwork(networkIndex, l2, "Atrace")], Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")]))
+			Z = tf.add(Z, B[generateParameterNameNetwork(networkIndex, l1, "B")])
 		else:
 			Z = tf.add(tf.matmul(AprevLayer, Wf[generateParameterNameNetwork(networkIndex, l1, "Wf")]), B[generateParameterNameNetwork(networkIndex, l1, "B")])		
 		A = activationFunction(Z)
