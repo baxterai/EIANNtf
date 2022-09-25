@@ -23,16 +23,25 @@ from ANNtf2_operations import *	#generateParameterNameSeq, generateParameterName
 import ANNtf2_operations
 import ANNtf2_globalDefs
 
-learningAlgorithmFinalLayerBackpropHebbian = True	#only apply backprop to final layer (all intermediary layers using hebbian algorithm)
+learningAlgorithmFinalLayerBackpropHebbian = False	#only apply backprop to final layer (all intermediary layers using hebbian algorithm)
 
 debugSingleLayerNetwork = False
 debugFastTrain = False
 debugGenerateLargeNetwork = True	#currently used to increase number of neurons per layer, as only 50% are excitatory 
+debugPrintVerbose = False
+
+zeroParametersIfViolateEItypeCondition = True	#orig: True	#do not allow gradients to reverse sign of W/B parameters
+verifyParametersDoNotViolateEItypeCondition = True
+
+firstLayerExcitatoryOnly = True	#orig: True
+
+normaliseFirstLayer = True	#require inputs normalised between -1 and 1 (first hidden layer neurons are entirely excitatory)
+equaliseNumberExamplesPerClass = False
+
 
 W = {}
 B = {}
 neuronEI = {}	#tf.dtypes.bool
-
 
 #Network parameters
 n_h = []
@@ -48,7 +57,7 @@ if(learningAlgorithmFinalLayerBackpropHebbian):
 def defineTrainingParameters(dataset):
 	global learningRate
 	learningRate = 0.001
-	batchSize = 100
+	batchSize = 100	#10
 	numEpochs = 10	#100 #10
 	if(debugFastTrain):
 		trainingSteps = batchSize
@@ -74,15 +83,15 @@ def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFea
 
 def defineNeuralNetworkParameters():
 
-	print("numberOfNetworks", numberOfNetworks)
+	#print("numberOfNetworks", numberOfNetworks)
 	
 	randomNormal = tf.initializers.RandomNormal()
 	
 	for networkIndex in range(1, numberOfNetworks+1):
 
 		for l in range(0, numberOfLayers+1):	#last layer is ignored
-			if(l == 0):	#not used
-				neuronEIint = tf.ones([n_h[l]], dtype=tf.dtypes.int32)	#first layer is always excitatory
+			if(firstLayerExcitatoryOnly and l == 0):
+				neuronEIint = tf.ones([n_h[l]], dtype=tf.dtypes.int32)	#first hidden layer neurons are entirely excitatory
 			else:	
 				neuronEIint = tf.random.uniform([n_h[l]], minval=0, maxval=2, dtype=tf.dtypes.int32)
 			neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")] = tf.Variable(tf.dtypes.cast(neuronEIint, dtype=tf.dtypes.bool))	#neuronEIint	#tf.dtypes.cast(neuronEIint, dtype=tf.dtypes.bool)	tf.dtypes.cast(neuronEIint, dtype=tf.dtypes.float32)
@@ -115,12 +124,14 @@ def defineNeuralNetworkParameters():
 			W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(Wlayer)
 			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
 
-			#print("neuronEIprevious = ", neuronEIprevious)			
-			#print("Wlayer = ", Wlayer)			
+			if(debugPrintVerbose):
+				print("l = ", l)
+				print("neuronEIprevious = ", neuronEIprevious)
+				print("Wlayer = ", Wlayer)
 			
 			#else:
 			#	W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
-			#	B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))	
+			#	B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
 				
 
 def neuralNetworkPropagation(x, networkIndex=1):
@@ -161,7 +172,7 @@ def neuralNetworkPropagationEIANNtrain(x, networkIndex=1):
 				#neuronEIprevious = tf.multiply(neuronEIprevious, 2)
 				#neuronEIprevious = tf.subtract(neuronEIprevious, 1)
 				#neuronEIprevious = tf.expand_dims(neuronEIprevious, axis=1)	#for broadcasting
-				#AWupdate = tf.multiply(neuronEIprevious, AWupdate)	#broadcasting required	#zero all weight updates corresponding to inhibitory input				
+				#AWupdate = tf.multiply(neuronEIprevious, AWupdate)	#broadcasting required	#zero all weight updates corresponding to inhibitory input		
 
 			AWnew = tf.add(AW, AWupdate)	#apply weight updates	
 			
@@ -185,6 +196,7 @@ def neuralNetworkPropagationEIANNtrain(x, networkIndex=1):
 def neuralNetworkPropagationEIANN(x, networkIndex=1):
 			
 	#print("numberOfLayers", numberOfLayers)
+	#print("x", x)
 	
 	AprevLayer = x
 	for l in range(1, numberOfLayers+1):
@@ -192,7 +204,9 @@ def neuralNetworkPropagationEIANN(x, networkIndex=1):
 		A = activationFunction(Z)
 
 		#print("l = " + str(l))		
+		#print("A = ", A)
 		#print("W = ", W[generateParameterNameNetwork(networkIndex, l, "W")] )
+		#print("B = ", B[generateParameterNameNetwork(networkIndex, l, "B")] )
 		
 		if(learningAlgorithmFinalLayerBackpropHebbian):
 			if(l < numberOfLayers):

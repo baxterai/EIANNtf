@@ -36,6 +36,9 @@ else:
 	numberOfFeedBackwardsIterations = 0
 	additiveZmethodRecordBackwardFeedDelta = False
 
+normaliseFirstLayer = False
+equaliseNumberExamplesPerClass = False
+
 Wf = {}
 Wb = {}
 B = {}

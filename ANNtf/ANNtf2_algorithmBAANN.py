@@ -32,6 +32,9 @@ import ANNtf2_globalDefs
 
 useTFdataset = True	#repeat and shuffle data
 
+normaliseFirstLayer = False
+equaliseNumberExamplesPerClass = False
+
 onlyTrainFinalLayer = True
 learningAlgorithmNone = True	#create a very large network (eg x10) neurons per layer, and perform final layer backprop only
 if(learningAlgorithmNone):
