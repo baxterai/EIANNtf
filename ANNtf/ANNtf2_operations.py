@@ -22,8 +22,6 @@ import numpy as np
 import ANNtf2_globalDefs
 import math
 
-debugSingleLayerNetwork = False
-
 
 #if(useBinaryWeights) or if(generateFirstLayerSDR)
 	
@@ -149,21 +147,18 @@ def generateTFtrainDataFromTrainDataUnbatched(trainDataUnbatched, shuffleSize, b
 
 
 def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks, generateLargeNetwork=False, generateNetworkStatic=False, generateDeepNetwork=False):
-	if(debugSingleLayerNetwork):
-		n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = defineNetworkParametersANNsingleLayer(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks)
+	if(generateLargeNetwork):
+		firstHiddenLayerNumberNeurons = num_input_neurons*3
 	else:
-		if(generateLargeNetwork):
-			firstHiddenLayerNumberNeurons = num_input_neurons*3
-		else:
-			firstHiddenLayerNumberNeurons = num_input_neurons
-		if(generateDeepNetwork):
-			numberOfLayers = 6
-		else:
-			numberOfLayers = 2
-		n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks, numberOfLayers, firstHiddenLayerNumberNeurons, generateNetworkStatic)
+		firstHiddenLayerNumberNeurons = num_input_neurons
+	if(generateDeepNetwork):
+		numberOfLayers = 6
+	else:
+		numberOfLayers = 2
+	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks, numberOfLayers, firstHiddenLayerNumberNeurons, generateNetworkStatic)
 	return n_h, numberOfLayers, numberOfNetworks, datasetNumClasses
 
-def defineNetworkParametersANNsingleLayer(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, trainMultipleFiles, numberOfNetworks):
+def defineNetworkParametersANNsingleLayer(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks):
 
 	n_x = num_input_neurons #datasetNumFeatures
 	n_y = num_output_neurons  #datasetNumClasses

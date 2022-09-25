@@ -14,6 +14,7 @@ source activate anntf2
 conda install -c tensorflow tensorflow=2.3
 	
 # Usage:
+source activate anntf2
 python3 ANNtf2.py
 
 # Description:
@@ -46,13 +47,13 @@ suppressGradientDoNotExistForVariablesWarnings = True
 
 costCrossEntropyWithLogits = False
 if(algorithm == "ANN"):
-	import ANNtf2_algorithmANN as ANNtf2_algorithm
+	import ANNtf2_algorithmANN as ANNtf_algorithm
 elif(algorithm == "FBANN"):
-	import ANNtf2_algorithmFBANN as ANNtf2_algorithm
+	import ANNtf2_algorithmFBANN as ANNtf_algorithm
 elif(algorithm == "EIANN"):
-	import ANNtf2_algorithmEIANN as ANNtf2_algorithm
+	import ANNtf2_algorithmEIANN as ANNtf_algorithm
 elif(algorithm == "BAANN"):
-	import ANNtf2_algorithmBAANN as ANNtf2_algorithm
+	import ANNtf2_algorithmBAANN as ANNtf_algorithm
 	
 #learningRate, trainingSteps, batchSize, displayStep, numEpochs = -1
 
@@ -136,27 +137,27 @@ xmlDatasetFileNameEnd = ".xml"
 
 
 def defineTrainingParameters(dataset, numberOfFeaturesPerWord=None, paddingTagIndex=None):
-	return ANNtf2_algorithm.defineTrainingParameters(dataset)
+	return ANNtf_algorithm.defineTrainingParameters(dataset)
 
 def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks, useSmallSentenceLengths=None, numberOfFeaturesPerWord=None):
-	return ANNtf2_algorithm.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks)	
+	return ANNtf_algorithm.defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks)	
 
 def defineNeuralNetworkParameters():
-	return ANNtf2_algorithm.defineNeuralNetworkParameters()
+	return ANNtf_algorithm.defineNeuralNetworkParameters()
 
 #define default forward prop function for backprop weights optimisation;
 def neuralNetworkPropagation(x, networkIndex=1):
-	return ANNtf2_algorithm.neuralNetworkPropagation(x, networkIndex)
+	return ANNtf_algorithm.neuralNetworkPropagation(x, networkIndex)
 	
 #define default forward prop function for test (identical to below);
 def neuralNetworkPropagationTest(test_x, networkIndex=1):
-	return ANNtf2_algorithm.neuralNetworkPropagation(test_x, networkIndex)
+	return ANNtf_algorithm.neuralNetworkPropagation(test_x, networkIndex)
 
-#if(ANNtf2_algorithm.supportMultipleNetworks):
+#if(ANNtf_algorithm.supportMultipleNetworks):
 def neuralNetworkPropagationLayer(x, networkIndex, l):
-	return ANNtf2_algorithm.neuralNetworkPropagationLayer(x, networkIndex, l)
+	return ANNtf_algorithm.neuralNetworkPropagationLayer(x, networkIndex, l)
 def neuralNetworkPropagationAllNetworksFinalLayer(x):
-	return ANNtf2_algorithm.neuralNetworkPropagationAllNetworksFinalLayer(x)
+	return ANNtf_algorithm.neuralNetworkPropagationAllNetworksFinalLayer(x)
 
 
 def trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex, costCrossEntropyWithLogits, display):
@@ -166,7 +167,7 @@ def trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, op
 	elif(algorithm == "FBANN"):
 		executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)
 	elif(algorithm == "EIANN"):
-		if(ANNtf2_algorithm.learningAlgorithmFinalLayerBackpropHebbian):
+		if(ANNtf_algorithm.learningAlgorithmFinalLayerBackpropHebbian):
 			#first learning algorithm: perform neuron independence training
 			batchYoneHot = tf.one_hot(batchY, depth=datasetNumClasses)
 			executeLearningEIANN(batchX, batchYoneHot, networkIndex)
@@ -179,7 +180,7 @@ def trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, op
 			
 def executeLearningEIANN(x, y, networkIndex):
 	#first learning algorithm: perform neuron independence training
-	pred = ANNtf2_algorithm.neuralNetworkPropagationEIANNtrain(x, networkIndex)
+	pred = ANNtf_algorithm.neuralNetworkPropagationEIANNtrain(x, networkIndex)
 
 def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, networkIndex=1):
 	with tf.GradientTape() as gt:
@@ -189,19 +190,19 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 		Wlist = []
 		Blist = []
 		for l1 in range(1, numberOfLayers+1):
-			if(ANNtf2_algorithm.supportSkipLayers):
+			if(ANNtf_algorithm.supportSkipLayers):
 				for l2 in range(0, l1):
 					if(l2 < l1):
-						Wlist.append(ANNtf2_algorithm.W[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "W")])
-				Blist.append(ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l1, "B")])			
+						Wlist.append(ANNtf_algorithm.W[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "W")])
+				Blist.append(ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l1, "B")])			
 			else:
-				if(ANNtf2_algorithm.debugOnlyTrainFinalLayer):
+				if(ANNtf_algorithm.debugOnlyTrainFinalLayer):
 					if(l1 == numberOfLayers):
-						Wlist.append(ANNtf2_algorithm.W[generateParameterNameNetwork(networkIndex, l1, "W")])
-						Blist.append(ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l1, "B")])				
+						Wlist.append(ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l1, "W")])
+						Blist.append(ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l1, "B")])				
 				else:	
-					Wlist.append(ANNtf2_algorithm.W[generateParameterNameNetwork(networkIndex, l1, "W")])
-					Blist.append(ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l1, "B")])
+					Wlist.append(ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l1, "W")])
+					Blist.append(ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l1, "B")])
 		trainableVariables = Wlist + Blist
 		WlistLength = len(Wlist)
 		BlistLength = len(Blist)
@@ -209,25 +210,25 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 		Wflist = []
 		Wblist = []
 		Blist = []
-		for l1 in range(1, ANNtf2_algorithm.highestLayer+1):
-			if(ANNtf2_algorithm.supportSkipLayers):
+		for l1 in range(1, ANNtf_algorithm.highestLayer+1):
+			if(ANNtf_algorithm.supportSkipLayers):
 				for l2 in range(0, l1):
 					if(l2 < l1):
-						Wflist.append(ANNtf2_algorithm.Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")])
-				if(ANNtf2_algorithm.feedbackConnections):
-					if((l1 <= ANNtf2_algorithm.highestLayerWithIncomingBackwardsConnections) and (l1 >= ANNtf2_algorithm.lowestLayerWithIncomingBackwardsConnections)):
-						for l2 in range(l1+1, ANNtf2_algorithm.highestLayer+1):
+						Wflist.append(ANNtf_algorithm.Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")])
+				if(ANNtf_algorithm.feedbackConnections):
+					if((l1 <= ANNtf_algorithm.highestLayerWithIncomingBackwardsConnections) and (l1 >= ANNtf_algorithm.lowestLayerWithIncomingBackwardsConnections)):
+						for l2 in range(l1+1, ANNtf_algorithm.highestLayer+1):
 							if(l2 > l1):
-								Wblist.append(ANNtf2_algorithm.Wb[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wb")])
+								Wblist.append(ANNtf_algorithm.Wb[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wb")])
 			else:
-				Wflist.append(ANNtf2_algorithm.Wf[generateParameterNameNetwork(networkIndex, l1, "Wf")])
-				if(ANNtf2_algorithm.feedbackConnections):
-					if((l1 <= ANNtf2_algorithm.highestLayerWithIncomingBackwardsConnections) and (l1 >= ANNtf2_algorithm.lowestLayerWithIncomingBackwardsConnections)):
-						Wblist.append(ANNtf2_algorithm.Wb[generateParameterNameNetwork(networkIndex, l1, "Wb")])
+				Wflist.append(ANNtf_algorithm.Wf[generateParameterNameNetwork(networkIndex, l1, "Wf")])
+				if(ANNtf_algorithm.feedbackConnections):
+					if((l1 <= ANNtf_algorithm.highestLayerWithIncomingBackwardsConnections) and (l1 >= ANNtf_algorithm.lowestLayerWithIncomingBackwardsConnections)):
+						Wblist.append(ANNtf_algorithm.Wb[generateParameterNameNetwork(networkIndex, l1, "Wb")])
 								
-			Blist.append(ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l1, "B")])
+			Blist.append(ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l1, "B")])
 			
-		if(ANNtf2_algorithm.feedbackConnections):
+		if(ANNtf_algorithm.feedbackConnections):
 			trainableVariables = Wflist + Wblist + Blist
 		else:
 			trainableVariables = Wflist + Blist
@@ -235,13 +236,13 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 		Wlist = []
 		Blist = []
 		for l in range(1, numberOfLayers+1):
-			if(ANNtf2_algorithm.learningAlgorithmFinalLayerBackpropHebbian):
+			if(ANNtf_algorithm.learningAlgorithmFinalLayerBackpropHebbian):
 				if(l == numberOfLayers):
-					Wlist.append(ANNtf2_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")])
-					Blist.append(ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")])				
+					Wlist.append(ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")])
+					Blist.append(ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")])				
 			else:	
-				Wlist.append(ANNtf2_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")])
-				Blist.append(ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")])
+				Wlist.append(ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")])
+				Blist.append(ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")])
 		trainableVariables = Wlist + Blist
 		WlistLength = len(Wlist)
 		BlistLength = len(Blist)
@@ -261,14 +262,14 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 		#set all W/B parameters to zero if their updated values violate the E/I neuron type condition
 		for l in range(1, numberOfLayers+1):
 
-			neuronEIlayerPrevious = ANNtf2_algorithm.neuronEI[generateParameterNameNetwork(networkIndex, l-1, "neuronEI")]
-			neuronEIlayerPreviousTiled = tileDimension(neuronEIlayerPrevious, 1, ANNtf2_algorithm.n_h[l], True)
-			neuronEI = ANNtf2_algorithm.neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")]
+			neuronEIlayerPrevious = ANNtf_algorithm.neuronEI[generateParameterNameNetwork(networkIndex, l-1, "neuronEI")]
+			neuronEIlayerPreviousTiled = tileDimension(neuronEIlayerPrevious, 1, ANNtf_algorithm.n_h[l], True)
+			neuronEI = ANNtf_algorithm.neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")]
 
-			Wlayer = ANNtf2_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")]
+			Wlayer = ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")]
 			WlayerSign = tf.sign(Wlayer)
 			WlayerSignBool = convertSignOutputToBool(WlayerSign)
-			Blayer = ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")]
+			Blayer = ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")]
 			BlayerSign = tf.sign(Blayer)
 			BlayerSignBool = convertSignOutputToBool(BlayerSign)
 			
@@ -284,21 +285,21 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 			#print("WlayerCorrected = ", WlayerCorrected)	   
 			#print("BlayerCorrected = ", BlayerCorrected)
 						
-			ANNtf2_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")] = WlayerCorrected
+			ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")] = WlayerCorrected
 			if(l < numberOfLayers):
-				ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")] = BlayerCorrected
+				ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")] = BlayerCorrected
 
 		#excitatory/inhibitory weight verification (in accordance with neuron types):	
 		for l in range(1, numberOfLayers+1):
 
-			neuronEIlayerPrevious = ANNtf2_algorithm.neuronEI[generateParameterNameNetwork(networkIndex, l-1, "neuronEI")]
-			neuronEIlayerPreviousTiled = tileDimension(neuronEIlayerPrevious, 1, ANNtf2_algorithm.n_h[l], True)
-			neuronEI = ANNtf2_algorithm.neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")]
+			neuronEIlayerPrevious = ANNtf_algorithm.neuronEI[generateParameterNameNetwork(networkIndex, l-1, "neuronEI")]
+			neuronEIlayerPreviousTiled = tileDimension(neuronEIlayerPrevious, 1, ANNtf_algorithm.n_h[l], True)
+			neuronEI = ANNtf_algorithm.neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")]
 
-			Wlayer = ANNtf2_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")]
+			Wlayer = ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")]
 			WlayerSign = tf.sign(Wlayer)
 			WlayerSignBool = convertSignOutputToBool(WlayerSign)
-			Blayer = ANNtf2_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")]
+			Blayer = ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")]
 			BlayerSign = tf.sign(Blayer)
 			BlayerSignBool = convertSignOutputToBool(BlayerSign)
 			
@@ -343,7 +344,7 @@ def calculatePropagationLoss(x, y, datasetNumClasses, numberOfLayers, costCrossE
 
 
 
-#if(ANNtf2_algorithm.supportMultipleNetworks):
+#if(ANNtf_algorithm.supportMultipleNetworks):
 
 def testBatchAllNetworksFinalLayer(batchX, batchY, datasetNumClasses, numberOfLayers):
 	
@@ -381,8 +382,8 @@ def executeOptimisationAllNetworksFinalLayer(x, y, datasetNumClasses, optimizer)
 		
 	Wlist = []
 	Blist = []
-	Wlist.append(ANNtf2_algorithm.WallNetworksFinalLayer)
-	Blist.append(ANNtf2_algorithm.BallNetworksFinalLayer)
+	Wlist.append(ANNtf_algorithm.WallNetworksFinalLayer)
+	Blist.append(ANNtf_algorithm.BallNetworksFinalLayer)
 	trainableVariables = Wlist + Blist
 
 	gradients = gt.gradient(loss, trainableVariables)
@@ -409,7 +410,7 @@ def calculatePropagationLossAllNetworksFinalLayer(x, y, datasetNumClasses, costC
 	
 	
 		
-def loadDataset(fileIndex):
+def loadDataset(fileIndex, equaliseNumberExamplesPerClass=False, normalise=False):
 
 	global numberOfFeaturesPerWord
 	global paddingTagIndex
@@ -433,20 +434,20 @@ def loadDataset(fileIndex):
 			
 	numberOfLayers = 0
 	if(dataset == "POStagSequence"):
-		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY)
+		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = ANNtf2_loadDataset.loadDatasetType1(datasetType1FileNameX, datasetType1FileNameY, normalise=normalise)
 	elif(dataset == "POStagSentence"):
-		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType3(datasetType3FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain, useSmallSentenceLengths)
+		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = ANNtf2_loadDataset.loadDatasetType3(datasetType3FileNameX, generatePOSunambiguousInput, onlyAddPOSunambiguousInputToTrain, useSmallSentenceLengths, normalise=normalise)
 	elif(dataset == "SmallDataset"):
-		datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_xTemp, train_yTemp, test_xTemp, test_yTemp = ANNtf2_loadDataset.loadDatasetType2(datasetType2FileName, datasetClassColumnFirst)
+		datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = ANNtf2_loadDataset.loadDatasetType2(datasetType2FileName, datasetClassColumnFirst, equaliseNumberExamplesPerClass=equaliseNumberExamplesPerClass, normalise=normalise)
 		numberOfFeaturesPerWord = None
 		paddingTagIndex = None
 	elif(dataset == "wikiXmlDataset"):
-		articles = ANNtf2_loadDataset.loadDatasetType4(datasetType4FileName, AEANNsequentialInputTypesMaxLength, useSmallSentenceLengths, AEANNsequentialInputTypeMinWordVectors)
-
+		articles = ANNtf2_loadDataset.loadDatasetType4(datasetType4FileName, LUANNsequentialInputTypesMaxLength, useSmallSentenceLengths, LUANNsequentialInputTypeTrainWordVectors)
+	
 	if(dataset == "wikiXmlDataset"):
 		return articles
 	else:
-		return numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_xTemp, train_yTemp, test_xTemp, test_yTemp
+		return numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y
 		
 
 
@@ -457,7 +458,7 @@ def trainMinimal():
 	fileIndexTemp = 0	#assert trainMultipleFiles = False
 	
 	#generate network parameters based on dataset properties:
-	numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = loadDataset(fileIndexTemp)
+	numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = loadDataset(fileIndexTemp, equaliseNumberExamplesPerClass=ANNtf_algorithm.equaliseNumberExamplesPerClass, normalise=ANNtf_algorithm.normaliseFirstLayer)
 
 	#Model constants
 	num_input_neurons = datasetNumFeatures  #train_x.shape[1]
@@ -475,7 +476,7 @@ def trainMinimal():
 		print("epoch e = ", e)
 	
 		fileIndex = 0
-		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = loadDataset(fileIndex)
+		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = loadDataset(fileIndex, equaliseNumberExamplesPerClass=ANNtf_algorithm.equaliseNumberExamplesPerClass, normalise=ANNtf_algorithm.normaliseFirstLayer)
 
 		shuffleSize = datasetNumExamples	#heuristic: 10*batchSize
 		trainDataIndex = 0
@@ -508,7 +509,7 @@ def train(trainMultipleNetworks=False, trainMultipleFiles=False, greedy=False):
 	fileIndexTemp = 0	#assert trainMultipleFiles = False
 	
 	#generate network parameters based on dataset properties:
-	numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = loadDataset(fileIndexTemp)
+	numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_xTemp, train_yTemp, test_xTemp, test_yTemp = loadDataset(fileIndexTemp, equaliseNumberExamplesPerClass=ANNtf_algorithm.equaliseNumberExamplesPerClass, normalise=ANNtf_algorithm.normaliseFirstLayer)
 
 	#Model constants
 	num_input_neurons = datasetNumFeatures  #train_x.shape[1]
@@ -551,7 +552,7 @@ def train(trainMultipleNetworks=False, trainMultipleFiles=False, greedy=False):
 			else:
 				fileIndex = f
 				
-			numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = loadDataset(fileIndex)
+			numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamples, train_x, train_y, test_x, test_y = loadDataset(fileIndex, equaliseNumberExamplesPerClass=ANNtf_algorithm.equaliseNumberExamplesPerClass, normalise=ANNtf_algorithm.normaliseFirstLayer)
 
 			shuffleSize = datasetNumExamples	#heuristic: 10*batchSize
 			trainDataIndex = 0
@@ -622,8 +623,8 @@ if __name__ == "__main__":
 		#current implemenation uses tf.keras (could be changed to tf);
 		fileIndexTemp = 0
 		learningRate, trainingSteps, batchSize, displayStep, numEpochs = defineTrainingParameters(dataset)
-		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_x, train_y, test_x, test_y = loadDataset(fileIndexTemp)
-		ANNtf2_algorithm.BAANNmain(train_x, train_y, test_x, test_y, datasetNumFeatures, datasetNumClasses, batchSize, trainingSteps, numEpochs)
+		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_x, train_y, test_x, test_y = loadDataset(fileIndexTemp, equaliseNumberExamplesPerClass=ANNtf_algorithm.equaliseNumberExamplesPerClass, normalise=ANNtf_algorithm.normaliseFirstLayer)
+		ANNtf_algorithm.BAANNmain(train_x, train_y, test_x, test_y, datasetNumFeatures, datasetNumClasses, batchSize, trainingSteps, numEpochs)
 	else:
 		print("main error: algorithm == unknown")
 		
