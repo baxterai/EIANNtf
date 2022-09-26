@@ -1,19 +1,19 @@
-"""ANNtf2_algorithmEIANN.py
+"""EIANNtf_algorithmEIANN.py
 
 # Author:
-Richard Bruce Baxter - Copyright (c) 2020-2022 Baxter AI (baxterai.com)
+Richard Bruce Baxter - Copyright (c) 2022 Baxter AI (baxterai.com)
 
 # License:
 MIT License
 
 # Installation:
-see ANNtf2.py
+see EIANNtf_main.py
 
 # Usage:
-see ANNtf2.py
+see EIANNtf_main.py
 
 # Description:
-ANNtf algorithm EIANN - define excitatory/inhibitory artificial neural network
+EIANNtf algorithm EIANN - define excitatory/inhibitory neuron artificial neural network
 
 """
 

@@ -1,7 +1,7 @@
-"""ANNtf2.py
+"""EIANNtf_main.py
 
 # Author:
-Richard Bruce Baxter - Copyright (c) 2020-2022 Baxter AI (baxterai.com)
+Richard Bruce Baxter - Copyright (c) 2022 Baxter AI (baxterai.com)
 
 # License:
 MIT License
@@ -15,10 +15,10 @@ conda install -c tensorflow tensorflow=2.3
 	
 # Usage:
 source activate anntf2
-python3 ANNtf2.py
+python3 EIANNtf_main.py
 
 # Description:
-ANNtf - train an experimental architecture artificial neural network (ANN/FBANN/EIANN/BAANN)
+EIANNtf main - train an excitatory/inhibitory neuron artificial neural network (EIANN)
 
 """
 
@@ -38,22 +38,13 @@ from numpy import random
 import ANNtf2_loadDataset
 
 #select algorithm:
-algorithm = "ANN"	#standard artificial neural network (backprop)
-#algorithm = "FBANN"	#feedback artificial neural network (reverse connectivity)	#incomplete
-#algorithm = "EIANN"	#excitatory/inhibitory artificial neural network	#incomplete+non-convergent
-#algorithm = "BAANN"	#breakaway artificial neural network
+algorithm = "EIANN"	#excitatory/inhibitory artificial neural network	#incomplete+non-convergent
 
 suppressGradientDoNotExistForVariablesWarnings = True
 
 costCrossEntropyWithLogits = False
-if(algorithm == "ANN"):
-	import ANNtf2_algorithmANN as ANNtf_algorithm
-elif(algorithm == "FBANN"):
-	import ANNtf2_algorithmFBANN as ANNtf_algorithm
-elif(algorithm == "EIANN"):
-	import ANNtf2_algorithmEIANN as ANNtf_algorithm
-elif(algorithm == "BAANN"):
-	import ANNtf2_algorithmBAANN as ANNtf_algorithm
+if(algorithm == "EIANN"):
+	import EIANNtf_algorithmEIANN as ANNtf_algorithm
 	
 #learningRate, trainingSteps, batchSize, displayStep, numEpochs = -1
 
@@ -81,18 +72,7 @@ else:
 numberOfNetworks = 1
 trainMultipleNetworks = False
 
-if(algorithm == "ANN"):
-	dataset = "SmallDataset"
-	trainMultipleNetworks = False	#default: False		#optional
-	if(trainMultipleNetworks):
-		numberOfNetworks = 5
-elif(algorithm == "FBANN"):
-	dataset = "SmallDataset"
-	#trainMultipleNetworks not currently supported
-elif(algorithm == "EIANN"):
-	dataset = "SmallDataset"
-	#trainMultipleNetworks not currently supported
-elif(algorithm == "BAANN"):
+if(algorithm == "EIANN"):
 	dataset = "SmallDataset"
 	#trainMultipleNetworks not currently supported
 
@@ -162,11 +142,7 @@ def neuralNetworkPropagationAllNetworksFinalLayer(x):
 
 def trainBatch(batchIndex, batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex, costCrossEntropyWithLogits, display):
 	
-	if(algorithm == "ANN"):
-		executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)
-	elif(algorithm == "FBANN"):
-		executeOptimisation(batchX, batchY, datasetNumClasses, numberOfLayers, optimizer, networkIndex)
-	elif(algorithm == "EIANN"):
+	if(algorithm == "EIANN"):
 		if(ANNtf_algorithm.learningAlgorithmFinalLayerBackpropHebbian):
 			#first learning algorithm: perform neuron independence training
 			batchYoneHot = tf.one_hot(batchY, depth=datasetNumClasses)
@@ -186,53 +162,7 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 	with tf.GradientTape() as gt:
 		loss, acc = calculatePropagationLoss(x, y, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex)
 		
-	if(algorithm == "ANN"):
-		Wlist = []
-		Blist = []
-		for l1 in range(1, numberOfLayers+1):
-			if(ANNtf_algorithm.supportSkipLayers):
-				for l2 in range(0, l1):
-					if(l2 < l1):
-						Wlist.append(ANNtf_algorithm.W[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "W")])
-				Blist.append(ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l1, "B")])			
-			else:
-				if(ANNtf_algorithm.debugOnlyTrainFinalLayer):
-					if(l1 == numberOfLayers):
-						Wlist.append(ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l1, "W")])
-						Blist.append(ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l1, "B")])				
-				else:	
-					Wlist.append(ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l1, "W")])
-					Blist.append(ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l1, "B")])
-		trainableVariables = Wlist + Blist
-		WlistLength = len(Wlist)
-		BlistLength = len(Blist)
-	elif(algorithm == "FBANN"):
-		Wflist = []
-		Wblist = []
-		Blist = []
-		for l1 in range(1, ANNtf_algorithm.highestLayer+1):
-			if(ANNtf_algorithm.supportSkipLayers):
-				for l2 in range(0, l1):
-					if(l2 < l1):
-						Wflist.append(ANNtf_algorithm.Wf[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wf")])
-				if(ANNtf_algorithm.feedbackConnections):
-					if((l1 <= ANNtf_algorithm.highestLayerWithIncomingBackwardsConnections) and (l1 >= ANNtf_algorithm.lowestLayerWithIncomingBackwardsConnections)):
-						for l2 in range(l1+1, ANNtf_algorithm.highestLayer+1):
-							if(l2 > l1):
-								Wblist.append(ANNtf_algorithm.Wb[generateParameterNameNetworkSkipLayers(networkIndex, l2, l1, "Wb")])
-			else:
-				Wflist.append(ANNtf_algorithm.Wf[generateParameterNameNetwork(networkIndex, l1, "Wf")])
-				if(ANNtf_algorithm.feedbackConnections):
-					if((l1 <= ANNtf_algorithm.highestLayerWithIncomingBackwardsConnections) and (l1 >= ANNtf_algorithm.lowestLayerWithIncomingBackwardsConnections)):
-						Wblist.append(ANNtf_algorithm.Wb[generateParameterNameNetwork(networkIndex, l1, "Wb")])
-								
-			Blist.append(ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l1, "B")])
-			
-		if(ANNtf_algorithm.feedbackConnections):
-			trainableVariables = Wflist + Wblist + Blist
-		else:
-			trainableVariables = Wflist + Blist
-	elif(algorithm == "EIANN"):
+	if(algorithm == "EIANN"):
 		Wlist = []
 		Blist = []
 		for l in range(1, numberOfLayers+1):
@@ -616,21 +546,8 @@ def generateRandomisedIndexArray(indexFirst, indexLast, arraySize=None):
 	
 				
 if __name__ == "__main__":
-	if(algorithm == "ANN"):
-		if(trainMultipleNetworks):
-			train(trainMultipleNetworks=trainMultipleNetworks)
-		else:
-			trainMinimal()
-	elif(algorithm == "FBANN"):
+	if(algorithm == "EIANN"):
 		trainMinimal()		
-	elif(algorithm == "EIANN"):
-		trainMinimal()		
-	elif(algorithm == "BAANN"):
-		#current implemenation uses tf.keras (could be changed to tf);
-		fileIndexTemp = 0
-		learningRate, trainingSteps, batchSize, displayStep, numEpochs = defineTrainingParameters(dataset)
-		numberOfFeaturesPerWord, paddingTagIndex, datasetNumFeatures, datasetNumClasses, datasetNumExamplesTemp, train_x, train_y, test_x, test_y = loadDataset(fileIndexTemp, equaliseNumberExamplesPerClass=ANNtf_algorithm.equaliseNumberExamplesPerClass, normalise=ANNtf_algorithm.normaliseFirstLayer)
-		ANNtf_algorithm.BAANNmain(train_x, train_y, test_x, test_y, datasetNumFeatures, datasetNumClasses, batchSize, trainingSteps, numEpochs)
 	else:
 		print("main error: algorithm == unknown")
 		
