@@ -152,7 +152,7 @@ def defineNetworkParameters(num_input_neurons, num_output_neurons, datasetNumFea
 	else:
 		firstHiddenLayerNumberNeurons = num_input_neurons
 	if(generateDeepNetwork):
-		numberOfLayers = 6
+		numberOfLayers = 3
 	else:
 		numberOfLayers = 2
 	n_h, numberOfLayers, numberOfNetworks, datasetNumClasses = defineNetworkParametersDynamic(num_input_neurons, num_output_neurons, datasetNumFeatures, dataset, numberOfNetworks, numberOfLayers, firstHiddenLayerNumberNeurons, generateNetworkStatic)
