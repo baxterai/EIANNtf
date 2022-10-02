@@ -29,7 +29,8 @@ positiveWeightImplementation = False	#orig: True
 if(not positiveWeightImplementation):
     integrateWeights = True
     if(integrateWeights):
-        debugNoEIneurons = False
+        integrateWeights1 = False    #explicitly declare E/I neurons
+        integrateWeights2 = True    #implicitly declare E/I neurons   
 
 preFinalDenseLayer = False
 
@@ -50,6 +51,7 @@ layerSizeBase = 32  #default: 32
 batch_size = 64 #default: 64
 epochs = 5  #1  #5
 
+debugNoEIneurons = False
 debugPreTrainWeights = True
 debugPreTrainOutputs = True
 debugPostTrainWeights = True
@@ -76,6 +78,9 @@ print(y_train[100])
 """## Define model"""
 
 num_classes = 10
+
+def activation(x):
+    return K.maximum(x, 0)  #ReLU
 
 def activationExcitatory(x):
     return K.maximum(x, 0)  #ReLU
@@ -215,15 +220,22 @@ def createEIlayer(layerIndex, h0, firstLayer=False, maxpool2d=None, dropout=None
                 h1 = tf.keras.layers.Dropout(dropout)(h1)
         else:
             if(integrateWeights):
-                if(firstLayer):
-                    h1E = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), padding='same')(h0)
-                    h1I = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), padding='same')(h0)
-                else:
-                    h1E = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=neuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint, padding='same')(h0)
-                    h1I = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=neuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint, padding='same')(h0)
-                h1E = tf.keras.layers.Activation(activationExcitatory)(h1E)
-                h1I = tf.keras.layers.Activation(activationInhibitory)(h1I)
-                h1 = tf.keras.layers.Concatenate(axis=2)([h1E, h1I])
+                if(integrateWeights1):
+                    if(firstLayer):
+                        h1E = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), padding='same')(h0)
+                        h1I = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), padding='same')(h0)
+                    else:
+                        h1E = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=neuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint, padding='same')(h0)
+                        h1I = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=neuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint, padding='same')(h0)
+                    h1E = tf.keras.layers.Activation(activation)(h1E)
+                    h1I = tf.keras.layers.Activation(activation)(h1I)
+                    h1 = tf.keras.layers.Concatenate(axis=2)([h1E, h1I])
+                elif(integrateWeights2):
+                    if(firstLayer):
+                        h1 = tf.keras.layers.Conv2D(layerSizeBase*layerRatio*2, (5,5), padding='same')(h0)
+                    else:
+                        h1 = tf.keras.layers.Conv2D(layerSizeBase*layerRatio*2, (5,5), kernel_initializer=neuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint, padding='same')(h0)
+                    h1 = tf.keras.layers.Activation(activation)(h1)
                 if(maxpool2d is not None):
                     h1 = tf.keras.layers.MaxPool2D(strides=maxpool2d)(h1)
                 if(dropout is not None):
