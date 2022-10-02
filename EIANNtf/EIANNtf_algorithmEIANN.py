@@ -23,7 +23,7 @@ from ANNtf2_operations import *	#generateParameterNameSeq, generateParameterName
 import ANNtf2_operations
 import ANNtf2_globalDefs
 
-positiveWeightImplementation = True	#orig: False
+positiveWeightImplementation = False	#orig: False
 if(positiveWeightImplementation):
 	positiveWeightImplementationBiases = True	#ensure positive biases also
 	if(positiveWeightImplementationBiases):

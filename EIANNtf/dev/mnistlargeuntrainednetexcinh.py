@@ -16,6 +16,34 @@ print("TensorFlow version:", tf.__version__)
 from keras import backend as K
 #print("keras version:",tf.keras.__version__)
 
+import numpy as np
+import sys
+np.set_printoptions(threshold=sys.maxsize)
+
+positiveWeightImplementation = False	#orig: True
+
+generateUntrainedNetwork = False
+if(generateUntrainedNetwork):
+    #only train the last layer
+    numberOfHiddenLayers = 2    #default: 2    #if 0 then useSVM=True
+else:
+    numberOfHiddenLayers = 2   #default: 2
+
+if(numberOfHiddenLayers > 1):
+    addSkipLayers = False   #optional
+else:
+    addSkipLayers = False   #mandatory
+
+layerSizeBase = 128  #default: 128
+
+batch_size = 64 #default: 64
+epochs = 5  #1  #5
+
+debugPreTrainWeights = False
+debugPreTrainOutputs = False
+debugPostTrainWeights = False
+debugPostTrainOutputs = False
+
 """## Load data"""
 
 mnist = tf.keras.datasets.mnist
@@ -23,82 +51,148 @@ mnist = tf.keras.datasets.mnist
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
 x_train, x_test = x_train / 255.0, x_test / 255.0
 
+print("x_train.shape = ", x_train.shape)
+
+input_shape = (28, 28)
+
 """## Define model"""
 
 def activationExcitatory(x):
     return K.maximum(x, 0)  #ReLU
 
 def activationInhibitory(x):
-    return -(K.maximum(x, 0))   #ReLU with negative output
+    if(positiveWeightImplementation):
+        return -(K.maximum(x, 0))   #ReLU with negative output
+    else:
+        return K.maximum(x, 0)  #ReLU
 
 def excitatoryNeuronInitializer(shape, dtype=None):
     return tf.math.abs(tf.random.normal(shape, dtype=dtype))
 
 def inhibitoryNeuronInitializer(shape, dtype=None):
-    #return tf.math.negative(tf.math.abs(tf.random.normal(shape, dtype=dtype)))
-    return tf.math.abs(tf.random.normal(shape, dtype=dtype))
+    if(positiveWeightImplementation):
+        return tf.math.abs(tf.random.normal(shape, dtype=dtype))
+    else:
+        return tf.math.negative(tf.math.abs(tf.random.normal(shape, dtype=dtype)))
 
-input_shape = (28, 28)
+class negative(tf.keras.constraints.Constraint):
+    #based on https://www.tensorflow.org/api_docs/python/tf/keras/constraints/Constraint
+    def __init__(self):
+        pass
+    def __call__(self, w):
+        return w * tf.cast(tf.math.less_equal(w, 0.), w.dtype)
+
 num_classes = 10
 
-positiveWeightImplementation = True	#mandatory (only implementation)
 if(positiveWeightImplementation):
     weightConstraint = tf.keras.constraints.non_neg()
-    positiveWeightImplementationBiases = True   #ensure positive biases also
-    if(positiveWeightImplementationBiases):
+    constrainBiases = True   #ensure positive biases also
+    if(constrainBiases):
         biasConstraint = tf.keras.constraints.non_neg()
-        positiveWeightImplementationBiasesLastLayer = False
-        if(positiveWeightImplementationBiasesLastLayer):
+        constrainBiasesLastLayer = False
+        if(constrainBiasesLastLayer):
             biasConstraintLastLayer = tf.keras.constraints.non_neg()
         else:
             biasConstraintLastLayer = None
     else:
         biasConstraint = None
+        biasConstraintLastLayer = None
+    weightConstraintLastLayer = weightConstraint
+else:
+    weightConstraintPositive = tf.keras.constraints.non_neg()
+    weightConstraintNegative = negative()
+    constrainBiases = False
+    if(constrainBiases):
+        biasConstraintPositive = tf.keras.constraints.non_neg()
+        biasConstraintNegative = negative()
+    else:
+        biasConstraintPositive = None
+        biasConstraintNegative = None
+    weightConstraintLastLayer = None
+    biasConstraintLastLayer = None
 
-generateUntrainedNetwork = False
 if(generateUntrainedNetwork):
     #only train the last layer
     generateLargeNetwork = True
-    numberOfHiddenLayers = 2
 else:
     generateLargeNetwork = False
-    numberOfHiddenLayers = 2
+
 
 if(generateLargeNetwork):
     generateLargeNetworkRatio = 50
     layerRatio = generateLargeNetworkRatio
 else:
-    layerRatio = 1
+    layerRatio = 1  #10 #1
+
+def createEIlayer(layerIndex, h0, firstLayer=False):
+    if(positiveWeightImplementation):
+        h1E = tf.keras.layers.Dense(layerSizeBase*layerRatio, kernel_initializer=excitatoryNeuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint)(h0)
+        h1I = tf.keras.layers.Dense(layerSizeBase*layerRatio, kernel_initializer=inhibitoryNeuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint)(h0)
+        h1E = tf.keras.layers.Activation(activationExcitatory)(h1E)
+        h1I = tf.keras.layers.Activation(activationInhibitory)(h1I)
+        h1 = tf.keras.layers.Concatenate()([h1E, h1I])
+    else:
+        if(firstLayer):
+            h1E = tf.keras.layers.Dense(layerSizeBase*layerRatio, kernel_initializer=excitatoryNeuronInitializer)(h0)   #excitatory neuron inputs
+            h1I = tf.keras.layers.Dense(layerSizeBase*layerRatio, kernel_initializer=inhibitoryNeuronInitializer)(h0)   #inhibitory neuron inputs
+        else:
+            h0E, h0I = h0
+            h1Ee = tf.keras.layers.Dense(layerSizeBase*layerRatio, kernel_initializer=excitatoryNeuronInitializer, kernel_constraint=weightConstraintPositive, bias_constraint=biasConstraintPositive)(h0E) #excitatory neuron excitatory inputs
+            h1Ei = tf.keras.layers.Dense(layerSizeBase*layerRatio, kernel_initializer=excitatoryNeuronInitializer, kernel_constraint=weightConstraintNegative, bias_constraint=biasConstraintNegative)(h0I) #excitatory neuron inhibitory inputs
+            h1Ie = tf.keras.layers.Dense(layerSizeBase*layerRatio, kernel_initializer=inhibitoryNeuronInitializer, kernel_constraint=weightConstraintPositive, bias_constraint=biasConstraintPositive)(h0E) #inhibitory neuron excitatory inputs
+            h1Ii = tf.keras.layers.Dense(layerSizeBase*layerRatio, kernel_initializer=inhibitoryNeuronInitializer, kernel_constraint=weightConstraintNegative, bias_constraint=biasConstraintNegative)(h0I) #inhibitory neuron inhibitory inputs
+            h1E = tf.keras.layers.Add()([h1Ee, h1Ei])
+            h1I = tf.keras.layers.Add()([h1Ie, h1Ii])
+        h1E = tf.keras.layers.Activation(activationExcitatory)(h1E)
+        h1I = tf.keras.layers.Activation(activationInhibitory)(h1I)
+        h1 = (h1E, h1I)
+    return h1
+
+def concatEIneurons(h):
+    if(positiveWeightImplementation):
+        return h
+    else: 
+        hE, hI = h
+        h = tf.keras.layers.Concatenate()([hE, hI])
+        return h
 
 x = tf.keras.layers.Input(shape=input_shape)
 h0 = tf.keras.layers.Flatten()(x)
 
 hLast = h0
 if(numberOfHiddenLayers >= 1):
-    h1E = tf.keras.layers.Dense(128*layerRatio, kernel_initializer=excitatoryNeuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint)(h0)
-    h1I = tf.keras.layers.Dense(128*layerRatio, kernel_initializer=inhibitoryNeuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint)(h0)
-    h1E = tf.keras.layers.Activation(activationExcitatory)(h1E)
-    h1I = tf.keras.layers.Activation(activationInhibitory)(h1I)
-    h1 = tf.keras.layers.Concatenate()([h1E, h1I])
+    h1 = createEIlayer(1, h0, firstLayer=True)
     hLast = h1
 if(numberOfHiddenLayers >= 2):
-    h2E = tf.keras.layers.Dense(128*layerRatio, kernel_initializer=excitatoryNeuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint)(h1)
-    h2I = tf.keras.layers.Dense(128*layerRatio, kernel_initializer=inhibitoryNeuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint)(h1)
-    h2E = tf.keras.layers.Activation(activationExcitatory)(h2E)
-    h2I = tf.keras.layers.Activation(activationInhibitory)(h2I)
-    h2 = tf.keras.layers.Concatenate()([h2E, h2I])
+    h2 = createEIlayer(2, h1)
     hLast = h2
 if(numberOfHiddenLayers >= 3):
-    h3E = tf.keras.layers.Dense(128*layerRatio, kernel_initializer=excitatoryNeuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint)(h2)
-    h3I = tf.keras.layers.Dense(128*layerRatio, kernel_initializer=inhibitoryNeuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint)(h2)
-    h3E = tf.keras.layers.Activation(activationExcitatory)(h3E)
-    h3I = tf.keras.layers.Activation(activationInhibitory)(h3I)
-    h3 = tf.keras.layers.Concatenate()([h3E, h3I])
+    h3 = createEIlayer(3, h2)
     hLast = h3
+if(numberOfHiddenLayers >= 4):
+    h4 = createEIlayer(4, h3)
+    hLast = h4
+if(addSkipLayers):
+    mList = []
+    if(numberOfHiddenLayers >= 1):
+        m1 = tf.keras.layers.Flatten()(concatEIneurons(h1))
+        mList.append(m1)
+    if(numberOfHiddenLayers >= 2):
+        m2 = tf.keras.layers.Flatten()(concatEIneurons(h2))
+        mList.append(m2)
+    if(numberOfHiddenLayers >= 3):
+        m3 = tf.keras.layers.Flatten()(concatEIneurons(h3))
+        mList.append(m3)
+    if(numberOfHiddenLayers >= 4):
+        m4 = tf.keras.layers.Flatten()(concatEIneurons(h4))
+        mList.append(m4)
+    hLast = tf.keras.layers.concatenate(mList)
+else:
+    hLast = concatEIneurons(hLast)
 
 if(generateUntrainedNetwork):
     hLast = tf.keras.layers.Lambda(lambda x: tf.keras.backend.stop_gradient(x))(hLast)
-y = tf.keras.layers.Dense(num_classes, activation='softmax', kernel_constraint=weightConstraint, bias_constraint=biasConstraintLastLayer)(hLast)
+y = tf.keras.layers.Dense(num_classes, activation='softmax', kernel_constraint=weightConstraintLastLayer, bias_constraint=biasConstraintLastLayer)(hLast)
 model = tf.keras.Model(x, y)
 
 #print(model.summary())
@@ -113,19 +207,57 @@ model.compile(optimizer='adam',
 
 print(model.summary())
 
-for i, layer in enumerate(model.layers):
-    weights = layer.get_weights()
-    #print("weights = ", weights)
+if(debugPreTrainWeights):
+    testwritefile = open('weights.txt', 'a')
+    for layerIndex, layer in enumerate(model.layers):
+        heading = "layerWeights = " + str(layerIndex) + "\n"
+        testwritefile.write(heading)
+        #print(heading)
+        weights = layer.get_weights()
+        #print(weights)
+        weightsS =  str(weights)
+        testwritefile.write(weightsS)
+
+if(debugPreTrainOutputs):
+    #testwritefile = open('output.txt', 'a')
+    xTrainFirstSample = np.expand_dims(x_train[0], axis=0)
+    for layerIndex, layer in enumerate(model.layers):
+        heading = "layerOutputs = " + str(layerIndex) + "\n"
+        print(heading)
+        #testwritefile.write(heading)
+        func = K.function([model.get_layer(index=0).input], layer.output)
+        layerOutput = func([xTrainFirstSample])  # input_data is a numpy array
+        print(layerOutput)
+        #layerOutputS =  str(layerOutput)  #tf.tensor.toString(layerOutput)    #layerOutput.tostring()
+        #testwritefile.write(layerOutputS)
 
 """## Train model"""
 
-model.fit(x_train, y_train, epochs=5)
+model.fit(x_train, y_train, batch_size=batch_size, epochs=epochs)
 
-for i, layer in enumerate(model.layers):
-    weights = layer.get_weights()
-    #print("weights = ", weights)
+if(debugPostTrainWeights):
+    testwritefile = open('weights.txt', 'a')
+    for layerIndex, layer in enumerate(model.layers):
+        heading = "layerWeights = " + str(layerIndex) + "\n"
+        testwritefile.write(heading)
+        #print(heading)
+        weights = layer.get_weights()
+        #print(weights)
+        weightsS =  str(weights)
+        testwritefile.write(weightsS)
 
-
+if(debugPostTrainOutputs):
+    #testwritefile = open('output.txt', 'a')
+    xTrainFirstSample = np.expand_dims(x_train[0], axis=0)
+    for layerIndex, layer in enumerate(model.layers):
+        heading = "layerOutputs = " + str(layerIndex) + "\n"
+        print(heading)
+        #testwritefile.write(heading)
+        func = K.function([model.get_layer(index=0).input], layer.output)
+        layerOutput = func([xTrainFirstSample])  # input_data is a numpy array
+        print(layerOutput)
+        #layerOutputS =  str(layerOutput)  #tf.tensor.toString(layerOutput)    #layerOutput.tostring()
+        #testwritefile.write(layerOutputS)
 
 """## Evaluate model"""
 
