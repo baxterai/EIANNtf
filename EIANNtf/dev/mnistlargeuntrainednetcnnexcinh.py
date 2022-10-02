@@ -26,6 +26,10 @@ import sys
 np.set_printoptions(threshold=sys.maxsize)
 
 positiveWeightImplementation = False	#orig: True
+if(not positiveWeightImplementation):
+    integrateWeights = True
+    if(integrateWeights):
+        debugNoEIneurons = False
 
 preFinalDenseLayer = False
 
@@ -46,10 +50,10 @@ layerSizeBase = 32  #default: 32
 batch_size = 64 #default: 64
 epochs = 5  #1  #5
 
-debugPreTrainWeights = False
-debugPreTrainOutputs = False
-debugPostTrainWeights = False
-debugPostTrainOutputs = False
+debugPreTrainWeights = True
+debugPreTrainOutputs = True
+debugPostTrainWeights = True
+debugPostTrainOutputs = True
 
 """## Load data"""
 
@@ -82,6 +86,23 @@ def activationInhibitory(x):
     else:
         return K.maximum(x, 0)  #ReLU
 
+def neuronInitializer(shape, dtype=None):
+    if(positiveWeightImplementation):
+        print("neuronInitializer error: requires !positiveWeightImplementation:integrateWeights")
+    else:
+        if(integrateWeights):
+            #print("shape = ", shape)
+            w = tf.math.abs(tf.random.normal(shape, dtype=dtype))
+            wEIsize = w.shape[2]//2
+            wSignE = tf.ones([w.shape[0], w.shape[1], wEIsize, w.shape[3]])
+            wSignI = tf.ones([w.shape[0], w.shape[1], wEIsize, w.shape[3]])
+            wSignI = tf.multiply(wSignI, -1)
+            wSign = tf.concat([wSignE, wSignI], axis=2)
+            w = tf.multiply(w, wSign)
+        else:
+            print("neuronInitializer error: requires !positiveWeightImplementation:integrateWeights")
+    return w
+
 def excitatoryNeuronInitializer(shape, dtype=None):
     return tf.math.abs(tf.random.normal(shape, dtype=dtype))
 
@@ -98,6 +119,25 @@ class negative(tf.keras.constraints.Constraint):
     def __call__(self, w):
         return w * tf.cast(tf.math.less_equal(w, 0.), w.dtype)
 
+class positiveOrNegative(tf.keras.constraints.Constraint):
+    #based on https://www.tensorflow.org/api_docs/python/tf/keras/constraints/Constraint
+    def __init__(self):
+        pass
+    def __call__(self, w):
+        w_shape = w.shape
+        #print("w_shape = ", w_shape)
+        wEIsize = w.shape[2]//2
+        wE = w[:, :, 0:wEIsize]
+        wI = w[:, :, wEIsize:]
+        wEcheck = tf.greater_equal(wE, 0)
+        wIcheck = tf.less_equal(wI, 0)
+        wEcheck = tf.cast(wEcheck, tf.float32)
+        wIcheck = tf.cast(wIcheck, tf.float32)
+        wE = tf.multiply(wE, wEcheck)
+        wI = tf.multiply(wI, wIcheck)
+        w = tf.concat([wE, wI], axis=2)
+        return w
+
 if(positiveWeightImplementation):
     weightConstraint = tf.keras.constraints.non_neg()
     constrainBiases = True   #ensure positive biases also
@@ -112,15 +152,19 @@ if(positiveWeightImplementation):
         biasConstraint = None
         biasConstraintLastLayer = None
 else:
-    weightConstraintPositive = tf.keras.constraints.non_neg()
-    weightConstraintNegative = negative()
-    constrainBiases = False
-    if(constrainBiases):
-        biasConstraintPositive = tf.keras.constraints.non_neg()
-        biasConstraintNegative = negative()
+    if(integrateWeights):
+        weightConstraint = positiveOrNegative()
+        biasConstraint = None
     else:
-        biasConstraintPositive = None
-        biasConstraintNegative = None
+        weightConstraintPositive = tf.keras.constraints.non_neg()
+        weightConstraintNegative = negative()
+        constrainBiases = False
+        if(constrainBiases):
+            biasConstraintPositive = tf.keras.constraints.non_neg()
+            biasConstraintNegative = negative()
+        else:
+            biasConstraintPositive = None
+            biasConstraintNegative = None
 
 if(generateUntrainedNetwork):
     #only train the last layer
@@ -152,46 +196,72 @@ def getLayerRatio(layerIndex):
 
 def createEIlayer(layerIndex, h0, firstLayer=False, maxpool2d=None, dropout=None):
     layerRatio = getLayerRatio(2)
-    if(positiveWeightImplementation):
-        h1E = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=excitatoryNeuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint, padding='same')(h0)
-        h1I = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=inhibitoryNeuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint, padding='same')(h0)
+    if(debugNoEIneurons):
+        h1E = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), padding='same')(h0)
+        h1I = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), padding='same')(h0)
         h1E = tf.keras.layers.Activation(activationExcitatory)(h1E)
         h1I = tf.keras.layers.Activation(activationInhibitory)(h1I)
-        h1 = tf.keras.layers.Concatenate()([h1E, h1I])
-        if(maxpool2d is not None):
-            h1 = tf.keras.layers.MaxPool2D(strides=maxpool2d)(h1)
-        if(dropout is not None):
-            h1 = tf.keras.layers.Dropout(dropout)(h1)
+        h1 = tf.keras.layers.Concatenate(axis=2)([h1E, h1I])
     else:
-        if(firstLayer):
-            h1E = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=excitatoryNeuronInitializer, padding='same')(h0)
-            h1I = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=inhibitoryNeuronInitializer, padding='same')(h0)
+        if(positiveWeightImplementation):
+            h1E = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=excitatoryNeuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint, padding='same')(h0)
+            h1I = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=inhibitoryNeuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint, padding='same')(h0)
+            h1E = tf.keras.layers.Activation(activationExcitatory)(h1E)
+            h1I = tf.keras.layers.Activation(activationInhibitory)(h1I)
+            h1 = tf.keras.layers.Concatenate()([h1E, h1I])
+            if(maxpool2d is not None):
+                h1 = tf.keras.layers.MaxPool2D(strides=maxpool2d)(h1)
+            if(dropout is not None):
+                h1 = tf.keras.layers.Dropout(dropout)(h1)
         else:
-            h0E, h0I = h0
-            h1Ee = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=excitatoryNeuronInitializer, kernel_constraint=weightConstraintPositive, bias_constraint=biasConstraintPositive, padding='same')(h0E) #excitatory neuron excitatory inputs
-            h1Ei = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=excitatoryNeuronInitializer, kernel_constraint=weightConstraintNegative, bias_constraint=biasConstraintNegative, padding='same')(h0I) #excitatory neuron inhibitory inputs
-            h1Ie = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=inhibitoryNeuronInitializer, kernel_constraint=weightConstraintPositive, bias_constraint=biasConstraintPositive, padding='same')(h0E) #inhibitory neuron excitatory inputs
-            h1Ii = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=inhibitoryNeuronInitializer, kernel_constraint=weightConstraintNegative, bias_constraint=biasConstraintNegative, padding='same')(h0I) #inhibitory neuron inhibitory inputs
-            h1E = tf.keras.layers.Add()([h1Ee, h1Ei])
-            h1I = tf.keras.layers.Add()([h1Ie, h1Ii])
-        h1E = tf.keras.layers.Activation(activationExcitatory)(h1E)
-        h1I = tf.keras.layers.Activation(activationInhibitory)(h1I)
-        if(maxpool2d is not None):
-            h1E = tf.keras.layers.MaxPool2D(strides=maxpool2d)(h1E)
-            h1I = tf.keras.layers.MaxPool2D(strides=maxpool2d)(h1I)
-        if(dropout is not None):
-            h1E = tf.keras.layers.Dropout(dropout)(h1E)
-            h1I = tf.keras.layers.Dropout(dropout)(h1I)
-        h1 = (h1E, h1I)
+            if(integrateWeights):
+                if(firstLayer):
+                    h1E = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), padding='same')(h0)
+                    h1I = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), padding='same')(h0)
+                else:
+                    h1E = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=neuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint, padding='same')(h0)
+                    h1I = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=neuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint, padding='same')(h0)
+                h1E = tf.keras.layers.Activation(activationExcitatory)(h1E)
+                h1I = tf.keras.layers.Activation(activationInhibitory)(h1I)
+                h1 = tf.keras.layers.Concatenate(axis=2)([h1E, h1I])
+                if(maxpool2d is not None):
+                    h1 = tf.keras.layers.MaxPool2D(strides=maxpool2d)(h1)
+                if(dropout is not None):
+                    h1 = tf.keras.layers.Dropout(dropout)(h1)
+            else:
+                if(firstLayer):
+                    h1E = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=excitatoryNeuronInitializer, padding='same')(h0)
+                    h1I = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=inhibitoryNeuronInitializer, padding='same')(h0)
+                else:
+                    h0E, h0I = h0
+                    h1Ee = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=excitatoryNeuronInitializer, kernel_constraint=weightConstraintPositive, bias_constraint=biasConstraintPositive, padding='same')(h0E) #excitatory neuron excitatory inputs
+                    h1Ei = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=excitatoryNeuronInitializer, kernel_constraint=weightConstraintNegative, bias_constraint=biasConstraintNegative, padding='same')(h0I) #excitatory neuron inhibitory inputs
+                    h1Ie = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=inhibitoryNeuronInitializer, kernel_constraint=weightConstraintPositive, bias_constraint=biasConstraintPositive, padding='same')(h0E) #inhibitory neuron excitatory inputs
+                    h1Ii = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), kernel_initializer=inhibitoryNeuronInitializer, kernel_constraint=weightConstraintNegative, bias_constraint=biasConstraintNegative, padding='same')(h0I) #inhibitory neuron inhibitory inputs
+                    h1E = tf.keras.layers.Add()([h1Ee, h1Ei])
+                    h1I = tf.keras.layers.Add()([h1Ie, h1Ii])
+                h1E = tf.keras.layers.Activation(activationExcitatory)(h1E)
+                h1I = tf.keras.layers.Activation(activationInhibitory)(h1I)
+                if(maxpool2d is not None):
+                    h1E = tf.keras.layers.MaxPool2D(strides=maxpool2d)(h1E)
+                    h1I = tf.keras.layers.MaxPool2D(strides=maxpool2d)(h1I)
+                if(dropout is not None):
+                    h1E = tf.keras.layers.Dropout(dropout)(h1E)
+                    h1I = tf.keras.layers.Dropout(dropout)(h1I)
+                h1 = (h1E, h1I)
     return h1
 
 def concatEIneurons(h):
     if(positiveWeightImplementation):
         return h
     else: 
-        hE, hI = h
-        h = tf.keras.layers.Concatenate()([hE, hI])
+        if(integrateWeights):
+            pass
+        else:
+            hE, hI = h
+            h = tf.keras.layers.Concatenate()([hE, hI])
         return h
+
 
 x = tf.keras.layers.Input(shape=input_shape)
 h0 = x
@@ -248,18 +318,19 @@ class myCallback(tf.keras.callbacks.Callback):
 callbacks = myCallback()
 
 if(debugPreTrainWeights):
-    #testwritefile = open('weights.txt', 'a')
+    testwritefile = open('weightsPreTrain.txt', 'w')
     for layerIndex, layer in enumerate(model.layers):
         heading = "layerWeights = " + str(layerIndex) + "\n"
-        print(heading)
-        #testwritefile.write(heading)
+        #print(heading)
+        testwritefile.write(heading)
         weights = layer.get_weights()
-        print(weights)
-        #weightsS =  str(weights)
-        #testwritefile.write(weightsS)
+        #print(weights)
+        weightsS =  str(weights)
+        testwritefile.write(weightsS)
+    testwritefile.close()
 
 if(debugPreTrainOutputs):
-    testwritefile = open('outputPreTrain.txt', 'a')
+    testwritefile = open('outputPreTrain.txt', 'w')
     xTrainFirstSample = np.expand_dims(x_train[0], axis=0)
     for layerIndex, layer in enumerate(model.layers):
         heading = "layerOutputs = " + str(layerIndex) + "\n"
@@ -270,6 +341,7 @@ if(debugPreTrainOutputs):
         #print(layerOutput)
         layerOutputS =  str(layerOutput)
         testwritefile.write(layerOutputS)
+    testwritefile.close()
 
 """## Train model"""
 
@@ -280,18 +352,19 @@ history = model.fit(x_train, y_train,
                     callbacks=[callbacks])
 
 if(debugPostTrainWeights):
-    #testwritefile = open('weights.txt', 'a')
+    testwritefile = open('weightsPostTrain.txt', 'w')
     for layerIndex, layer in enumerate(model.layers):
         heading = "layerWeights = " + str(layerIndex) + "\n"
-        print(heading)
-        #testwritefile.write(heading)
+        #print(heading)
+        testwritefile.write(heading)
         weights = layer.get_weights()
-        print(weights)
-        #weightsS =  str(weights)
-        #testwritefile.write(weightsS)
+        #print(weights)
+        weightsS =  str(weights)
+        testwritefile.write(weightsS)
+    testwritefile.close()
 
 if(debugPostTrainOutputs):
-    testwritefile = open('outputPostTrain.txt', 'a')
+    testwritefile = open('outputPostTrain.txt', 'w')
     xTrainFirstSample = np.expand_dims(x_train[0], axis=0)
     for layerIndex, layer in enumerate(model.layers):
         heading = "layerOutputs = " + str(layerIndex) + "\n"
@@ -302,6 +375,7 @@ if(debugPostTrainOutputs):
         #print(layerOutput)
         layerOutputS =  str(layerOutput)
         testwritefile.write(layerOutputS)
+    testwritefile.close()
 
 """## Evaluate model"""
 
