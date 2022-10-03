@@ -25,7 +25,8 @@ if(not positiveWeightImplementation):
     integrateWeights = True
     if(integrateWeights):
         integrateWeights1 = False    #explicitly declare E/I neurons
-        integrateWeights2 = True    #implicitly declare E/I neurons        
+        integrateWeights2 = True    #implicitly declare E/I neurons 
+        integrateWeightsInitialiseZero = True   #improves training performance
 
 generateUntrainedNetwork = False
 if(generateUntrainedNetwork):
@@ -80,13 +81,16 @@ def neuronInitializer(shape, dtype=None):
         print("neuronInitializer error: requires !positiveWeightImplementation:integrateWeights")
     else:
         if(integrateWeights):
-            w = tf.math.abs(tf.random.normal(shape, dtype=dtype))
-            wEIsize = w.shape[0]//2
-            wSignE = tf.ones([wEIsize, w.shape[1]])
-            wSignI = tf.ones([wEIsize, w.shape[1]])
-            wSignI = tf.multiply(wSignI, -1)
-            wSign = tf.concat([wSignE, wSignI], axis=0)
-            w = tf.multiply(w, wSign)
+            if(integrateWeightsInitialiseZero):
+                w = tf.zeros(shape, dtype=dtype)    #tf.math.abs(tf.random.normal(shape, dtype=dtype))
+            else:
+                w = tf.math.abs(tf.random.normal(shape, dtype=dtype))
+                wEIsize = w.shape[0]//2
+                wSignE = tf.ones([wEIsize, w.shape[1]])
+                wSignI = tf.ones([wEIsize, w.shape[1]])
+                wSignI = tf.multiply(wSignI, -1)
+                wSign = tf.concat([wSignE, wSignI], axis=0)
+                w = tf.multiply(w, wSign)
         else:
             print("neuronInitializer error: requires !positiveWeightImplementation:integrateWeights")
     return w
@@ -204,8 +208,7 @@ def createEIlayer(layerIndex, h0, firstLayer=False):
                         h1 = tf.keras.layers.Dense(layerSizeBase*layerRatio*4)(h0)   #excitatory neuron inputs
                     else:
                         h1 = tf.keras.layers.Dense(layerSizeBase*layerRatio*2, kernel_initializer=neuronInitializer, kernel_constraint=weightConstraint, bias_constraint=biasConstraint)(h0)   #excitatory neuron inputs
-                        #h1 = tf.keras.layers.Dense(layerSizeBase*layerRatio*2, kernel_initializer=neuronInitializer)(h0)   #excitatory neuron inputs
-                    h1 = tf.keras.layers.Activation(activation)(h1)
+                    h1 = tf.keras.layers.Activation(activation)(h1) #ReLU
             else:
                 if(firstLayer):
                     h1E = tf.keras.layers.Dense(layerSizeBase*layerRatio, kernel_initializer=excitatoryNeuronInitializer)(h0)   #excitatory neuron inputs

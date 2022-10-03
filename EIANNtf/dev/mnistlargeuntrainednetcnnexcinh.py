@@ -31,7 +31,8 @@ if(not positiveWeightImplementation):
     if(integrateWeights):
         integrateWeights1 = False    #explicitly declare E/I neurons
         integrateWeights2 = True    #implicitly declare E/I neurons   
-
+        integrateWeightsInitialiseZero = True   #improves training performance
+ 
 preFinalDenseLayer = False
 
 generateUntrainedNetwork = False
@@ -96,14 +97,17 @@ def neuronInitializer(shape, dtype=None):
         print("neuronInitializer error: requires !positiveWeightImplementation:integrateWeights")
     else:
         if(integrateWeights):
-            #print("shape = ", shape)
-            w = tf.math.abs(tf.random.normal(shape, dtype=dtype))
-            wEIsize = w.shape[2]//2
-            wSignE = tf.ones([w.shape[0], w.shape[1], wEIsize, w.shape[3]])
-            wSignI = tf.ones([w.shape[0], w.shape[1], wEIsize, w.shape[3]])
-            wSignI = tf.multiply(wSignI, -1)
-            wSign = tf.concat([wSignE, wSignI], axis=2)
-            w = tf.multiply(w, wSign)
+            if(integrateWeightsInitialiseZero):
+                w = tf.zeros(shape, dtype=dtype)    #tf.math.abs(tf.random.normal(shape, dtype=dtype))
+            else:
+                #print("shape = ", shape)
+                w = tf.math.abs(tf.random.normal(shape, dtype=dtype))
+                wEIsize = w.shape[2]//2
+                wSignE = tf.ones([w.shape[0], w.shape[1], wEIsize, w.shape[3]])
+                wSignI = tf.ones([w.shape[0], w.shape[1], wEIsize, w.shape[3]])
+                wSignI = tf.multiply(wSignI, -1)
+                wSign = tf.concat([wSignE, wSignI], axis=2)
+                w = tf.multiply(w, wSign)
         else:
             print("neuronInitializer error: requires !positiveWeightImplementation:integrateWeights")
     return w
