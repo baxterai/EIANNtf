@@ -172,18 +172,32 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 		block_output_tensor = tf.identity(x)
 		
 		for l in range(1, numberOfLayers+1):
-			Wlayer = ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")]
-			Blayer = ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")]
-			if(ANNtf_algorithm.positiveWeightImplementation):
-				Worig.append(tf.Variable(tf.identity(Wlayer)))
-				Borig.append(tf.Variable(tf.identity(Blayer)))	
-			if(ANNtf_algorithm.learningAlgorithmFinalLayerBackpropHebbian):
+			trainLayer = True
+			if(ANNtf_algorithm.onlyTrainFinalLayer):
+				trainLayer = False
 				if(l == numberOfLayers):
-					Wlist.append(Wlayer)
-					Blist.append(Blayer)				
-			else:
-				Wlist.append(Wlayer)
-				Blist.append(Blayer)
+					trainLayer = True
+			if(trainLayer):	
+				if(ANNtf_algorithm.inlineImplementation):
+					Wlayer = ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")]
+					Blayer = ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")]
+					if(ANNtf_algorithm.positiveWeightImplementation):
+						Worig.append(tf.Variable(tf.identity(Wlayer)))
+						Borig.append(tf.Variable(tf.identity(Blayer)))
+				else:
+					WlayerIe = ANNtf_algorithm.WIe[generateParameterNameNetwork(networkIndex, l, "WIe")]
+					BlayerIe = ANNtf_algorithm.BIe[generateParameterNameNetwork(networkIndex, l, "BIe")]
+					WlayerEe = ANNtf_algorithm.WEe[generateParameterNameNetwork(networkIndex, l, "WEe")]
+					BlayerEe = ANNtf_algorithm.BEe[generateParameterNameNetwork(networkIndex, l, "BEe")]
+					WlayerEi = ANNtf_algorithm.WEi[generateParameterNameNetwork(networkIndex, l, "WEi")]
+					BlayerEi = ANNtf_algorithm.BEi[generateParameterNameNetwork(networkIndex, l, "BEi")]				
+					Wlist.append(WlayerIe)
+					Blist.append(BlayerIe)
+					Wlist.append(WlayerEe)
+					Blist.append(BlayerEe)
+					Wlist.append(WlayerEi)
+					Blist.append(BlayerEi)
+				
 		trainableVariables = Wlist + Blist
 		WlistLength = len(Wlist)
 		BlistLength = len(Blist)
@@ -201,135 +215,135 @@ def executeOptimisation(x, y, datasetNumClasses, numberOfLayers, optimizer, netw
 		optimizer.apply_gradients(zip(gradients, trainableVariables))
 
 	if(algorithm == "EIANN"):
-		if(ANNtf_algorithm.positiveWeightImplementation):
-			if(ANNtf_algorithm.zeroParametersIfViolateEItypeCondition):
-				#zero weight updates if they result in a weight sign switch
-				for l in range(1, numberOfLayers+1):
-					WlayerNew = ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")]
-					BlayerNew = ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")]
-					WlayerOrig = Worig[l-1]
-					BlayerOrig = Borig[l-1]
-					WlayerCorrected = ANNtf_algorithm.zeroWeightsIfSignSwitched(WlayerOrig, WlayerNew)
-					BlayerCorrected = ANNtf_algorithm.zeroWeightsIfSignSwitched(BlayerOrig, BlayerNew)
-					#print("WlayerNew = ", WlayerNew)
-					#print("BlayerNew = ", BlayerNew)
-					#print("WlayerOrig = ", WlayerOrig)
-					#print("BlayerOrig = ", BlayerOrig)
-					#print("WlayerCorrected = ", WlayerOrig)
-					#print("BlayerCorrected = ", BlayerOrig)
-					ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(WlayerCorrected)
-					if(ANNtf_algorithm.positiveWeightImplementationBiases):
-						if(l == numberOfLayers):
-							if(ANNtf_algorithm.positiveWeightImplementationBiasesLastLayer):
-								ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(BlayerCorrected)
-						else:
+		if(ANNtf_algorithm.inlineImplementation):
+			if(ANNtf_algorithm.positiveWeightImplementation):
+				if(ANNtf_algorithm.zeroParametersIfViolateEItypeCondition):
+					#zero weight updates if they result in a weight sign switch
+					for l in range(1, numberOfLayers+1):
+						WlayerNew = ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")]
+						BlayerNew = ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")]
+						WlayerOrig = Worig[l-1]
+						BlayerOrig = Borig[l-1]
+						WlayerCorrected = ANNtf_algorithm.zeroWeightsIfSignSwitched(WlayerOrig, WlayerNew)
+						BlayerCorrected = ANNtf_algorithm.zeroWeightsIfSignSwitched(BlayerOrig, BlayerNew)
+						#print("WlayerNew = ", WlayerNew)
+						#print("BlayerNew = ", BlayerNew)
+						#print("WlayerOrig = ", WlayerOrig)
+						#print("BlayerOrig = ", BlayerOrig)
+						#print("WlayerCorrected = ", WlayerOrig)
+						#print("BlayerCorrected = ", BlayerOrig)
+						ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(WlayerCorrected)
+						if(constrainBiasesCheck(l)):
 							ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(BlayerCorrected)
-			if(ANNtf_algorithm.verifyParametersDoNotViolateEItypeCondition):
-				#excitatory/inhibitory weight verification (verify they are all positive):	
-				for l in range(1, numberOfLayers+1):
-
-					Wlayer = ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")]
-					WlayerSignBool = tf.math.greater_equal(Wlayer, 0.0)
-					Blayer = ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")]
-					BlayerSignBool = tf.math.greater_equal(Blayer, 0.0)
-
-					WlayerSignCheck = tf.math.reduce_all(WlayerSignBool).numpy()
-					BlayerSignCheck = tf.math.reduce_all(BlayerSignBool).numpy()
-
-					if(not WlayerSignCheck):
-					   print("!WlayerSignCheck, l = ", l)
-					   print("WlayerSignBool = ", WlayerSignBool)	
-					   print("Wlayer = ", Wlayer)
-					   exit()
-					if(ANNtf_algorithm.positiveWeightImplementationBiases):
-						if(l == numberOfLayers):
-							if(ANNtf_algorithm.positiveWeightImplementationBiasesLastLayer):
-								if(not BlayerSignCheck):
-								   print("!BlayerSignCheck, l = ", l)
-								   print("BlayerSignBool = ", BlayerSignBool)	
-								   print("Blayer = ", Blayer)	
-								   exit()	
-						else:		
+				if(ANNtf_algorithm.verifyParametersDoNotViolateEItypeCondition):
+					#excitatory/inhibitory weight verification (verify they are all positive):	
+					for l in range(1, numberOfLayers+1):
+						Wlayer = ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")]
+						WlayerSignBool = tf.math.greater_equal(Wlayer, 0.0)
+						Blayer = ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")]
+						BlayerSignBool = tf.math.greater_equal(Blayer, 0.0)
+						WlayerSignCheck = tf.math.reduce_all(WlayerSignBool).numpy()
+						BlayerSignCheck = tf.math.reduce_all(BlayerSignBool).numpy()
+						if(not WlayerSignCheck):
+						   print("!WlayerSignCheck, l = ", l)
+						   print("WlayerSignBool = ", WlayerSignBool)	
+						   print("Wlayer = ", Wlayer)
+						   exit()
+						if(constrainBiasesCheck(l)):
 							if(not BlayerSignCheck):
 							   print("!BlayerSignCheck, l = ", l)
 							   print("BlayerSignBool = ", BlayerSignBool)	
 							   print("Blayer = ", Blayer)	
-							   exit()	
+							   exit()
+			else:
+				if(ANNtf_algorithm.zeroParametersIfViolateEItypeCondition):
+					#set all W/B parameters to zero if their updated values violate the E/I neuron type condition
+					for l in range(1, numberOfLayers+1):
+						neuronEIlayerPrevious = ANNtf_algorithm.neuronEI[generateParameterNameNetwork(networkIndex, l-1, "neuronEI")]
+						neuronEIlayerPreviousTiled = tileDimension(neuronEIlayerPrevious, 1, ANNtf_algorithm.n_h[l], True)
+						neuronEI = ANNtf_algorithm.neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")]
+						zeroParameterIfViolateEItypeCondition(ANNtf_algorithm.W, "W", neuronEIlayerPreviousTiled, networkIndex, l)
+						if(constrainBiasesCheck(l)):
+							zeroParameterIfViolateEItypeCondition(ANNtf_algorithm.B, "B", neuronEI, networkIndex, l)
+								
+				if(ANNtf_algorithm.verifyParametersDoNotViolateEItypeCondition):
+					#excitatory/inhibitory weight verification (in accordance with neuron types):	
+					for l in range(1, numberOfLayers+1):
+						neuronEIlayerPrevious = ANNtf_algorithm.neuronEI[generateParameterNameNetwork(networkIndex, l-1, "neuronEI")]
+						neuronEIlayerPreviousTiled = tileDimension(neuronEIlayerPrevious, 1, ANNtf_algorithm.n_h[l], True)
+						neuronEI = ANNtf_algorithm.neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")]
+						verifyParameterDoNotViolateEItypeCondition(ANNtf_algorithm.W, "W", neuronEIlayerPreviousTiled, networkIndex, l)
+						if(constrainBiasesCheck(l)):
+							verifyParameterDoNotViolateEItypeCondition(ANNtf_algorithm.B, "B", neuronEI, networkIndex, l)
 		else:
 			if(ANNtf_algorithm.zeroParametersIfViolateEItypeCondition):
 				#set all W/B parameters to zero if their updated values violate the E/I neuron type condition
 				for l in range(1, numberOfLayers+1):
-
-					neuronEIlayerPrevious = ANNtf_algorithm.neuronEI[generateParameterNameNetwork(networkIndex, l-1, "neuronEI")]
-					neuronEIlayerPreviousTiled = tileDimension(neuronEIlayerPrevious, 1, ANNtf_algorithm.n_h[l], True)
-					neuronEI = ANNtf_algorithm.neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")]
-
-					Wlayer = ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")]
-					WlayerSign = tf.sign(Wlayer)
-					WlayerSignBool = convertSignOutputToBool(WlayerSign)
-					Blayer = ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")]
-					BlayerSign = tf.sign(Blayer)
-					BlayerSignBool = convertSignOutputToBool(BlayerSign)
-
-					WlayerSignCheck = tf.equal(WlayerSignBool, neuronEIlayerPreviousTiled)
-					BlayerSignCheck = tf.equal(BlayerSignBool, neuronEI)
-
-					#ignore 0.0 values in W/B arrays:
-					WlayerSignCheck = tf.logical_or(WlayerSignCheck, tf.equal(WlayerSign, 0.0))
-					BlayerSignCheck = tf.logical_or(BlayerSignCheck, tf.equal(BlayerSign, 0.0))
-
-					WlayerCorrected = tf.where(WlayerSignCheck, Wlayer, 0.0)
-					BlayerCorrected = tf.where(BlayerSignCheck, Blayer, 0.0)
-
-					#print("Wlayer = ", Wlayer)	   
-					#print("WlayerCorrected = ", WlayerCorrected)
-					#print("Blayer = ", Blayer)				   
-					#print("BlayerCorrected = ", BlayerCorrected)
-
-					ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(WlayerCorrected)
-					if(l < numberOfLayers):
-						ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(BlayerCorrected)
+					zeroParameterIfViolateEItypeCondition(ANNtf_algorithm.WIe, "WIe", True, networkIndex, l)
+					if(constrainBiasesCheck(l)):
+						zeroParameterIfViolateEItypeCondition(ANNtf_algorithm.BIe, "BIe", True, networkIndex, l)
+					zeroParameterIfViolateEItypeCondition(ANNtf_algorithm.WEe, "WEe", True, networkIndex, l)
+					if(constrainBiasesCheck(l)):
+						zeroParameterIfViolateEItypeCondition(ANNtf_algorithm.BEe, "BEe", True, networkIndex, l)
+					zeroParameterIfViolateEItypeCondition(ANNtf_algorithm.WEi, "WEi", False, networkIndex, l)
+					if(constrainBiasesCheck(l)):
+						zeroParameterIfViolateEItypeCondition(ANNtf_algorithm.BEi, "BEi", False, networkIndex, l)				
 			if(ANNtf_algorithm.verifyParametersDoNotViolateEItypeCondition):
 				#excitatory/inhibitory weight verification (in accordance with neuron types):	
 				for l in range(1, numberOfLayers+1):
+					verifyParameterDoNotViolateEItypeCondition(ANNtf_algorithm.WIe, "WIe", True, networkIndex, l)
+					if(constrainBiasesCheck(l)):
+						verifyParameterDoNotViolateEItypeCondition(ANNtf_algorithm.BIe, "BIe", True, networkIndex, l)
+					verifyParameterDoNotViolateEItypeCondition(ANNtf_algorithm.WEe, "WEe", True, networkIndex, l)
+					if(constrainBiasesCheck(l)):
+						verifyParameterDoNotViolateEItypeCondition(ANNtf_algorithm.BEe, "BEe", True, networkIndex, l)
+					verifyParameterDoNotViolateEItypeCondition(ANNtf_algorithm.WEi, "WEi", False, networkIndex, l)
+					if(constrainBiasesCheck(l)):
+						verifyParameterDoNotViolateEItypeCondition(ANNtf_algorithm.BEi, "BEi", False, networkIndex, l)
 
-					neuronEIlayerPrevious = ANNtf_algorithm.neuronEI[generateParameterNameNetwork(networkIndex, l-1, "neuronEI")]
-					neuronEIlayerPreviousTiled = tileDimension(neuronEIlayerPrevious, 1, ANNtf_algorithm.n_h[l], True)
-					neuronEI = ANNtf_algorithm.neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")]
+def constrainBiasesCheck(l):
+	result = False
+	if(ANNtf_algorithm.constrainBiases and (ANNtf_algorithm.constrainBiasesLastLayer or (l < numberOfLayers))):
+		result = True
+	return result
+											
+def zeroParameterIfViolateEItypeCondition(param, paramName, paramSignExpected, networkIndex, l):
 
-					Wlayer = ANNtf_algorithm.W[generateParameterNameNetwork(networkIndex, l, "W")]
-					WlayerSign = tf.sign(Wlayer)
-					WlayerSignBool = convertSignOutputToBool(WlayerSign)
-					Blayer = ANNtf_algorithm.B[generateParameterNameNetwork(networkIndex, l, "B")]
-					BlayerSign = tf.sign(Blayer)
-					BlayerSignBool = convertSignOutputToBool(BlayerSign)
+	Wlayer = param[generateParameterNameNetwork(networkIndex, l, paramName)]
+	WlayerSign = tf.sign(Wlayer)
+	WlayerSignBool = convertSignOutputToBool(WlayerSign)
 
-					WlayerSignCheck = tf.equal(WlayerSignBool, neuronEIlayerPreviousTiled)
-					BlayerSignCheck = tf.equal(BlayerSignBool, neuronEI)
+	WlayerSignCheck = tf.equal(WlayerSignBool, paramSignExpected)
 
-					#ignore 0.0 values in W/B arrays:
-					WlayerSignCheck = tf.logical_or(WlayerSignCheck, tf.equal(WlayerSign, 0.0))
-					BlayerSignCheck = tf.logical_or(BlayerSignCheck, tf.equal(BlayerSign, 0.0))
+	#ignore 0.0 values in W/B arrays:
+	WlayerSignCheck = tf.logical_or(WlayerSignCheck, tf.equal(WlayerSign, 0.0))
 
-					WlayerSignCheck = tf.math.reduce_all(WlayerSignCheck).numpy()
-					BlayerSignCheck = tf.math.reduce_all(WlayerSignCheck).numpy()
+	WlayerCorrected = tf.where(WlayerSignCheck, Wlayer, 0.0)
 
-					#print("WlayerSignCheck = ", WlayerSignCheck)	   
-					#print("BlayerSignCheck = ", BlayerSignCheck)
-					#print("Wlayer = ", Wlayer)	   
-					#print("Blayer = ", Blayer)
+	param[generateParameterNameNetwork(networkIndex, l, paramName)] = tf.Variable(WlayerCorrected)
+					
+def verifyParameterDoNotViolateEItypeCondition(param, paramName, paramSignExpected, networkIndex, l):
 
-					if(not WlayerSignCheck):
-					   print("!WlayerSignCheck, l = ", l)
-					   print("neuronEIlayerPrevious = ", neuronEIlayerPrevious)
-					   print("Wlayer = ", Wlayer)
-					   exit()
-					if(not BlayerSignCheck):
-					   print("!BlayerSignCheck, l = ", l)
-					   print("neuronEI = ", neuronEI)
-					   print("Blayer = ", Blayer)
-					   exit()
+	Wlayer = param[generateParameterNameNetwork(networkIndex, l, paramName)]
+	WlayerSign = tf.sign(Wlayer)
+	WlayerSignBool = convertSignOutputToBool(WlayerSign)
 
+	WlayerSignCheck = tf.equal(WlayerSignBool, paramSignExpected)
+
+	#ignore 0.0 values in W/B arrays:
+	WlayerSignCheck = tf.logical_or(WlayerSignCheck, tf.equal(WlayerSign, 0.0))
+
+	WlayerSignCheck = tf.math.reduce_all(WlayerSignCheck).numpy()
+
+	#print("WlayerSignCheck = ", WlayerSignCheck)	   
+	#print("Wlayer = ", Wlayer)	   
+
+	if(not WlayerSignCheck):
+	   print("!WlayerSignCheck, l = ", l)
+	   print("neuronEIlayerPrevious = ", neuronEIlayerPrevious)
+	   print("Wlayer = ", Wlayer)
+	   exit()			
+	   
 
 def calculatePropagationLoss(x, y, datasetNumClasses, numberOfLayers, costCrossEntropyWithLogits, networkIndex=1):
 	acc = 0	#only valid for softmax class targets 

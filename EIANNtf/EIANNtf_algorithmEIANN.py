@@ -23,32 +23,60 @@ from ANNtf2_operations import *	#generateParameterNameSeq, generateParameterName
 import ANNtf2_operations
 import ANNtf2_globalDefs
 
-positiveWeightImplementation = False	#orig: False
-if(positiveWeightImplementation):
-	positiveWeightImplementationBiases = True	#ensure positive biases also
-	if(positiveWeightImplementationBiases):
-		positiveWeightImplementationBiasesLastLayer = False
-
-learningAlgorithmFinalLayerBackpropHebbian = False	#only apply backprop to final layer (all intermediary layers using hebbian algorithm)
-
 debugSingleLayerNetwork = False
 debugFastTrain = False
-debugGenerateLargeNetwork = True	#currently used to increase number of neurons per layer, as only 50% are excitatory 
-debugPrintVerbose = False
-debugGenerateDeepNetwork = True	#optional
 
+debugGenerateLargeNetwork = False	#True	#currently used to increase number of neurons per layer, as only 50% are excitatory 
+debugPrintVerbose = False	#print weights and activations
+debugGenerateDeepNetwork = False #True	#optional
+debugSmallBatchSize = False	#small batch size for debugging matrix output
+debugOnlyTrainFinalLayer = False
+
+
+#initialise dependent vars
+onlyTrainFinalLayer = False
+learningAlgorithmFinalLayerBackpropHebbian = False
+constrainBiases = False
+normaliseFirstLayer = False
+
+inlineImplementation = False	#orig: True	#True: excitatory/inhibitory neurons are on same sublayer, False: add inhibitory neurons to separate preceding sublayer
+if(inlineImplementation):
+	positiveWeightImplementation = False	#orig: False	#optional
+	if(positiveWeightImplementation):
+		constrainBiases = True	#ensure positive biases also
+		if(constrainBiases):
+			constrainBiasesLastLayer = False
+else:
+	positiveWeightImplementation = False    #False: only current coded implementation
+
+if(inlineImplementation):
+	learningAlgorithmFinalLayerBackpropHebbian = False	#only apply backprop to final layer (all intermediary layers using hebbian learning algorithm)	#incomplete	#requires inlineImplementation
+	if(learningAlgorithmFinalLayerBackpropHebbian):
+		onlyTrainFinalLayer = True
+
+if(debugOnlyTrainFinalLayer):
+	onlyTrainFinalLayer = True
+		
 zeroParametersIfViolateEItypeCondition = True	#orig: True	#do not allow gradients to reverse sign of W/B parameters
 verifyParametersDoNotViolateEItypeCondition = True
 
-firstLayerExcitatoryOnly = True	#orig: True
-
-normaliseFirstLayer = True	#require inputs normalised between -1 and 1 (first hidden layer neurons are entirely excitatory)
+inputLayerExcitatoryOnly = True	#orig: True
+if(not inputLayerExcitatoryOnly):
+	normaliseFirstLayer = True	#require inputs normalised between -1 and 1 (first hidden layer neurons are entirely excitatory)
 equaliseNumberExamplesPerClass = False
 
-W = {}
-B = {}
-neuronEI = {}	#tf.dtypes.bool
-
+if(inlineImplementation):
+	W = {}
+	B = {}
+	neuronEI = {}	#tf.dtypes.bool
+else:
+	WIe = {}	#inhibitory neuron excitatory inputs
+	BIe = {}	#inhibitory neuron excitatory inputs
+	WEe = {}	#excitatory neuron excitatory inputs
+	BEe = {}	#excitatory neuron excitatory inputs
+	WEi = {}	#excitatory neuron inhibitory inputs
+	BEi = {}	#excitatory neuron inhibitory inputs
+							
 #Network parameters
 n_h = []
 numberOfLayers = 0
@@ -64,7 +92,10 @@ if(learningAlgorithmFinalLayerBackpropHebbian):
 def defineTrainingParameters(dataset):
 	global learningRate
 	learningRate = 0.001
-	batchSize = 100	#10
+	if(debugSmallBatchSize):
+		batchSize = 10
+	else:
+		batchSize = 100	#10
 	numEpochs = 10	#100 #10
 	if(debugFastTrain):
 		trainingSteps = batchSize
@@ -94,54 +125,67 @@ def defineNeuralNetworkParameters():
 	
 	for networkIndex in range(1, numberOfNetworks+1):
 
-		for l in range(0, numberOfLayers+1):	#last layer is ignored
-			if(firstLayerExcitatoryOnly and l == 0):
-				neuronEIint = tf.ones([n_h[l]], dtype=tf.dtypes.int32)	#first hidden layer neurons are entirely excitatory
-			else:	
-				neuronEIint = tf.random.uniform([n_h[l]], minval=0, maxval=2, dtype=tf.dtypes.int32)
-			neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")] = tf.Variable(tf.dtypes.cast(neuronEIint, dtype=tf.dtypes.bool))	#neuronEIint	#tf.dtypes.cast(neuronEIint, dtype=tf.dtypes.bool)	tf.dtypes.cast(neuronEIint, dtype=tf.dtypes.float32)
+		if(inlineImplementation):
+			for l in range(0, numberOfLayers+1):	#last layer is ignored
+				if(inputLayerExcitatoryOnly and l == 0):
+					neuronEIint = tf.ones([n_h[l]], dtype=tf.dtypes.int32)	#first hidden layer neurons are entirely excitatory
+				else:	
+					neuronEIint = tf.random.uniform([n_h[l]], minval=0, maxval=2, dtype=tf.dtypes.int32)
+				neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")] = tf.Variable(tf.dtypes.cast(neuronEIint, dtype=tf.dtypes.bool))	#neuronEIint	#tf.dtypes.cast(neuronEIint, dtype=tf.dtypes.bool)	tf.dtypes.cast(neuronEIint, dtype=tf.dtypes.float32)
 
-		#for l in range(1, numberOfLayers+1):	#first layer has no type enforcement
-		#	neuronEIint = tf.random.uniform([n_h[l]], minval=0, maxval=2, dtype=tf.dtypes.int32)
-		#	#print("neuronEIint.shape = ", neuronEIint.shape)
-		#	neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")] = tf.Variable(tf.dtypes.cast(neuronEIint, dtype=tf.dtypes.bool))	#neuronEIint	#tf.dtypes.cast(neuronEIint, dtype=tf.dtypes.bool)	tf.dtypes.cast(neuronEIint, dtype=tf.dtypes.float32)
+			#for l in range(1, numberOfLayers+1):	#first layer has no type enforcement
+			#	neuronEIint = tf.random.uniform([n_h[l]], minval=0, maxval=2, dtype=tf.dtypes.int32)
+			#	#print("neuronEIint.shape = ", neuronEIint.shape)
+			#	neuronEI[generateParameterNameNetwork(networkIndex, l, "neuronEI")] = tf.Variable(tf.dtypes.cast(neuronEIint, dtype=tf.dtypes.bool))	#neuronEIint	#tf.dtypes.cast(neuronEIint, dtype=tf.dtypes.bool)	tf.dtypes.cast(neuronEIint, dtype=tf.dtypes.float32)
 
-		for l in range(1, numberOfLayers+1):
-		
-			#set weights to positive/negative depending on the neuron type of the preceeding layer
+			for l in range(1, numberOfLayers+1):
+
+				#set weights to positive/negative depending on the neuron type of the preceeding layer
+
+				#if(l > 1):
+
+				Wlayer = randomNormal([n_h[l-1], n_h[l]])
+				if(positiveWeightImplementation):
+					Wlayer = tf.abs(Wlayer)
+				else:
+					neuronEIprevious = neuronEI[generateParameterNameNetwork(networkIndex, l-1, "neuronEI")]
+
+					WlayerSign = tf.sign(Wlayer)
+					WlayerSignBool = convertSignOutputToBool(WlayerSign)
+
+					neuronEIpreviousTiled = tileDimension(neuronEIprevious, 1, n_h[l], True)
+					WlayerSignCorrect = tf.equal(WlayerSignBool, neuronEIpreviousTiled)
+
+					WlayerSignCorrect = tf.dtypes.cast(WlayerSignCorrect, dtype=tf.dtypes.float32)
+					WlayerSignCorrectionFactor = tf.multiply(WlayerSignCorrect, 2.0)
+					WlayerSignCorrectionFactor = tf.subtract(WlayerSignCorrectionFactor, 1.0)
+					Wlayer = tf.multiply(Wlayer, WlayerSignCorrectionFactor)
+
+				W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(Wlayer)
+				B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
+
+				if(debugPrintVerbose):
+					print("l = ", l)
+					print("neuronEIprevious = ", neuronEIprevious)
+					print("Wlayer = ", Wlayer)
 				
-			#if(l > 1):
-	
-			Wlayer = randomNormal([n_h[l-1], n_h[l]])
+		else:
+			for l in range(1, numberOfLayers+1):
+				WlayerIe = tf.abs(randomNormal([n_h[l-1], n_h[l]]))
+				WlayerEe = tf.abs(randomNormal([n_h[l-1], n_h[l]]))
+				WlayerEi = tf.negative(tf.abs(randomNormal([n_h[l-1], n_h[l]])))
+				WIe[generateParameterNameNetwork(networkIndex, l, "WIe")] = tf.Variable(WlayerIe)	#inhibitory neuron excitatory inputs
+				BIe[generateParameterNameNetwork(networkIndex, l, "BIe")] = tf.Variable(tf.zeros(n_h[l]))	#inhibitory neuron excitatory inputs
+				WEe[generateParameterNameNetwork(networkIndex, l, "WEe")] = tf.Variable(WlayerEe)	#excitatory neuron excitatory inputs
+				BEe[generateParameterNameNetwork(networkIndex, l, "BEe")] = tf.Variable(tf.zeros(n_h[l]))	#excitatory neuron excitatory inputs
+				WEi[generateParameterNameNetwork(networkIndex, l, "WEi")] = tf.Variable(WlayerEi)	#excitatory neuron inhibitory inputs
+				BEi[generateParameterNameNetwork(networkIndex, l, "BEi")] = tf.Variable(tf.zeros(n_h[l]))	#excitatory neuron inhibitory inputs
+				if(debugPrintVerbose):
+					print("l = ", l)
+					print("WlayerIe = ", WlayerIe)
+					print("WlayerEe = ", WlayerEe)
+					print("WlayerEi = ", WlayerEi)
 			
-			if(positiveWeightImplementation):
-				Wlayer = tf.abs(Wlayer)
-			else:
-				neuronEIprevious = neuronEI[generateParameterNameNetwork(networkIndex, l-1, "neuronEI")]
-
-				WlayerSign = tf.sign(Wlayer)
-				WlayerSignBool = convertSignOutputToBool(WlayerSign)
-
-				neuronEIpreviousTiled = tileDimension(neuronEIprevious, 1, n_h[l], True)
-				WlayerSignCorrect = tf.equal(WlayerSignBool, neuronEIpreviousTiled)
-
-				WlayerSignCorrect = tf.dtypes.cast(WlayerSignCorrect, dtype=tf.dtypes.float32)
-				WlayerSignCorrectionFactor = tf.multiply(WlayerSignCorrect, 2.0)
-				WlayerSignCorrectionFactor = tf.subtract(WlayerSignCorrectionFactor, 1.0)
-				Wlayer = tf.multiply(Wlayer, WlayerSignCorrectionFactor)	
-			
-			W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(Wlayer)
-			B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
-
-			if(debugPrintVerbose):
-				print("l = ", l)
-				print("neuronEIprevious = ", neuronEIprevious)
-				print("Wlayer = ", Wlayer)
-			
-			#else:
-			#	W[generateParameterNameNetwork(networkIndex, l, "W")] = tf.Variable(randomNormal([n_h[l-1], n_h[l]]))
-			#	B[generateParameterNameNetwork(networkIndex, l, "B")] = tf.Variable(tf.zeros(n_h[l]))
-				
 
 def neuralNetworkPropagation(x, networkIndex=1):
 	return neuralNetworkPropagationEIANN(x, networkIndex)
@@ -205,33 +249,64 @@ def zeroWeightsIfSignSwitched(AW, AWnew):
 	#print("weightSignSwitch = ", weightSignSwitch)
 	weightSignSwitch = tf.dtypes.cast(weightSignSwitch, dtype=tf.dtypes.float32)
 	AWnew = tf.multiply(AWnew, weightSignSwitch)
-	if(positiveWeightImplementation):	
+	if(positiveWeightImplementation):
 		AWnew = tf.abs(AWnew)	#ensure all positive (ie prevent -0 values)
 	return AWnew	
 							
 def neuralNetworkPropagationEIANN(x, networkIndex=1):
-			
-	#print("numberOfLayers", numberOfLayers)
-	#print("x", x)
+	
+	if(debugPrintVerbose):		
+		print("numberOfLayers", numberOfLayers)
+		print("x", x)
 	
 	AprevLayer = x
 	for l in range(1, numberOfLayers+1):
-		Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
-		A = activationFunction(Z, l, networkIndex)
-
-		#print("l = " + str(l))		
-		#print("A = ", A)
-		#print("W = ", W[generateParameterNameNetwork(networkIndex, l, "W")] )
-		#print("B = ", B[generateParameterNameNetwork(networkIndex, l, "B")] )
 		
-		if(learningAlgorithmFinalLayerBackpropHebbian):
+		if(inlineImplementation):
+			Z = tf.add(tf.matmul(AprevLayer, W[generateParameterNameNetwork(networkIndex, l, "W")]), B[generateParameterNameNetwork(networkIndex, l, "B")])
+			A = activationFunction(Z, l, networkIndex)
+			if(debugPrintVerbose):
+				print("l = ", l)
+				print("A = ", A)
+				print("W = ", W[generateParameterNameNetwork(networkIndex, l, "W")] )
+				print("B = ", B[generateParameterNameNetwork(networkIndex, l, "B")] )
+		else:
+			ZI = tf.add(tf.matmul(AprevLayer, WIe[generateParameterNameNetwork(networkIndex, l, "WIe")]), BIe[generateParameterNameNetwork(networkIndex, l, "BIe")])
+			AI = activationFunction(ZI, l, networkIndex)	#not required
+			AI = AI*calculateInhibitoryNeuronNormalisationFactor(AprevLayer, AI)
+			ZEe = tf.add(tf.matmul(AprevLayer, WEe[generateParameterNameNetwork(networkIndex, l, "WEe")]), BEe[generateParameterNameNetwork(networkIndex, l, "BEe")])
+			ZEi = tf.add(tf.matmul(AprevLayer, WEi[generateParameterNameNetwork(networkIndex, l, "WEi")]), BEi[generateParameterNameNetwork(networkIndex, l, "BEi")])
+			ZE = tf.add(ZEe, ZEi)
+			AE = activationFunction(ZE, l, networkIndex)
+			Z = ZE		
+			A = AE
+			if(debugPrintVerbose):
+				print("l = ", l)
+				print("ZI = ", ZI)
+				print("AI = ", AI)
+				print("ZEe = ", ZEe)
+				print("ZEi = ", ZEi)
+				print("Z = ", Z)
+				print("A = ", A)
+				print("WlayerIe = ", WIe[generateParameterNameNetwork(networkIndex, l, "WIe")])
+				print("WlayerEe = ", WEe[generateParameterNameNetwork(networkIndex, l, "WEe")])
+				print("WlayerEi = ", WEi[generateParameterNameNetwork(networkIndex, l, "WEi")])
+				print("BlayerIe = ", BIe[generateParameterNameNetwork(networkIndex, l, "BIe")])
+				print("BlayerEe = ", BEe[generateParameterNameNetwork(networkIndex, l, "BEe")])
+				print("BlayerEi = ", BEi[generateParameterNameNetwork(networkIndex, l, "BEi")])
+				
+		if(onlyTrainFinalLayer):
 			if(l < numberOfLayers):
 				A = tf.stop_gradient(A)
 				
 		AprevLayer = A
-	
+		
 	return tf.nn.softmax(Z)
 
+def calculateInhibitoryNeuronNormalisationFactor(AprevLayer, h1I):
+    h1InormalisationFactor = tf.reduce_mean(AprevLayer)/tf.reduce_mean(h1I)
+    return h1InormalisationFactor
+	
 def activationFunction(Z, l, networkIndex=1):
 	A = tf.nn.relu(Z)
 	#A = tf.nn.sigmoid(Z)
