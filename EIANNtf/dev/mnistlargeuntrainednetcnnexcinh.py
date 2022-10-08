@@ -39,14 +39,15 @@ else:
 
 inputLayerExcitatoryOnly = True #True: only current coded implementation
 
-preFinalDenseLayer = False
-
 generateUntrainedNetwork = False
 if(generateUntrainedNetwork):
     #only train the last layer
     numberOfHiddenLayers = 2    #default: 2    #if 0 then useSVM=True
+    preFinalDenseLayer = False
 else:
     numberOfHiddenLayers = 2   #default: 4
+    preFinalDenseLayer = False
+
 
 if(numberOfHiddenLayers > 1):
     addSkipLayers = False   #optional
@@ -63,6 +64,9 @@ debugPreTrainWeights = True
 debugPreTrainOutputs = True
 debugPostTrainWeights = True
 debugPostTrainOutputs = True
+if(debugNoEIneurons):
+    numberOfHiddenLayers = 4  #default = 4, if 0 then useSVM=True
+    preFinalDenseLayer = True
 
 """## Load data"""
 
@@ -241,11 +245,12 @@ def getLayerRatio(layerIndex):
 def createEIlayer(layerIndex, h0, firstLayer=False, maxpool2d=None, dropout=None):
     layerRatio = getLayerRatio(2)
     if(debugNoEIneurons):
-        h1E = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), padding='same')(h0)
-        h1I = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), padding='same')(h0)
-        h1E = tf.keras.layers.Activation(EIactivationExcitatory)(h1E)
-        h1I = tf.keras.layers.Activation(EIactivationInhibitory)(h1I)
-        h1 = tf.keras.layers.Concatenate(axis=2)([h1E, h1I])
+        h1 = tf.keras.layers.Conv2D(layerSizeBase*layerRatio, (5,5), padding='same')(h0)
+        h1 = tf.keras.layers.ReLU()(h1)
+        if(maxpool2d is not None):
+            h1 = tf.keras.layers.MaxPool2D(strides=maxpool2d)(h1)
+        if(dropout is not None):
+            h1 = tf.keras.layers.Dropout(dropout)(h1)
     else:
         if(inlineImplementation):
             if(positiveWeightImplementation):
@@ -314,6 +319,10 @@ def createEIlayer(layerIndex, h0, firstLayer=False, maxpool2d=None, dropout=None
             h1E = tf.keras.layers.Add()([h1Ee, h1Ei])
             h1E = tf.keras.layers.Activation(EIactivation)(h1E)
             h1 = h1E
+            if(maxpool2d is not None):
+                h1 = tf.keras.layers.MaxPool2D(strides=maxpool2d)(h1)
+            if(dropout is not None):
+                h1 = tf.keras.layers.Dropout(dropout)(h1)
     return h1
 
 def calculateInhibitoryNeuronNormalisationFactor(h0, h1I):
@@ -334,10 +343,10 @@ def concatEIneurons(h):
     else:
         return h
 
-
 x = tf.keras.layers.Input(shape=input_shape)
 h0 = x
 hLast = h0
+
 if(numberOfHiddenLayers >= 1):
     h1 = createEIlayer(1, h0, firstLayer=True)
     hLast = h1
@@ -350,6 +359,7 @@ if(numberOfHiddenLayers >= 3):
 if(numberOfHiddenLayers >= 4):
     h4 = createEIlayer(4, h3, maxpool2d=(2,2))
     hLast = h4
+
 if(addSkipLayers):
     mList = []
     if(numberOfHiddenLayers >= 1):
@@ -372,8 +382,10 @@ hLast = tf.keras.layers.Flatten()(hLast)
 if(preFinalDenseLayer):
     hLast = tf.keras.layers.Dense(128, activation='relu')(hLast)
     hLast = tf.keras.layers.Dropout(0.5)(hLast)
+
 if(generateUntrainedNetwork):
     hLast = tf.keras.layers.Lambda(lambda x: tf.keras.backend.stop_gradient(x))(hLast)
+
 y = tf.keras.layers.Dense(num_classes, activation='softmax')(hLast)
 model = tf.keras.Model(x, y)
 

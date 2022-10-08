@@ -70,6 +70,8 @@ input_shape = (28, 28)
 
 """## Define model"""
 
+num_classes = 10
+
 def EIactivation(x):
     return K.maximum(x, 0)  #ReLU
     
@@ -152,8 +154,6 @@ class positiveOrNegative(tf.keras.constraints.Constraint):
         w = tf.concat([wE, wI], axis=0)
         return w
 
-num_classes = 10
-
 if(inlineImplementation):
     if(positiveWeightImplementation):
         EIweightConstraint = tf.keras.constraints.non_neg()
@@ -215,11 +215,8 @@ else:
 
 def createEIlayer(layerIndex, h0, firstLayer=False):
     if(debugNoEIneurons):
-        h1E = tf.keras.layers.Dense(layerSizeBase*layerRatio)(h0)   #excitatory neuron inputs
-        h1I = tf.keras.layers.Dense(layerSizeBase*layerRatio)(h0)   #inhibitory neuron inputs   
-        h1E = tf.keras.layers.Activation(EIactivationExcitatory)(h1E)
-        h1I = tf.keras.layers.Activation(EIactivationInhibitory)(h1I)
-        h1 = tf.keras.layers.Concatenate()([h1E, h1I])  
+        h1 = tf.keras.layers.Dense(layerSizeBase*layerRatio)(h0)
+        h1 = tf.keras.layers.ReLU()(h1)
     else:
         if(inlineImplementation):
             if(positiveWeightImplementation):
@@ -292,8 +289,8 @@ def concatEIneurons(h):
 
 x = tf.keras.layers.Input(shape=input_shape)
 h0 = tf.keras.layers.Flatten()(x)
-
 hLast = h0
+
 if(numberOfHiddenLayers >= 1):
     h1 = createEIlayer(1, h0, firstLayer=True)
     hLast = h1
@@ -306,6 +303,7 @@ if(numberOfHiddenLayers >= 3):
 if(numberOfHiddenLayers >= 4):
     h4 = createEIlayer(4, h3)
     hLast = h4
+
 if(addSkipLayers):
     mList = []
     if(numberOfHiddenLayers >= 1):
@@ -326,18 +324,14 @@ else:
 
 if(generateUntrainedNetwork):
     hLast = tf.keras.layers.Lambda(lambda x: tf.keras.backend.stop_gradient(x))(hLast)
+
 y = tf.keras.layers.Dense(num_classes, activation='softmax', kernel_constraint=EIweightConstraintLastLayer, bias_constraint=EIbiasConstraintLastLayer)(hLast)
 model = tf.keras.Model(x, y)
 
-#print(model.summary())
-#model.compile(optimizer=tf.keras.optimizers.RMSprop(epsilon=1e-08), loss='categorical_crossentropy', metrics=['acc'])
-#evaluation accuracy: ? (with 1 or 2 hidden layers)
-
 loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
-model.compile(optimizer='adam',
-              loss=loss_fn,
-              metrics=['accuracy'])
+model.compile(optimizer='adam', loss=loss_fn, metrics=['accuracy'])
+    #temp: model.compile(optimizer=tf.keras.optimizers.RMSprop(epsilon=1e-08), loss='categorical_crossentropy', metrics=['acc'])
 
 print(model.summary())
 #printModelSummary(model)
